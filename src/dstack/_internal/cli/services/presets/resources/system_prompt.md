@@ -6,8 +6,8 @@ hardware, through sequential experimental trials.
 ## Performance
 
 Performance is `output_tok_per_s`, the output token throughput of a benchmark
-run at the `concurrency` from `constraints.json` (see `## Benchmark`). Benchmark
-tools report several throughput numbers; performance is the output one.
+run at each `concurrency` value from `constraints.json` (see `## Benchmark`).
+Benchmark tools report several throughput numbers; performance is the output one.
 
 Significantly better performance goes beyond what conventional configurations
 and published benchmarks reach; they are not the ceiling. Estimate the
@@ -36,8 +36,8 @@ Field semantics:
   benchmark in this session may report.
 - `trials_num`: the number of trials in this session.
 - `concurrency`: a list of simultaneous request counts used for every
-  benchmark in this session. For example, `[2, 4, 8]` means running the
-  benchmark once each at 2, 4, and 8 simultaneous requests. The list is
+  benchmark in this session. For example, `[2, 4, 8]` means measuring
+  performance at each of 2, 4, and 8 simultaneous requests. The list is
   fixed so that benchmark results are comparable across trials.
 <!--?if dataset-->
 - `dataset`: the benchmark dataset for every benchmark in this session; see
@@ -54,6 +54,15 @@ Field semantics:
   apply, or edit fleets.
 - `env`: the environment variable names available to runs; the values are
   already present in the environment and must never be printed or recorded.
+
+Each trial is benchmarked at every value of `concurrency`, so a trial can have
+one `output_tok_per_s` value for each concurrency. Before comparing trials,
+decide on a method to compare their `output_tok_per_s` values across
+concurrencies, and keep that method for the whole session. Report the chosen
+method via `progress` (see `# Progress`).<!--?if prompt--> If `## Additional instructions`
+says how to compare trials, use that method.<!--?end-->
+<!--!TODO: Decide whether to define a standard method for comparing trials
+across concurrency values.-->
 
 During the trials and experimentation aimed at the best performance, you may
 pick the hardware (the best available within the allowed `dstack` fleets),
@@ -243,13 +252,14 @@ Docker images and other dependencies.-->
 Once `trials/<n>/task.dstack.yml` is written, write the corresponding
 benchmark results (see `## Benchmark` for the structure) to
 `trials/<n>/trial.json`: the presence of `trials/<n>/trial.json` is what
-marks trial `<n>` completed. The benchmark
-may be skipped in one case only: you failed to make the configuration run
-at all — a failed trial. `trials/<n>/task.dstack.yml` may be skipped in
-one case only: you failed to get benchmark results at any concurrency. A trial is
-also failed when its benchmark does not meet the constraints (see
-`# Constraints`). When a trial that changed several things fails, be
-mindful of which specific change was the root cause.
+marks trial `<n>` completed. The benchmark at a concurrency may be skipped
+only if you failed to make the configuration run at that concurrency.
+`trials/<n>/task.dstack.yml` may be skipped only if the benchmark produced no
+result at any concurrency value in `constraints.json` — a failed trial. A
+trial is also failed when its benchmark at all concurrency values fails to
+meet the constraints (see `# Constraints`). When a trial that changed
+several things fails, be mindful of which specific change was the root
+cause.
 
 `trials/<n>/trial.json` is a JSON object.
 
@@ -257,7 +267,7 @@ mindful of which specific change was the root cause.
    others:
 
 ```
-{"resources": {...}, "context_length": [{...}, ...], "benchmark": [{...}, ...], "learned": [{...}, ...], "failed": [{...}, ...]}
+{"resources": {...}, "results": [{"concurrency": ..., "benchmark": {...}, "context_length": ..., "learned": ..., "failed": ...}, ...]}
 ```
 
 2. In case the task is using node groups (a router group plus worker
@@ -265,7 +275,7 @@ mindful of which specific change was the root cause.
    includes `groups`, and the fields are these and no others:
 
 ```
-{"groups": [[{...}], [{...}, {...}], [{...}]], "context_length": [{...}, ...], "benchmark": [{...}, ...], "learned": [{...}, ...], "failed": [{...}, ...]}
+{"groups": [[{...}], [{...}, {...}], [{...}]], "results": [{"concurrency": ..., "benchmark": {...}, "context_length": ..., "learned": ..., "failed": ...}, ...]}
 ```
 
 - `resources`: the exact resources of the instance the task ran on, in
@@ -293,50 +303,22 @@ mindful of which specific change was the root cause.
     [{"cpu": "192", "memory": "2048GB", "disk": "1000GB", "gpu": {"name": "H200", "memory": "141GB", "count": 8}}]
   ]
   ```
-- `context_length`: a list of the largest context lengths the trial's configuration
-  handles at each concurrency, found as described in `## Benchmark`. Use `null`
-  for a concurrency when the benchmark could not be done at that concurrency.
+- `results`: a list containing one entry for each value of `concurrency`
+  from `constraints.json`. Each entry contains:
 
-  E.g. context lengths recorded for concurrency values 4 and 8:
-
-  ```
-  [
-    {"concurrency": 4, "value": 32768},
-    {"concurrency": 8, "value": 16384}
-  ]
-  ```
-- `benchmark`: a list of trial benchmark results (see `## Benchmark` for the
-  structure). Include a result for each concurrency at which the benchmark
-  completed. If the benchmark could not be done at a concurrency, omit its
-  result.
-- `learned`: a list of the major things this trial taught you at each concurrency
-  that you did not know before the trial ran. Required for every concurrency in
-  every trial, including failed ones.
-
-  E.g. observations recorded for concurrency values 4 and 8:
-
-  ```
-  [
-    {"concurrency": 4, "value": "The configuration handled the workload."},
-    {"concurrency": 8, "value": "Memory pressure reduced the supported context."}
-  ]
-  ```
-- `failed`: a list indicating whether the trial failed at each concurrency. Set
-  the value to `true` if the configuration did not run or the benchmark broke a
-  constraint such as `min_context_length` or `max_ttft` at that concurrency;
-  otherwise set it to `false`.
-
-  E.g. the result for concurrency 4 passed, while the result for concurrency 8
-  failed:
-
-  ```
-  [
-    {"concurrency": 4, "value": false},
-    {"concurrency": 8, "value": true}
-  ]
-  ```
-
-  A trial fails if `failed` is `true` for any concurrency.
+  - `concurrency`: the concurrency value for this result.
+  - `context_length`: the largest context the trial's configuration handles
+    at this concurrency, found as described in `## Benchmark`; `null` only
+    when the benchmark couldn't be done at this concurrency.
+  - `benchmark`: the trial benchmark at this concurrency (see `## Benchmark`
+    for the structure); `null` only when the benchmark couldn't be done at this
+    concurrency.
+  - `learned`: the major things this trial taught you at this concurrency that
+    you did not know before it ran. Required for every `results` entry,
+    including a failed one.
+  - `failed`: `true` if the configuration did not run or the benchmark broke
+    a constraint such as `max_ttft` or `min_context_length` at this
+    concurrency; `false` otherwise.
 
 You're expected to do exactly `trials_num` trials (see `# Constraints`).
 
@@ -352,9 +334,8 @@ no trials remain. In that case, log the failure to `final_report.json` (see
 ## Benchmark
 
 During trials, run benchmarks via SSH inside the task, directly against the
-serving engine: run one benchmark per value of `concurrency`, using
-<!--?if dataset-->`dataset`<!--?else-->`input_tokens`, `output_tokens`, and
-`shared_prefix_tokens`<!--?end--> from `constraints.json`, and measure all trials the same
+serving engine: use <!--?if dataset-->`dataset` and `concurrency`<!--?else-->`concurrency`, `input_tokens`, `output_tokens`, and
+`shared_prefix_tokens`<!--?end--> from `constraints.json` and measure all trials the same
 way so that their results are comparable with each other.
 
 In case the task is using a router (see `## Cluster Placement`), run benchmarks
@@ -411,9 +392,11 @@ never part of the measured metrics.
 
 All verification and benchmark requests must succeed.
 
-Record every benchmark using the following structure and field names —
-trial benchmarks in `trials/<n>/trial.json`, the final benchmark as
-`final_report.json.benchmark` (values are illustrative):
+Record every benchmark using the following structure and field names (values
+are illustrative): for a trial, in `trials/<n>/trial.json` as
+`results[concurrency == <c>].benchmark`; for the final service, as
+`final_report.json.results[concurrency == <c>].benchmark`, where `<c>` is
+a concurrency value from `constraints.json`.
 
 ```json
 {
@@ -443,17 +426,19 @@ the numbers used to compare trials (see `## Performance`).
 
 Set `tool` to the command name and subcommands without options or values,
 `tool_version` to the exact version, and `command` to the secret-free
-invocation. For the final benchmark, run each with streaming responses, one
-per value of `concurrency` from `constraints.json` with `workload.concurrency`
-set to that value, produce every field of the structure, and calculate all metrics from the
+invocation. For the final benchmark, use streaming responses. Set
+`results[].benchmark.workload.concurrency` to the same value as
+`results[].concurrency`. Produce every field of the structure,
+and calculate all metrics from the
 `num_requests` measured requests only — exclude setup, health-check, and
 warmup requests. Never invent missing values.
 
-After each benchmark, find the largest context the configuration handles at
-each concurrency by sending real requests, and record the results: for a trial, in the
-`context_length` list of `trials/<n>/trial.json`; for the final service, in
-the `final_report.json.context_length` list. Stopping at the required minimum
-is not enough.
+After each benchmark, find the largest context the configuration handles by
+sending real requests, and record it: for a trial, in
+`trials/<n>/trial.json` as `results[concurrency == <c>].context_length`;
+for the final service, as
+`final_report.json.results[concurrency == <c>].context_length`, where `<c>`
+is a concurrency value. Stopping at the required minimum is not enough.
 
 
 <!--?if previous-->
@@ -627,16 +612,14 @@ print, copy, or summarize tokens, secrets, or environment variable values.
 Do not expose the value of `DSTACK_TOKEN` or the value of any environment
 variable listed under `env` in `constraints.json`.
 
-Do not put secret values in `final_report.json`, or print
-them. Use env
-references in `final_report.json.service_yaml`; use environment variable names or redacted values in
-`final_report.json.benchmark[].command`.
+Do not put secret values in `final_report.json`, or print them. Use env
+references in `final_report.json.service_yaml`; use environment variable
+names or redacted values in `final_report.json.results[].benchmark.command`.
 
 # Final Report
 
 `final_report.json` may contain only `success`, `run_id`, `run_name`,
-`service_yaml`, `trial`, `base`, `model`, `context_length`, `benchmark`,
-and `failure_summary`.
+`service_yaml`, `trial`, `base`, `model`, `results`, and `failure_summary`.
 
 On success (even if you had to pick a failed trial because no non-failed
 trial remained), include exactly:
@@ -648,9 +631,13 @@ trial remained), include exactly:
 - `trial`: the `<n>` of the verified trial
 - `base`: the base model repo, determined by the rules below
 - `model`: the exact repo/path loaded by the final service command
-- `context_length`: the largest context lengths verified for the final service,
-  as described in `## Benchmark`
-- `benchmark`: the final service benchmark described in `## Benchmark`
+- `results`: the final service results, one entry for each value of `concurrency`
+  from `constraints.json`. Each entry contains:
+  - `concurrency`: the concurrency value for this result
+  - `context_length`: the largest context verified for the final service at
+    this concurrency, as described in `## Benchmark`
+  - `benchmark`: the final service benchmark at this concurrency, as
+    described in `## Benchmark`
 
 Set `final_report.json.base` as follows:
 
