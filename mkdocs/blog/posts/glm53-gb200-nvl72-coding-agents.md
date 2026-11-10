@@ -3,6 +3,7 @@ title: "Serve GLM-5.3 Coding Agents Faster and Cheaper on GB200 NVL72"
 date: 2026-11-10
 description: "Optimized with dstack presets, 14 GB200 NVL72 nodes serve 48 GLM-5.3 coding agents as fast as the three fastest OpenRouter endpoints, with lower p50 TTFT, and self-hosting them costs under a third of buying the same tokens."
 slug: glm53-gb200-nvl72-coding-agents
+unlisted: true
 image: https://dstack.ai/static-assets/static-assets/images/dstack-glm-53-gb200-nvl72-crusoe.png
 categories:
   - Benchmarks
