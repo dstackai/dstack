@@ -663,7 +663,9 @@ async def _apply_assignment_result(
                     await _reset_job_lock_for_retry(session=session, item=item)
                     return
                 fleet_spec = get_fleet_spec(fleet_model)
-                if not can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec):
+                if not can_create_new_cloud_instance_in_fleet(
+                    fleet_model, fleet_spec, job_project_id=context.project.id
+                ):
                     await _terminate_submitted_job(
                         session=session,
                         job_model=job_model,

@@ -1771,8 +1771,9 @@ class TestJobSubmittedWorker:
         res = await session.execute(select(InstanceModel))
         assert res.scalars().all() == []
 
+    @pytest.mark.parametrize("fleet_type", ["cloud", "ssh"])
     async def test_assigns_job_to_imported_fleet(
-        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker, fleet_type: str
     ):
         exporter_user = await create_user(
             session, name="exporter-user", global_role=GlobalRole.USER
@@ -1787,11 +1788,11 @@ class TestJobSubmittedWorker:
             session, name="importer-project", owner=importer_user
         )
         repo = await create_repo(session=session, project_id=importer_project.id)
-        fleet = await create_fleet(
-            session=session,
-            project=exporter_project,
-            spec=get_fleet_spec(get_ssh_fleet_configuration()),
-        )
+        if fleet_type == "cloud":
+            fleet_spec = get_fleet_spec()
+        else:
+            fleet_spec = get_fleet_spec(get_ssh_fleet_configuration())
+        fleet = await create_fleet(session=session, project=exporter_project, spec=fleet_spec)
         instance = await create_instance(
             session=session,
             project=exporter_project,
@@ -1819,6 +1820,204 @@ class TestJobSubmittedWorker:
         assert job.instance_assigned
         assert job.instance is not None and job.instance.id == instance.id
         assert job.fleet_id == fleet.id
+
+    @pytest.mark.parametrize(
+        ("imported_idle_instances", "expected_fleet"),
+        [
+            pytest.param(1, "own", id="imported-fleet-too-small"),
+            pytest.param(2, "imported", id="imported-fleet-fits"),
+        ],
+    )
+    async def test_selects_imported_cloud_fleet_only_if_idle_instances_fit_run(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobSubmittedWorker,
+        imported_idle_instances: int,
+        expected_fleet: str,
+    ):
+        user = await create_user(session=session)
+        exporter_project = await create_project(
+            session=session, name="exporter-project", owner=user
+        )
+        importer_project = await create_project(
+            session=session, name="importer-project", owner=user
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        imported_fleet_spec = get_fleet_spec()
+        imported_fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=4)
+        imported_fleet = await create_fleet(
+            session=session, project=exporter_project, spec=imported_fleet_spec
+        )
+        for instance_num in range(imported_idle_instances):
+            await create_instance(
+                session=session,
+                project=exporter_project,
+                fleet=imported_fleet,
+                status=InstanceStatus.IDLE,
+                instance_num=instance_num,
+                price=1,
+            )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[imported_fleet],
+        )
+        own_fleet_spec = get_fleet_spec()
+        own_fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=2)
+        own_fleet = await create_fleet(
+            session=session, project=importer_project, spec=own_fleet_spec
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=ServiceConfiguration(
+                port=8080, commands=["echo"], replicas=Range[int](min=2, max=2)
+            ),
+        )
+        run = await create_run(
+            session=session, project=importer_project, repo=repo, user=user, run_spec=run_spec
+        )
+        job = await create_job(session=session, run=run, replica_num=0)
+
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS, price=2)
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        if expected_fleet == "own":
+            assert job.fleet_id == own_fleet.id
+        else:
+            assert job.fleet_id == imported_fleet.id
+
+    async def test_does_not_provision_new_capacity_in_imported_cloud_fleet(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        user = await create_user(session=session)
+        exporter_project = await create_project(
+            session=session, name="exporter-project", owner=user
+        )
+        importer_project = await create_project(
+            session=session, name="importer-project", owner=user
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=2)
+        fleet = await create_fleet(session=session, project=exporter_project, spec=fleet_spec)
+        await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        run = await create_run(session=session, project=importer_project, repo=repo, user=user)
+        job = await create_job(session=session, run=run)
+
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS)
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        backend_mock.compute.return_value.get_offers.assert_not_called()
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert job.termination_reason_message == "Fleet is at capacity"
+        assert not job.instance_assigned
+        res = await session.execute(
+            select(InstanceModel).where(
+                InstanceModel.fleet_id == fleet.id,
+                InstanceModel.deleted == False,
+            )
+        )
+        assert len(res.scalars().all()) == 1
+
+    @pytest.mark.parametrize(
+        "run_pinned_to_fleet",
+        [
+            pytest.param(False, id="new-run"),
+            # Volumes can be added by a rolling deployment after the run was placed
+            pytest.param(True, id="run-pinned-to-imported-fleet"),
+        ],
+    )
+    async def test_does_not_assign_job_with_volumes_to_imported_fleet(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobSubmittedWorker,
+        run_pinned_to_fleet: bool,
+    ):
+        user = await create_user(session=session)
+        exporter_project = await create_project(
+            session=session, name="exporter-project", owner=user
+        )
+        importer_project = await create_project(
+            session=session, name="importer-project", owner=user
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        volume = await create_volume(
+            session=session,
+            project=importer_project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(),
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        fleet = await create_fleet(session=session, project=exporter_project)
+        await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration.volumes = [VolumeMountPoint(name=volume.name, path="/volume")]
+        run = await create_run(
+            session=session,
+            project=importer_project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet if run_pinned_to_fleet else None,
+        )
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert not job.instance_assigned
 
     async def test_assigns_job_to_specific_fleet(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
