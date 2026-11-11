@@ -9,13 +9,12 @@ import logging
 import re
 from enum import Enum
 from fnmatch import fnmatch
-from typing import Optional
+from typing import Annotated, Any, Dict, Literal, Optional, Type, Union, get_args, get_origin
 
 import mkdocs_gen_files
 import yaml
 from pydantic import BaseModel, RootModel
 from pydantic_core import PydanticUndefined
-from typing_extensions import Annotated, Any, Dict, Literal, Type, Union, get_args, get_origin
 
 from dstack._internal.core.models.resources import Range
 from mkdocs.structure.files import File

@@ -1,7 +1,6 @@
-from typing import Annotated, Dict, List, Literal, Optional, Union
+from typing import Annotated, Dict, List, Literal, Optional, Self, Union
 
 from pydantic import Field, RootModel, model_validator
-from typing_extensions import Self
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.utils.common import get_or_error

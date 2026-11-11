@@ -3,7 +3,7 @@ import string
 from collections import Counter
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Annotated, Any, Dict, List, Literal, Optional, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Self, Union
 
 from pydantic import (
     BeforeValidator,
@@ -20,7 +20,6 @@ from pydantic import (
     model_validator,
 )
 from pydantic_core import CoreSchema, core_schema
-from typing_extensions import Self
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import (

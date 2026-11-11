@@ -1,8 +1,19 @@
 import re
-from typing import Dict, Iterable, Iterator, List, Mapping, NamedTuple, Tuple, Union, cast
+from typing import (
+    Annotated,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    NamedTuple,
+    Self,
+    Tuple,
+    Union,
+    cast,
+)
 
 from pydantic import ConfigDict, Field, RootModel, field_validator
-from typing_extensions import Annotated, Self
 
 from dstack._internal.core.models.common import CoreModel
 

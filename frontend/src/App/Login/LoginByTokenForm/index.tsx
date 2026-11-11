@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, FormInput, SpaceBetween } from 'components';
+import { Button, FormInput, SpaceBetween, TokenVisibilityButton } from 'components';
 
 import { useAppDispatch } from 'hooks';
 import { useCheckAuthTokenMutation } from 'services/user';
@@ -14,7 +14,9 @@ type FormValues = Pick<IUserWithCreds['creds'], 'token'>;
 
 export const LoginByTokenForm: React.FC = () => {
     const { t } = useTranslation();
-    const { handleSubmit, control, setError } = useForm<FormValues>();
+    const { handleSubmit, control, setError, watch } = useForm<FormValues>();
+    const token = watch('token');
+    const [isTokenVisible, setIsTokenVisible] = useState(false);
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
 
@@ -45,6 +47,14 @@ export const LoginByTokenForm: React.FC = () => {
                     constraintText="Use your personal access token"
                     control={control}
                     name="token"
+                    type={isTokenVisible ? 'text' : 'password'}
+                    secondaryControl={
+                        <TokenVisibilityButton
+                            disabled={isLoading || !token}
+                            visible={isTokenVisible}
+                            onChange={setIsTokenVisible}
+                        />
+                    }
                     disabled={isLoading}
                     rules={{ required: t('validation.required') }}
                     autoComplete="off"

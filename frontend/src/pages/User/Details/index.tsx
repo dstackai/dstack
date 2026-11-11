@@ -98,7 +98,8 @@ export const UserDetails: React.FC = () => {
             >
                 <Tabs withNavigation tabs={tabs} />
 
-                <Outlet />
+                {/* Remount tabs on user change so per-user state (e.g. token visibility) doesn't leak */}
+                <Outlet key={paramUserName} />
             </ContentLayout>
 
             <ConfirmationDialog

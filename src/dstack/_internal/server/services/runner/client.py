@@ -3,14 +3,13 @@ import uuid
 from collections.abc import Generator
 from http import HTTPStatus
 from pathlib import Path
-from typing import BinaryIO, Dict, List, Literal, Optional, TypeVar, Union, overload
+from typing import BinaryIO, Dict, List, Literal, Optional, Self, TypeVar, Union, overload
 
 import packaging.version
 import pydantic
 import requests
 import requests.exceptions
 import requests_unixsocket
-from typing_extensions import Self
 
 from dstack._internal.core.consts import DSTACK_PROJECT_ENV
 from dstack._internal.core.errors import DstackError
@@ -273,15 +272,14 @@ class RunnerClient:
         secrets: Dict[str, str],
         repo_credentials: Optional[RemoteRepoCreds],
         instance_env: Optional[Union[Env, Dict[str, str]]] = None,
-        router_env: Optional[Dict[str, str]] = None,
     ):
         # XXX: This is a quick-and-dirty hack to deliver InstanceModel-specific
-        # and Dynamo-router environment variables to the runner without runner
-        # API modification. Both layers are merged into a deep-copied job_spec
-        # so the shared spec object held by the caller is not mutated.
+        # environment variables to the runner without runner API modification.
+        # They are merged into a deep-copied job_spec so the shared spec object
+        # held by the caller is not mutated.
         job_spec = job.job_spec
         server_access = bool(getattr(run.run_spec.configuration, "dstack", False))
-        if instance_env is not None or router_env is not None or server_access:
+        if instance_env is not None or server_access:
             merged_env: Dict[str, str] = {}
             if instance_env is not None:
                 if isinstance(instance_env, Env):
@@ -289,8 +287,6 @@ class RunnerClient:
                 else:
                     merged_env.update(instance_env)
             merged_env.update(job_spec.env)
-            if router_env is not None:
-                merged_env.update(router_env)
             if server_access:
                 merged_env.setdefault(DSTACK_PROJECT_ENV, run.project_name)
             job_spec = job_spec.model_copy(deep=True)

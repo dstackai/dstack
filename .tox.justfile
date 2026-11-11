@@ -1,5 +1,5 @@
 # Keep in sync with pyproject.toml and .github/workflows/build-artifacts.yml
-supported_python_versions := '3.10,3.11,3.12,3.13,3.14,3.15'
+supported_python_versions := '3.11,3.12,3.13,3.14,3.15'
 
 install_tox_msg := '''
     tox is not installed; to install it using uv:
