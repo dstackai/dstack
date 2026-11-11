@@ -3,18 +3,23 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from unittest.mock import patch
 
 import httpx
 import pytest
 import time_machine
 
 from dstack._internal.core.errors import SSHError
+from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.proxy.gateway.app import make_app
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import Nginx
 from dstack._internal.proxy.gateway.testing.common import Mocks
 from dstack._internal.proxy.lib.models import ChatModel, OpenAIChatModelFormat
+from dstack._internal.proxy.lib.services.service_connection import ServiceConnection
 from dstack._internal.proxy.lib.testing.common import make_project, make_service
+from dstack._internal.server.testing.common import get_ssh_key
+from tests._internal.utils.test_ssh import PRIVATE_KEY, PUBLIC_KEY
 
 
 def make_client(nginx_dir: Path, repo: Optional[GatewayProxyRepo] = None) -> httpx.AsyncClient:
@@ -88,6 +93,156 @@ def sample_model_options(name: str = "test-model") -> dict:
             }
         }
     }
+
+
+@pytest.mark.asyncio
+class TestUpdateReplicaProxyJumpKeys:
+    async def test_saves_key_without_opening_a_missing_connection(self, tmp_path, system_mocks):
+        state_file = tmp_path / "state.json"
+        repo = GatewayProxyRepo(file=state_file)
+        project = make_project("project")
+        service = make_service(project.name, "run", domain="run.test")
+        replica = service.replicas[0].model_copy(
+            update={
+                "ssh_head_proxy": SSHConnectionParams(
+                    hostname="jump.test", username="ubuntu", port=22
+                ),
+                "ssh_head_proxy_private_key": PRIVATE_KEY,
+            }
+        )
+        await repo.set_project(project)
+        await repo.set_service(service.with_replicas((replica,)))
+        # A registered replica may have no connection after a failed gateway restore.
+        client = make_client(tmp_path, repo=repo)
+        replacement = get_ssh_key()
+
+        with patch.object(repo, "save", wraps=repo.save) as save:
+            response = await client.post(
+                "/api/registry/replicas/proxy_jump_keys",
+                json={
+                    "replicas": [
+                        {
+                            "project_name": project.name,
+                            "run_name": service.run_name,
+                            "job_id": replica.id,
+                            "ssh_proxy_jump_private_key": replacement.private,
+                        }
+                    ]
+                },
+            )
+            assert response.status_code == 200
+            assert response.json() == {"failures": {}}
+            save.assert_called_once()
+
+        restored = await GatewayProxyRepo.load(state_file).get_service(
+            project.name, service.run_name
+        )
+        assert restored is not None
+        assert restored.replicas[0].ssh_head_proxy_private_key == replacement.private
+        services = (await client.get("/api/services/list")).json()["services"]
+        assert services[0]["replicas"][0]["ssh_proxy_jump_public_key"] == replacement.public
+        system_mocks.open_conn.assert_not_awaited()
+        system_mocks.close_conn.assert_not_awaited()
+        system_mocks.reload_nginx.assert_not_called()
+
+    @pytest.mark.parametrize("failure", ["missing", "key-file", "state-save"])
+    async def test_batch_saves_once_preserves_tunnels_and_retries_failures(
+        self, tmp_path, system_mocks, monkeypatch, failure
+    ):
+        state_file = tmp_path / "state.json"
+        repo = GatewayProxyRepo(file=state_file)
+        client = make_client(tmp_path, repo=repo)
+        replacement = get_ssh_key()
+        updates = []
+        for n in range(2):
+            project, run, job = f"project-{n}", f"run-{n}", f"job-{n}"
+            response = await client.post(
+                f"/api/registry/{project}/services/register",
+                json=register_service_payload(run_name=run, domain=f"{run}.test"),
+            )
+            assert response.status_code == 200
+            payload = register_replica_payload_with_head_proxy(job_id=job)
+            payload["ssh_head_proxy_private_key"] = PRIVATE_KEY
+            response = await client.post(
+                f"/api/registry/{project}/services/{run}/replicas/register", json=payload
+            )
+            assert response.status_code == 200
+            updates.append(
+                dict(
+                    project_name=project,
+                    run_name=run,
+                    job_id=job,
+                    ssh_proxy_jump_private_key=replacement.private,
+                )
+            )
+        # Populate the cached old public keys before replacing their private keys.
+        before = (await client.get("/api/services/list")).json()
+        assert all(
+            service["replicas"][0]["ssh_proxy_jump_public_key"] == " ".join(PUBLIC_KEY.split()[:2])
+            for service in before["services"]
+        )
+        system_mocks.open_conn.reset_mock()
+        system_mocks.close_conn.reset_mock()
+        system_mocks.reload_nginx.reset_mock()
+        if failure == "state-save":
+            with patch.object(repo, "save", side_effect=OSError("state save failed")):
+                with pytest.raises(OSError, match="state save failed"):
+                    await client.post(
+                        "/api/registry/replicas/proxy_jump_keys", json={"replicas": updates}
+                    )
+            # Keep reporting the old keys so the server retries the failed save.
+            assert (await client.get("/api/services/list")).json() == before
+            restored = GatewayProxyRepo.load(state_file)
+            for n in range(2):
+                service = await restored.get_service(f"project-{n}", f"run-{n}")
+                assert service is not None
+                assert service.replicas[0].ssh_head_proxy_private_key == PRIVATE_KEY
+        batch = list(updates)
+        if failure == "missing":
+            batch.append({**updates[0], "job_id": "missing"})
+        original_update = ServiceConnection.update_proxy_jump_key
+
+        async def fail_one_key_file(connection, replica):
+            if replica.id == "job-1":
+                raise OSError("key file write failed")
+            return await original_update(connection, replica)
+
+        with patch.object(repo, "save", wraps=repo.save) as save:
+            with monkeypatch.context() as scoped:
+                if failure == "key-file":
+                    scoped.setattr(ServiceConnection, "update_proxy_jump_key", fail_one_key_file)
+                response = await client.post(
+                    "/api/registry/replicas/proxy_jump_keys", json={"replicas": batch}
+                )
+            assert response.status_code == 200
+            expected_failures = {
+                "missing": {"missing"},
+                "key-file": {"job-1"},
+                "state-save": set(),
+            }
+            assert set(response.json()["failures"]) == expected_failures[failure]
+            assert save.call_count == 1
+            restored = GatewayProxyRepo.load(state_file)
+            for n in range(2):
+                service = await restored.get_service(f"project-{n}", f"run-{n}")
+                assert service is not None and len(service.replicas) == 1
+                expected = PRIVATE_KEY if failure == "key-file" and n == 1 else replacement.private
+                assert service.replicas[0].ssh_head_proxy_private_key == expected
+            # Retry a failed write, then repeat a successful batch as after a lost response.
+            for _ in range(2):
+                response = await client.post(
+                    "/api/registry/replicas/proxy_jump_keys", json={"replicas": updates}
+                )
+                assert response.json() == {"failures": {}}
+                assert save.call_count == (2 if failure == "key-file" else 1)
+        after = (await client.get("/api/services/list")).json()
+        assert all(
+            service["replicas"][0]["ssh_proxy_jump_public_key"] == replacement.public
+            for service in after["services"]
+        )
+        system_mocks.open_conn.assert_not_awaited()
+        system_mocks.close_conn.assert_not_awaited()
+        system_mocks.reload_nginx.assert_not_called()
 
 
 @pytest.mark.asyncio

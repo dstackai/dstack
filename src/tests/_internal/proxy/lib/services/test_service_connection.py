@@ -6,6 +6,7 @@ import pytest
 import pytest_asyncio
 
 from dstack._internal.core.errors import SSHError
+from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 from dstack._internal.proxy.lib.services import service_connection
@@ -125,6 +126,31 @@ class TestServiceConnection:
         tunnel_factory.return_value.wait_closed.assert_not_awaited()
         assert tunnel_factory.call_args.kwargs["background"] is True
 
+    async def test_in_server_jump_tunnel_reopens_only_on_a_new_request(
+        self, project, service, pool, tunnel_factory, monitor_clock
+    ):
+        service = service.model_copy(update={"domain": None})
+        replica = service.replicas[0].model_copy(
+            update={
+                "ssh_head_proxy": SSHConnectionParams(hostname="jump", username="ubuntu", port=22),
+                "ssh_head_proxy_private_key": "key",
+            }
+        )
+        connection = await pool.get_or_add(project, service, replica)
+        tunnel = tunnel_factory.return_value
+        tunnel.exits.put_nowait(255)
+        await _yield_to_event_loop()
+
+        tunnel.aopen.assert_awaited_once()
+        tunnel.aclose.assert_awaited_once()
+        assert not connection._is_open.is_set()
+        assert monitor_clock.pending.empty()
+        assert tunnel_factory.call_args.kwargs["background"] is False
+
+        assert await pool.get_or_add(project, service, replica) is connection
+        assert tunnel.aopen.await_count == 2
+        assert connection._is_open.is_set()
+
     async def test_removal_cancels_reconnect_before_final_tunnel_cleanup(
         self, project, service, pool, tunnel_factory
     ):
@@ -165,6 +191,61 @@ class TestServiceConnection:
 
 @pytest.mark.asyncio
 class TestServiceConnectionPool:
+    @pytest.mark.parametrize("gateway", [False, True])
+    async def test_proxy_jump_key_update_preserves_client_socket_and_reconnects_with_new_key(
+        self, project, service, pool, tunnel_factory, gateway
+    ):
+        service = service.model_copy(update={"domain": service.domain if gateway else None})
+        replica = service.replicas[0].model_copy(
+            update={
+                "ssh_head_proxy": SSHConnectionParams(hostname="jump", username="ubuntu", port=22),
+                "ssh_head_proxy_private_key": "old key",
+            }
+        )
+        connection = await pool.get_or_add(project, service, replica)
+        client = await connection.client()
+        socket = connection.app_socket_path
+        changed = replica.model_copy(update={"ssh_head_proxy_private_key": "new key"})
+        assert await pool.get_or_add(project, service, changed) is connection
+        assert await connection.client() is client
+        assert not client.is_closed
+        assert connection.app_socket_path == socket
+        tunnel = tunnel_factory.return_value
+        tunnel.update_proxy_identity.assert_called_once_with(0, "new key")
+        tunnel.aclose.assert_not_awaited()
+        tunnel.aopen.assert_awaited_once()
+        assert await pool.get_or_add(project, service, changed) is connection
+        tunnel.update_proxy_identity.assert_called_once()
+        tunnel.exits.put_nowait(255)
+        await _yield_to_event_loop()
+        if not gateway:
+            tunnel.aopen.assert_awaited_once()
+            assert await pool.get_or_add(project, service, changed) is connection
+        assert tunnel.aopen.await_count == 2
+        assert await pool.get(replica.id) is connection
+
+    async def test_failed_key_file_update_keeps_working_connection_and_can_retry(
+        self, project, service, pool, tunnel_factory
+    ):
+        replica = service.replicas[0].model_copy(
+            update={
+                "ssh_head_proxy": SSHConnectionParams(hostname="jump", username="ubuntu", port=22),
+                "ssh_head_proxy_private_key": "old key",
+            }
+        )
+        connection = await pool.get_or_add(project, service, replica)
+        client = await connection.client()
+        changed = replica.model_copy(update={"ssh_head_proxy_private_key": "new key"})
+        tunnel = tunnel_factory.return_value
+        tunnel.update_proxy_identity.side_effect = OSError("write failed")
+        with pytest.raises(OSError, match="write failed"):
+            await pool.get_or_add(project, service, changed)
+        assert connection.replica == replica
+        assert not client.is_closed
+        tunnel.aclose.assert_not_awaited()
+        tunnel.update_proxy_identity.side_effect = None
+        assert await pool.get_or_add(project, service, changed) is connection
+
     async def test_cancelled_removal_finishes_monitor_and_resource_cleanup(
         self, project, service, pool, tunnel_factory
     ):

@@ -216,7 +216,13 @@ class InstanceFetcher(Fetcher[InstancePipelineItem]):
                                 # because the fleet pipeline cannot reclaim stale instance locks.
                                 or_(
                                     InstanceModel.fleet_id.is_(None),
-                                    FleetModel.lock_owner.is_(None),
+                                    and_(
+                                        FleetModel.lock_owner.is_(None),
+                                        or_(
+                                            FleetModel.lock_expires_at.is_(None),
+                                            FleetModel.lock_expires_at < now,
+                                        ),
+                                    ),
                                 ),
                                 InstanceModel.lock_expires_at.is_(None),
                             ),

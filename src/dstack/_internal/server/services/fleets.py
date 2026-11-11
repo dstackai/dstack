@@ -1,11 +1,13 @@
 import asyncio
+import time
 import uuid
 from collections.abc import Callable
-from datetime import datetime
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from functools import wraps
-from typing import List, Literal, Optional, Tuple, TypeVar, Union
+from typing import AsyncIterator, List, Literal, Optional, Tuple, TypeVar, Union
 
-from sqlalchemy import and_, exists, false, func, or_, select
+from sqlalchemy import and_, exists, false, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, joinedload, selectinload
 
@@ -603,9 +605,7 @@ async def apply_plan(
         get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids),
     ):
         # Refetch after lock
-        # TODO: Lock instances with FOR UPDATE?
-        # We do not respect InstanceModel.lock_* fields here because FleetPipeline does not update SSH instances.
-        # TODO: Respect InstanceModel.lock_* fields if FleetPipeline and apply update the same instances.
+        # _update_fleet also locks instances and checks their pipeline locks before changing keys.
         res = await session.execute(
             select(FleetModel)
             .where(
@@ -1157,63 +1157,198 @@ async def _update_fleet(
 
     _check_can_update_fleet_spec(fleet_sensitive.spec, spec)
 
-    fleet_model.spec = spec.model_dump_json()
-    # Reset consolidation attempt so the next pipeline pass picks up the spec change promptly.
-    fleet_model.consolidation_attempt = 0
+    async with _lock_ssh_key_update_instances(
+        session, fleet_model, spec.configuration.ssh_config
+    ) as key_updates:
+        for instance_model, connection_info in key_updates:
+            instance_model.remote_connection_info = connection_info
 
-    if (
-        fleet_sensitive.spec.configuration.ssh_config is not None
-        and spec.configuration.ssh_config is not None
-    ):
-        added_hosts, removed_hosts, changed_hosts = _calculate_ssh_hosts_changes(
-            current=fleet_sensitive.spec.configuration.ssh_config.hosts,
-            new=spec.configuration.ssh_config.hosts,
-        )
-        # `_check_can_update_fleet_spec` ensures hosts are not changed
-        assert not changed_hosts, changed_hosts
-        active_instance_nums: set[int] = set()
-        removed_instance_nums: list[int] = []
-        if removed_hosts or added_hosts:
-            for instance_model in fleet_model.instances:
-                if instance_model.deleted:
-                    continue
-                active_instance_nums.add(instance_model.instance_num)
-                rci = get_instance_remote_connection_info(instance_model)
-                if rci is None:
-                    logger.error(
-                        "Cloud instance %s in SSH fleet %s",
-                        instance_model.id,
-                        fleet_model.id,
+        fleet_model.spec = spec.model_dump_json()
+        # Reset consolidation attempt so the next pipeline pass picks up the spec change promptly.
+        fleet_model.consolidation_attempt = 0
+
+        if (
+            fleet_sensitive.spec.configuration.ssh_config is not None
+            and spec.configuration.ssh_config is not None
+        ):
+            added_hosts, removed_hosts, changed_hosts = _calculate_ssh_hosts_changes(
+                current=fleet_sensitive.spec.configuration.ssh_config.hosts,
+                new=spec.configuration.ssh_config.hosts,
+            )
+            # `_check_can_update_fleet_spec` ensures hosts are not changed
+            assert not changed_hosts, changed_hosts
+            active_instance_nums: set[int] = set()
+            removed_instance_nums: list[int] = []
+            if removed_hosts or added_hosts:
+                for instance_model in fleet_model.instances:
+                    if instance_model.deleted:
+                        continue
+                    active_instance_nums.add(instance_model.instance_num)
+                    rci = get_instance_remote_connection_info(instance_model)
+                    if rci is None:
+                        logger.error(
+                            "Cloud instance %s in SSH fleet %s",
+                            instance_model.id,
+                            fleet_model.id,
+                        )
+                        continue
+                    if rci.host in removed_hosts:
+                        removed_instance_nums.append(instance_model.instance_num)
+            if added_hosts:
+                await _check_ssh_hosts_not_yet_added(session, spec, fleet.id)
+                for host in added_hosts.values():
+                    instance_num = get_next_instance_num(active_instance_nums)
+                    instance_model = await create_fleet_ssh_instance_model(
+                        project=project,
+                        spec=spec,
+                        ssh_params=spec.configuration.ssh_config,
+                        env=spec.configuration.env,
+                        blocks=spec.configuration.blocks,
+                        instance_num=instance_num,
+                        host=host,
                     )
-                    continue
-                if rci.host in removed_hosts:
-                    removed_instance_nums.append(instance_model.instance_num)
-        if added_hosts:
-            await _check_ssh_hosts_not_yet_added(session, spec, fleet.id)
-            for host in added_hosts.values():
-                instance_num = get_next_instance_num(active_instance_nums)
-                instance_model = await create_fleet_ssh_instance_model(
-                    project=project,
-                    spec=spec,
-                    ssh_params=spec.configuration.ssh_config,
-                    env=spec.configuration.env,
-                    blocks=spec.configuration.blocks,
-                    instance_num=instance_num,
-                    host=host,
-                )
-                fleet_model.instances.append(instance_model)
-                events.emit(
-                    session,
-                    f"Instance created on fleet update. Status: {instance_model.status.upper()}",
-                    actor=events.UserActor.from_user(user),
-                    targets=[events.Target.from_model(instance_model)],
-                )
-                active_instance_nums.add(instance_num)
-        if removed_instance_nums:
-            _terminate_fleet_instances(session, fleet_model, removed_instance_nums, actor=user)
+                    fleet_model.instances.append(instance_model)
+                    events.emit(
+                        session,
+                        f"Instance created on fleet update. Status: {instance_model.status.upper()}",
+                        actor=events.UserActor.from_user(user),
+                        targets=[events.Target.from_model(instance_model)],
+                    )
+                    active_instance_nums.add(instance_num)
+            if removed_instance_nums:
+                _terminate_fleet_instances(session, fleet_model, removed_instance_nums, actor=user)
 
+        await session.commit()
+        return fleet_model_to_fleet(fleet_model)
+
+
+_SSH_KEY_UPDATE_WAIT_SECONDS = 30
+
+
+@asynccontextmanager
+async def _lock_ssh_key_update_instances(
+    session: AsyncSession, fleet_model: FleetModel, ssh_config: Optional[SSHParams]
+) -> AsyncIterator[list[tuple[InstanceModel, str]]]:
+    """Let instance processing finish before atomically updating SSH keys.
+
+    `_update_fleet` already holds the fleet row lock. If keys change, reserve the
+    fleet using its existing lease fields so instance fetchers stop taking new
+    locks. Release the DB connection between attempts, and leave the keys unchanged
+    on timeout or cancellation. The lease expires after a crashed API process.
+    """
+    if ssh_config is None or not _get_ssh_instance_key_updates(fleet_model.instances, ssh_config):
+        yield []
+        return
+
+    fleet_id, previous_spec = fleet_model.id, fleet_model.spec
+    lock_token = uuid.uuid4()
+    deadline = time.monotonic() + _SSH_KEY_UPDATE_WAIT_SECONDS
+    # Leave enough time after the wait for the final DB-only update. No connection
+    # is held while sleeping, and an abandoned lease is recovered by the pipelines.
+    lease_duration = timedelta(seconds=_SSH_KEY_UPDATE_WAIT_SECONDS + 30)
     await session.commit()
-    return fleet_model_to_fleet(fleet_model)
+    try:
+        res = await session.execute(
+            update(FleetModel)
+            .where(
+                FleetModel.id == fleet_id,
+                FleetModel.spec == previous_spec,
+                FleetModel.deleted == False,
+                FleetModel.lock_expires_at.is_(None),
+            )
+            .values(lock_token=lock_token, lock_expires_at=get_current_datetime() + lease_duration)
+            .returning(FleetModel.id)
+            .execution_options(synchronize_session=False)
+        )
+        if res.scalar_one_or_none() is None:
+            raise ServerClientError(
+                "Failed to update SSH keys: fleet changed or is being processed. Try again later."
+            )
+        await session.commit()
+
+        while True:
+            # Start with a write so SQLite cannot acquire a stale read snapshot
+            # before renewing the lease. The same guard detects a lost lease on Postgres.
+            res = await session.execute(
+                update(FleetModel)
+                .where(
+                    FleetModel.id == fleet_id,
+                    FleetModel.lock_token == lock_token,
+                    FleetModel.lock_expires_at > get_current_datetime(),
+                )
+                .values(lock_expires_at=get_current_datetime() + lease_duration)
+                .returning(FleetModel.id)
+                .execution_options(synchronize_session=False)
+            )
+            if res.scalar_one_or_none() is None:
+                raise ServerClientError(
+                    "Failed to update SSH keys: fleet lock was lost. Try again later."
+                )
+            res = await session.execute(
+                select(InstanceModel)
+                .where(InstanceModel.fleet_id == fleet_id, InstanceModel.deleted == False)
+                .order_by(InstanceModel.id)
+                .with_for_update(key_share=True)
+                .execution_options(populate_existing=True)
+            )
+            key_updates = _get_ssh_instance_key_updates(list(res.scalars()), ssh_config)
+            locked = [i for i, _ in key_updates if i.lock_expires_at is not None]
+            if not locked:
+                # Instance processing may have completed or deleted instances during
+                # the wait. Refetch the relationship before applying host-list changes.
+                await session.execute(
+                    select(FleetModel)
+                    .where(FleetModel.id == fleet_id)
+                    .options(selectinload(FleetModel.instances))
+                    .execution_options(populate_existing=True)
+                )
+                fleet_model.lock_token = None
+                fleet_model.lock_expires_at = None
+                yield key_updates
+                return
+            await session.commit()
+            if time.monotonic() >= deadline:
+                raise ServerClientError(
+                    f"Timed out waiting to update SSH keys: instance {locked[0].name!r} is still being processed. Try again later."
+                )
+            await asyncio.sleep(0.1)
+    finally:
+        # Roll back before releasing the lease so exceptions cannot persist only
+        # part of a fleet update. A stale caller must never unlock another owner.
+        await session.rollback()
+        await session.execute(
+            update(FleetModel)
+            .where(FleetModel.id == fleet_id, FleetModel.lock_token == lock_token)
+            .values(lock_token=None, lock_expires_at=None)
+            .execution_options(synchronize_session=False)
+        )
+        await session.commit()
+
+
+def _get_ssh_instance_key_updates(
+    instances: list[InstanceModel], ssh_config: SSHParams
+) -> list[tuple[InstanceModel, str]]:
+    hosts = {h if isinstance(h, str) else h.hostname: h for h in ssh_config.hosts}
+    updates = []
+    for instance in instances:
+        rci = get_instance_remote_connection_info(instance)
+        if instance.deleted or rci is None or (host := hosts.get(rci.host)) is None:
+            continue
+        ssh_key, proxy_jump = ssh_config.ssh_key, ssh_config.proxy_jump
+        if not isinstance(host, str):
+            ssh_key, proxy_jump = host.ssh_key or ssh_key, host.proxy_jump or proxy_jump
+        assert ssh_key is not None
+        if proxy_jump is not None:
+            assert proxy_jump.ssh_key is not None
+        updated = rci.model_copy(
+            update={
+                "ssh_keys": [ssh_key],
+                "ssh_proxy_keys": [proxy_jump.ssh_key] if proxy_jump is not None else None,
+            }
+        )
+        if updated != rci:
+            updates.append((instance, updated.model_dump_json()))
+    return updates
 
 
 def _can_update_fleet_spec(current_fleet_spec: FleetSpec, new_fleet_spec: FleetSpec) -> bool:
@@ -1298,8 +1433,12 @@ def _check_can_update_fleet_configuration(current: FleetConfiguration, new: Flee
         _check_can_update_ssh_config(current_ssh_config, new_ssh_config)
 
 
-@_check_can_update("hosts")
+@_check_can_update("hosts", "identity_file", "ssh_key", "proxy_jump")
 def _check_can_update_ssh_config(current: SSHParams, new: SSHParams, diff: ModelDiff):
+    if "proxy_jump" in diff:
+        if current.proxy_jump is None or new.proxy_jump is None:
+            raise ServerClientError("Adding or removing proxy_jump cannot be updated in-place")
+        _check_can_update_inner(current.proxy_jump, new.proxy_jump, ("identity_file", "ssh_key"))
     if "hosts" in diff:
         _, _, changed_hosts = _calculate_ssh_hosts_changes(current.hosts, new.hosts)
         if changed_hosts:
@@ -1323,15 +1462,17 @@ def _calculate_ssh_hosts_changes(
             if current_host != new_host:
                 changed_hosts.add(host)
         else:
-            current_host = copy_model(current_host, reset={"identity_file"})
-            new_host = copy_model(new_host, reset={"identity_file"})
+            current_host = copy_model(current_host, reset={"identity_file", "ssh_key"})
+            new_host = copy_model(new_host, reset={"identity_file", "ssh_key"})
             # XXX: cannot use copy_model() or diff_models() with
             # `reset={..., "proxy_jump": {"identity_file"}}`
             # as SSHProxyParams.identity_file has no default value
             if current_host.proxy_jump is not None:
                 current_host.proxy_jump.identity_file = ""
+                current_host.proxy_jump.ssh_key = None
             if new_host.proxy_jump is not None:
                 new_host.proxy_jump.identity_file = ""
+                new_host.proxy_jump.ssh_key = None
             if diff_models(current_host, new_host):
                 changed_hosts.add(host)
     return added_hosts, removed_hosts, changed_hosts
@@ -1379,10 +1520,15 @@ async def _check_ssh_hosts_not_yet_added(
 
 def _remove_fleet_spec_sensitive_info(spec: FleetSpec):
     if spec.configuration.ssh_config is not None:
-        spec.configuration.ssh_config.ssh_key = None
+        ssh_config = spec.configuration.ssh_config
+        ssh_config.ssh_key = None
+        if ssh_config.proxy_jump is not None:
+            ssh_config.proxy_jump.ssh_key = None
         for host in spec.configuration.ssh_config.hosts:
             if not isinstance(host, str):
                 host.ssh_key = None
+                if host.proxy_jump is not None:
+                    host.proxy_jump.ssh_key = None
 
 
 def _validate_fleet_spec_and_set_defaults(spec: FleetSpec):

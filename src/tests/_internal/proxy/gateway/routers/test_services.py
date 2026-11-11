@@ -1,3 +1,4 @@
+import threading
 import uuid
 
 import httpx
@@ -7,6 +8,7 @@ from dstack._internal.proxy.gateway.app import make_app
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.lib.models import Replica
 from dstack._internal.proxy.lib.testing.common import make_project, make_service
+from dstack._internal.utils import ssh as ssh_utils
 
 
 def make_client(repo: GatewayProxyRepo) -> httpx.AsyncClient:
@@ -23,7 +25,17 @@ class TestListServices:
         assert resp.status_code == 200
         assert resp.json() == {"services": []}
 
-    async def test_list(self):
+    @pytest.mark.parametrize("proxy_jump_key", [None, "head-private-key"])
+    async def test_list(self, monkeypatch, proxy_jump_key):
+        event_loop_thread = threading.get_ident()
+
+        def get_public_key(private_key):
+            assert private_key == proxy_jump_key
+            # Uncached RSA parsing must run outside the gateway's event loop.
+            assert threading.get_ident() != event_loop_thread
+            return "public-key"
+
+        monkeypatch.setattr(ssh_utils, "get_public_key_from_private_key", get_public_key)
         repo = GatewayProxyRepo()
         service_id = uuid.uuid4().hex
         replica_id = uuid.uuid4().hex
@@ -37,6 +49,7 @@ class TestListServices:
                     ssh_destination="ubuntu@server",
                     ssh_port=22,
                     ssh_proxy=None,
+                    ssh_head_proxy_private_key=proxy_jump_key,
                 )
             ]
         )
@@ -51,7 +64,12 @@ class TestListServices:
                     "id": service_id,
                     "project_name": "test-proj",
                     "run_name": "srv-1",
-                    "replicas": [{"id": replica_id}],
+                    "replicas": [
+                        {
+                            "id": replica_id,
+                            "ssh_proxy_jump_public_key": "public-key" if proxy_jump_key else None,
+                        }
+                    ],
                 }
             ]
         }
