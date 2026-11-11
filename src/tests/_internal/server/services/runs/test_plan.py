@@ -46,6 +46,8 @@ from dstack._internal.server.testing.common import (
     get_job_provisioning_data,
     get_remote_connection_info,
     get_run_spec,
+    get_volume,
+    get_volume_configuration,
     mock_lease,
 )
 
@@ -526,6 +528,63 @@ class TestGetTargetedInstanceOffers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_skips_imported_instance_if_job_has_volumes(
+        self, test_db, session: AsyncSession
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user, name="importer-project")
+        exporter_project = await create_project(
+            session=session, owner=user, name="exporter-project"
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        exported_fleet = await create_fleet(
+            session=session, project=exporter_project, name="exported-fleet"
+        )
+        await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=exported_fleet,
+            instance_num=1,
+            backend=BackendType.AWS,
+            region="eu-west-1",
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[project],
+            exported_fleets=[exported_fleet],
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(image="debian", commands=["echo"]),
+            profile=Profile(
+                instances=[
+                    FleetInstanceSelector(
+                        fleet=EntityReference.parse("exporter-project/exported-fleet"),
+                        instance=1,
+                    )
+                ]
+            ),
+        )
+        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+        volume = get_volume(
+            project_name=project.name,
+            configuration=get_volume_configuration(backend=BackendType.AWS, region="eu-west-1"),
+        )
+
+        offers = await get_targeted_instance_offers(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+            job=jobs[0],
+            volumes=[[volume]],
+            exclude_not_available=True,
+        )
+
+        assert offers == []
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_shared_block_offer_for_selected_instance(
         self, test_db, session: AsyncSession
     ) -> None:
@@ -810,6 +869,50 @@ class TestGetBackendOffersInRunCandidateFleets:
 
 
 class TestGetBackendOffersInFleet:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_no_offers_for_imported_fleet(
+        self, test_db, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        user = await create_user(session=session)
+        exporter_project = await create_project(
+            session=session, owner=user, name="exporter-project"
+        )
+        importer_project = await create_project(
+            session=session, owner=user, name="importer-project"
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=2)
+        fleet = await create_fleet(session=session, project=exporter_project, spec=fleet_spec)
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(image="debian", commands=["echo"]),
+        )
+        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+        get_offers_by_requirements_mock = AsyncMock()
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan.get_offers_by_requirements",
+            get_offers_by_requirements_mock,
+        )
+
+        offers = await _get_backend_offers_in_fleet(
+            project=importer_project,
+            fleet_model=fleet,
+            run_spec=run_spec,
+            job=jobs[0],
+            volumes=None,
+        )
+
+        assert offers == []
+        get_offers_by_requirements_mock.assert_not_awaited()
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_keeps_unconstrained_offers_for_non_empty_cluster_fleet_without_elected_master(

@@ -1006,8 +1006,12 @@ def get_fleet_master_instance_provisioning_data(
     return None
 
 
-def can_create_new_cloud_instance_in_fleet(fleet_model: FleetModel, fleet_spec: FleetSpec) -> bool:
+def can_create_new_cloud_instance_in_fleet(
+    fleet_model: FleetModel, fleet_spec: FleetSpec, job_project_id: uuid.UUID
+) -> bool:
     if fleet_spec.configuration.ssh_config is not None:
+        return False
+    if fleet_model.project_id != job_project_id:
         return False
     active_instances = [i for i in fleet_model.instances if i.status.is_active()]
     # nodes.max is a soft limit that can be exceeded when provisioning concurrently.
@@ -1021,8 +1025,10 @@ def can_create_new_cloud_instance_in_fleet(fleet_model: FleetModel, fleet_spec: 
     return True
 
 
-def check_can_create_new_cloud_instance_in_fleet(fleet_model: FleetModel, fleet_spec: FleetSpec):
-    if not can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec):
+def check_can_create_new_cloud_instance_in_fleet(
+    fleet_model: FleetModel, fleet_spec: FleetSpec, job_project_id: uuid.UUID
+):
+    if not can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec, job_project_id):
         raise ValueError("Cannot fit new cloud instance into fleet")
 
 

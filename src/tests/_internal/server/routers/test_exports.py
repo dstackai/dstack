@@ -111,9 +111,10 @@ class TestCreateExport:
         await create_fleet(
             session=session,
             project=project,
-            name="fleet1",
+            name="ssh-fleet",
             spec=get_fleet_spec(get_ssh_fleet_configuration()),
         )
+        await create_fleet(session=session, project=project, name="cloud-fleet")
         backend = await create_backend(session=session, project_id=project.id)
         await create_gateway(
             session=session, project_id=project.id, backend_id=backend.id, name="gateway1"
@@ -125,7 +126,7 @@ class TestCreateExport:
             json={
                 "name": "test-export",
                 "importer_projects": ["ImporterProject"],
-                "exported_fleets": ["fleet1"],
+                "exported_fleets": ["ssh-fleet", "cloud-fleet"],
                 "exported_gateways": ["gateway1"],
             },
         )
@@ -135,8 +136,10 @@ class TestCreateExport:
         assert export_response["is_global"] == False
         assert len(export_response["imports"]) == 1
         assert export_response["imports"][0]["project_name"] == "ImporterProject"
-        assert len(export_response["exported_fleets"]) == 1
-        assert export_response["exported_fleets"][0]["name"] == "fleet1"
+        assert sorted(f["name"] for f in export_response["exported_fleets"]) == [
+            "cloud-fleet",
+            "ssh-fleet",
+        ]
         assert len(export_response["exported_gateways"]) == 1
         assert export_response["exported_gateways"][0]["name"] == "gateway1"
 
@@ -258,14 +261,6 @@ class TestCreateExport:
             pytest.param(
                 {
                     "name": "test-export",
-                    "exported_fleets": ["cloud-fleet"],
-                },
-                "Fleets ['cloud-fleet'] are cloud fleets. Can only export SSH fleets",
-                id="cloud-fleet",
-            ),
-            pytest.param(
-                {
-                    "name": "test-export",
                     "importer_projects": ["eXpOrTeRpRoJeCt"],  # case-insensitive
                 },
                 "Project 'ExporterProject' cannot import from itself",
@@ -314,7 +309,6 @@ class TestCreateExport:
             name="exported-fleet",
             spec=get_fleet_spec(get_ssh_fleet_configuration()),
         )
-        await create_fleet(session=session, project=project, name="cloud-fleet")
         backend = await create_backend(session=session, project_id=project.id)
         await create_gateway(
             session=session,
@@ -740,14 +734,6 @@ class TestUpdateExport:
             pytest.param(
                 {
                     "name": "test-export",
-                    "add_exported_fleets": ["cloud-fleet"],
-                },
-                "Fleets ['cloud-fleet'] are cloud fleets. Can only export SSH fleets",
-                id="add-cloud-fleet",
-            ),
-            pytest.param(
-                {
-                    "name": "test-export",
                     "add_importer_projects": ["eXpOrTeRpRoJeCt"],  # case-insensitive
                 },
                 "Project 'ExporterProject' cannot import from itself",
@@ -933,7 +919,6 @@ class TestUpdateExport:
             exported_gateways=[exported_gateway],
             name="test-export",
         )
-        await create_fleet(session=session, project=project, name="cloud-fleet")
         await create_fleet(
             session=session,
             project=project,

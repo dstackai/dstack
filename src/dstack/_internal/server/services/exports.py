@@ -34,7 +34,7 @@ from dstack._internal.server.models import (
     ProjectRole,
     UserModel,
 )
-from dstack._internal.server.services.fleets import get_fleet_spec, list_project_fleet_models
+from dstack._internal.server.services.fleets import list_project_fleet_models
 from dstack._internal.server.services.gateways import list_project_gateway_models
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.projects import (
@@ -386,13 +386,6 @@ async def add_exported_fleets(
     if missing := set(names) - {f.name for f in fleets}:
         raise ResourceNotExistsError(
             f"Fleets {missing} not found in project {export.project.name!r}"
-        )
-    cloud_fleet_names = [
-        f.name for f in fleets if get_fleet_spec(f).configuration.ssh_config is None
-    ]
-    if cloud_fleet_names:
-        raise ServerClientError(
-            f"Fleets {cloud_fleet_names} are cloud fleets. Can only export SSH fleets"
         )
     for fleet in fleets:
         export.exported_fleets.append(ExportedFleetModel(fleet=fleet))
