@@ -10,6 +10,7 @@ import pytest
 import time_machine
 
 from dstack._internal.core.errors import SSHError
+from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.proxy.gateway.app import make_app
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import Nginx
@@ -96,6 +97,54 @@ def sample_model_options(name: str = "test-model") -> dict:
 
 @pytest.mark.asyncio
 class TestUpdateReplicaProxyJumpKeys:
+    async def test_saves_key_without_opening_a_missing_connection(self, tmp_path, system_mocks):
+        state_file = tmp_path / "state.json"
+        repo = GatewayProxyRepo(file=state_file)
+        project = make_project("project")
+        service = make_service(project.name, "run", domain="run.test")
+        replica = service.replicas[0].model_copy(
+            update={
+                "ssh_head_proxy": SSHConnectionParams(
+                    hostname="jump.test", username="ubuntu", port=22
+                ),
+                "ssh_head_proxy_private_key": PRIVATE_KEY,
+            }
+        )
+        await repo.set_project(project)
+        await repo.set_service(service.with_replicas((replica,)))
+        # A registered replica may have no connection after a failed gateway restore.
+        client = make_client(tmp_path, repo=repo)
+        replacement = get_ssh_key()
+
+        with patch.object(repo, "save", wraps=repo.save) as save:
+            response = await client.post(
+                "/api/registry/replicas/proxy_jump_keys",
+                json={
+                    "replicas": [
+                        {
+                            "project_name": project.name,
+                            "run_name": service.run_name,
+                            "job_id": replica.id,
+                            "ssh_proxy_jump_private_key": replacement.private,
+                        }
+                    ]
+                },
+            )
+            assert response.status_code == 200
+            assert response.json() == {"failures": {}}
+            save.assert_called_once()
+
+        restored = await GatewayProxyRepo.load(state_file).get_service(
+            project.name, service.run_name
+        )
+        assert restored is not None
+        assert restored.replicas[0].ssh_head_proxy_private_key == replacement.private
+        services = (await client.get("/api/services/list")).json()["services"]
+        assert services[0]["replicas"][0]["ssh_proxy_jump_public_key"] == replacement.public
+        system_mocks.open_conn.assert_not_awaited()
+        system_mocks.close_conn.assert_not_awaited()
+        system_mocks.reload_nginx.assert_not_called()
+
     @pytest.mark.parametrize("failure", ["missing", "key-file", "state-save"])
     async def test_batch_saves_once_preserves_tunnels_and_retries_failures(
         self, tmp_path, system_mocks, monkeypatch, failure

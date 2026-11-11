@@ -222,6 +222,7 @@ async def update_replica_proxy_jump_keys(
     Keep existing tunnels, registrations, and Nginx configuration. Save successful
     replacements once, including across services/projects. Return failures by job ID
     so one removed replica or failed key-file write cannot block the other updates.
+    Update only existing pooled connections; save keys for missing connections without opening them.
     Repeating the same keys is a no-op; the next sync retries any remaining differences.
     """
     by_service: dict[tuple[str, str], dict[str, schemas.ReplicaProxyJumpKeyUpdate]] = {}
@@ -234,8 +235,7 @@ async def update_replica_proxy_jump_keys(
     async with lock:
         for (project_name, run_name), pending in by_service.items():
             service = await repo.get_service(project_name, run_name)
-            project = await repo.get_project(project_name)
-            if service is None or project is None:
+            if service is None:
                 for job_id in pending:
                     failures[job_id] = f"Service {project_name}/{run_name} not found"
                 continue
@@ -259,7 +259,9 @@ async def update_replica_proxy_jump_keys(
                     }
                 )
                 try:
-                    await service_conn_pool.get_or_add(project, service, updated_replica)
+                    connection = await service_conn_pool.get(replica.id)
+                    if connection is not None:
+                        await connection.update_proxy_jump_key(updated_replica)
                 except Exception as exc:
                     logger.warning(
                         "Could not update replica %s proxy_jump SSH key: %r", replica.id, exc

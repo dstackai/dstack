@@ -141,8 +141,8 @@ class ServiceConnection:
     async def update_proxy_jump_key(self, replica: Replica) -> None:
         """Replace the SSH fleet's `proxy_jump` key without reopening the tunnel or HTTP client.
 
-        The pool calls this only when the `proxy_jump` private key is the sole change
-        from self.replica. Apply the key file before replacing that configuration,
+        Callers must preserve all fields except the `proxy_jump` private key.
+        Apply the key file before replacing that configuration,
         so a failed write leaves the previous configuration available for retry.
         The replacement key is used on the next SSH open; the socket path is unchanged.
         """
