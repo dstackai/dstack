@@ -1,7 +1,7 @@
 ---
 title: "Serve GLM-5.3 Coding Agents Faster and Cheaper on GB200 NVL72"
 date: 2026-11-10
-description: "Optimized with dstack presets, 14 GB200 NVL72 nodes serve 48 GLM-5.3 coding agents as fast as the three fastest OpenRouter endpoints, with lower p50 TTFT, and self-hosting them costs under a third of buying the same tokens."
+description: "Optimized with dstack presets, 14 GB200 NVL72 nodes serve 48 GLM-5.3 coding agents as fast as the three fastest OpenRouter endpoints, with lower p50 TTFT, and self-hosting them costs less than buying the same tokens."
 slug: glm53-gb200-nvl72-coding-agents
 unlisted: true
 image: https://dstack.ai/static-assets/static-assets/images/dstack-glm-53-gb200-nvl72-crusoe.png
@@ -11,7 +11,7 @@ categories:
 
 # Serve GLM-5.3 Coding Agents Faster and Cheaper on GB200 NVL72
 
-With `dstack` [presets](../../docs/concepts/presets.md), the preset agent optimized a GB200 NVL72 fleet to serve GLM-5.3 coding agents as fast as the three fastest endpoints on OpenRouter, with lower p50 TTFT. Self-hosting them this way costs under a third of buying the same tokens from those endpoints. By a coding agent we mean one session of a tool like Claude Code: a multi-turn conversation that resends its whole context, about 135k tokens, on every request and spawns subagents along the way.
+With `dstack` [presets](../../docs/concepts/presets.md), the preset agent optimized a GB200 NVL72 fleet to serve GLM-5.3 coding agents as fast as the three fastest endpoints on OpenRouter, with lower p50 TTFT. Self-hosting them this way costs less than buying the same tokens from those endpoints. By a coding agent we mean one session of a tool like Claude Code: a multi-turn conversation that resends its whole context, about 135k tokens, on every request and spawns subagents along the way.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-glm-53-gb200-nvl72-crusoe.png" width="630" />
 
@@ -108,7 +108,7 @@ We then raised the agent count for each winner. Aggregated, replayed at normal p
 
 ### Self-hosting is economically viable
 
-Optimized for 48 agents, 14 GB200 nodes match the fastest GLM-5.3 endpoints on p50 output speed and beat them on p50 TTFT and on output speed at p99. Self-hosting costs $12.77 per million output tokens, at least 70% less than the $43–66 it costs to buy the same tokens from these endpoints.
+Optimized for 48 agents, 14 GB200 nodes match the fastest GLM-5.3 endpoints on p50 output speed and beat them on p50 TTFT and on output speed at p99. Self-hosting them costs less than buying the same tokens from these endpoints, even on GB200 NVL72 and without patching the engine or writing kernels.
 
 ### Cache fit decides aggregated vs PD
 
