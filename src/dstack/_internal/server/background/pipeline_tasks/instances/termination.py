@@ -61,6 +61,10 @@ async def terminate_instance(instance_model: InstanceModel) -> ProcessResult:
             next_step = "Please terminate the instance manually to avoid unexpected charges."
             if _is_to_be_deleted_by_orphan_cleanup(instance_model, job_provisioning_data):
                 next_step = "Orphan cleanup will retry deleting the instance."
+            result.event_messages.append(
+                f"Failed all attempts to terminate instance in the backend. {next_step}"
+                f" Last error: {_format_error(exc)}"
+            )
             logger.error(
                 "Failed all attempts to terminate instance %s. %s Error: %r",
                 instance_model.name,
@@ -104,6 +108,12 @@ async def _terminate_in_backend(
             job_provisioning_data.region,
             job_provisioning_data.backend_data,
         )
+
+
+def _format_error(exc: Exception) -> str:
+    if isinstance(exc, BackendError):
+        return str(exc) or type(exc).__name__
+    return type(exc).__name__  # avoid leaking internal details
 
 
 def _is_to_be_deleted_by_orphan_cleanup(

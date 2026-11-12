@@ -21,6 +21,7 @@ from dstack._internal.server.testing.common import (
     create_instance,
     create_project,
     get_job_provisioning_data,
+    list_events,
     mock_lease,
 )
 from tests._internal.server.background.pipeline_tasks.instances.helpers import (
@@ -224,6 +225,45 @@ class TestTermination:
             mock.assert_called_once()
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATED
+
+    async def test_emits_event_if_all_termination_attempts_failed(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+    ):
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.TERMINATING,
+        )
+        instance.termination_reason = InstanceTerminationReason.IDLE_TIMEOUT
+        initial_time = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
+        instance.last_job_processed_at = initial_time
+        instance.last_processed_at = initial_time - dt.timedelta(minutes=1)
+        await session.commit()
+
+        with (
+            time_machine.travel(initial_time + dt.timedelta(minutes=1), tick=False),
+            self.mock_terminate_in_backend(error=BackendError("err")),
+        ):
+            await process_instance(session, worker, instance)
+        assert not any("Failed all attempts" in e.message for e in await list_events(session))
+
+        with (
+            time_machine.travel(initial_time + dt.timedelta(minutes=15, seconds=55), tick=False),
+            self.mock_terminate_in_backend(error=BackendError("quota exceeded")),
+        ):
+            await process_instance(session, worker, instance)
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+        messages = [e.message for e in await list_events(session)]
+        assert any(
+            "Failed all attempts to terminate instance in the backend" in m
+            and "quota exceeded" in m
+            for m in messages
+        )
 
 
 class TestIsDeletedByOrphanCleanup:
