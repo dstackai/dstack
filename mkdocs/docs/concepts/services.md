@@ -261,7 +261,7 @@ Below are examples for running `Qwen/Qwen3.8-Flash-Next` with SMG and `zai-org/G
       - name: frontend
         replicas: 1
         # The vLLM image provides vLLM's GLM tool call and reasoning parsers
-        image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.5.1
+        image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.6.2
         commands:
           - export ETCD_ENDPOINTS=http://${{ groups[0].replicas[0].IP_ADDRESS }}:2379
           - |
@@ -279,7 +279,7 @@ Below are examples for running `Qwen/Qwen3.8-Flash-Next` with SMG and `zai-org/G
 
       - name: worker
         replicas: 2
-        image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.5.1
+        image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.6.2
         commands:
           - export ETCD_ENDPOINTS=http://${{ groups[0].replicas[0].IP_ADDRESS }}:2379
           # vLLM binds the KV events endpoint only if it's a wildcard address, otherwise it connects
@@ -294,6 +294,10 @@ Below are examples for running `Qwen/Qwen3.8-Flash-Next` with SMG and `zai-org/G
 
     port: 8000
     model: zai-org/GLM-4.5-Air-FP8
+
+    # Resubmit a failed replica, such as etcd, instead of failing the whole run
+    retry:
+      on_events: [error, interruption]
     ```
 
     </div>
@@ -421,7 +425,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
       - name: frontend
         replicas: 1
         # The vLLM image provides vLLM's GLM tool call and reasoning parsers
-        image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.5.1
+        image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.6.2
         commands:
           - export ETCD_ENDPOINTS=http://${{ groups[0].replicas[0].IP_ADDRESS }}:2379
           - |
@@ -440,7 +444,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
       # Only prefill workers publish KV events, as Dynamo's decode routing ignores prefix overlap
       - name: prefill-worker
         replicas: 4
-        image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.5.1
+        image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.6.2
         commands:
           - export ETCD_ENDPOINTS=http://${{ groups[0].replicas[0].IP_ADDRESS }}:2379
           - export VLLM_NIXL_SIDE_CHANNEL_HOST=$DSTACK_MASTER_NODE_IP
@@ -458,7 +462,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
 
       - name: decode-worker
         replicas: 8
-        image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.5.1
+        image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.6.2
         commands:
           - export ETCD_ENDPOINTS=http://${{ groups[0].replicas[0].IP_ADDRESS }}:2379
           - export VLLM_NIXL_SIDE_CHANNEL_HOST=$DSTACK_MASTER_NODE_IP
@@ -474,6 +478,10 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
 
     port: 8000
     model: zai-org/GLM-4.5-Air-FP8
+
+    # Resubmit a failed replica, such as etcd, instead of failing the whole run
+    retry:
+      on_events: [error, interruption]
     ```
 
     </div>
