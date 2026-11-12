@@ -127,7 +127,7 @@ async def process_active_run(context: ActiveContext) -> ActiveResult:
     run_spec = context.run_spec
 
     fleet_id = _detect_fleet_id_from_jobs(run_model)
-    analysis = await _analyze_active_run(run_model)
+    analysis = await _analyze_active_run(run_model, run_spec.merged_profile.stop_criteria)
     transition = _get_active_run_transition(run_spec, run_model, analysis)
 
     run_update_map = _build_run_update_map(run_model, run_spec, transition, fleet_id)
@@ -183,11 +183,14 @@ def _detect_fleet_id_from_jobs(run_model: RunModel) -> Optional[uuid.UUID]:
     return None
 
 
-async def _analyze_active_run(run_model: RunModel) -> _RunAnalysis:
+async def _analyze_active_run(
+    run_model: RunModel, stop_criteria: Optional[StopCriteria]
+) -> _RunAnalysis:
     run_analysis = _RunAnalysis()
     for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
         replica_analysis = await _analyze_active_run_replica(
             run_model=run_model,
+            stop_criteria=stop_criteria,
             replica_num=replica_num,
             job_models=job_models,
         )
@@ -197,9 +200,19 @@ async def _analyze_active_run(run_model: RunModel) -> _RunAnalysis:
 
 async def _analyze_active_run_replica(
     run_model: RunModel,
+    stop_criteria: Optional[StopCriteria],
     replica_num: int,
     job_models: List[JobModel],
 ) -> _ReplicaAnalysis:
+    if stop_criteria == StopCriteria.MASTER_DONE and _master_job_is_done(job_models):
+        # The master decides the replica's outcome. The other jobs are neither waited for
+        # nor retried, and their failures are ignored.
+        return _ReplicaAnalysis(
+            replica_num=replica_num,
+            job_models=job_models,
+            contributed_statuses={RunStatus.DONE},
+        )
+
     contributed_statuses: Set[RunStatus] = set()
     termination_reasons: Set[RunTerminationReason] = set()
     needs_retry = False
@@ -256,6 +269,10 @@ def _apply_replica_analysis(
 
     if not replica_analysis.needs_retry:
         analysis.contributed_statuses.update(replica_analysis.contributed_statuses)
+
+
+def _master_job_is_done(job_models: List[JobModel]) -> bool:
+    return any(j.job_num == 0 and _job_is_done_or_finishing_done(j) for j in job_models)
 
 
 def _job_is_done_or_finishing_done(job_model: JobModel) -> bool:
@@ -361,15 +378,6 @@ def _is_retry_duration_exceeded(job_model: JobModel, current_duration: timedelta
     return current_duration > timedelta(seconds=job_spec.retry.duration)
 
 
-def _should_stop_on_master_done(run_spec: RunSpec, run_model: RunModel) -> bool:
-    if run_spec.merged_profile.stop_criteria != StopCriteria.MASTER_DONE:
-        return False
-    for job_model in run_model.jobs:
-        if job_model.job_num == 0 and job_model.status == JobStatus.DONE:
-            return True
-    return False
-
-
 def _get_active_run_transition(
     run_spec: RunSpec,
     run_model: RunModel,
@@ -394,12 +402,6 @@ def _get_active_run_transition(
             termination_reason=RunTerminationReason.GATEWAY_ERROR,
         )
 
-    if _should_stop_on_master_done(run_spec, run_model):
-        return _ActiveRunTransition(
-            new_status=RunStatus.TERMINATING,
-            termination_reason=RunTerminationReason.ALL_JOBS_DONE,
-        )
-
     if RunStatus.RUNNING in analysis.contributed_statuses:
         return _ActiveRunTransition(new_status=RunStatus.RUNNING)
     if RunStatus.PROVISIONING in analysis.contributed_statuses:
@@ -407,6 +409,11 @@ def _get_active_run_transition(
     if RunStatus.SUBMITTED in analysis.contributed_statuses:
         return _ActiveRunTransition(new_status=RunStatus.SUBMITTED)
     if RunStatus.DONE in analysis.contributed_statuses and not analysis.replicas_to_retry:
+        if run_spec.configuration.type == "service":
+            # A service runs until stopped. While other replicas keep the run active,
+            # scaling brings back replicas that exit with 0. When none are left,
+            # the run is resubmitted as a whole, with a backoff.
+            return _ActiveRunTransition(new_status=RunStatus.PENDING)
         return _ActiveRunTransition(
             new_status=RunStatus.TERMINATING,
             termination_reason=RunTerminationReason.ALL_JOBS_DONE,

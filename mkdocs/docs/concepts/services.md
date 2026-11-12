@@ -1388,6 +1388,8 @@ on a dedicated domain name by setting up a [gateway](gateways.md).
 
 By default, if `dstack` can't find capacity, or the service exits with an error, or the instance is interrupted, the run will fail.
 
+A service runs until it's stopped. If a replica exits with `0`, `dstack` restarts it regardless of the retry policy.
+
 If you'd like `dstack` to automatically retry, configure the
 [retry](../reference/dstack.yml/service.md#retry) property accordingly:
 <!-- TODO: Add a relevant example -->

@@ -1,6 +1,7 @@
 import json
 import uuid
 from datetime import timedelta
+from typing import Optional
 from unittest.mock import AsyncMock, patch
 
 import gpuhunt
@@ -842,8 +843,27 @@ class TestRunActiveWorker:
         assert run.termination_reason == RunTerminationReason.RETRY_LIMIT_EXCEEDED
         assert run.lock_token is None
 
+    @pytest.mark.parametrize(
+        ("master_status", "worker_status", "worker_termination_reason"),
+        [
+            pytest.param(JobStatus.DONE, JobStatus.RUNNING, None, id="master-done"),
+            pytest.param(JobStatus.TERMINATING, JobStatus.RUNNING, None, id="master-finishing"),
+            pytest.param(
+                JobStatus.DONE,
+                JobStatus.FAILED,
+                JobTerminationReason.CONTAINER_EXITED_WITH_ERROR,
+                id="worker-failed",
+            ),
+        ],
+    )
     async def test_stops_on_master_done(
-        self, test_db, session: AsyncSession, worker: RunWorker
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: RunWorker,
+        master_status: JobStatus,
+        worker_status: JobStatus,
+        worker_termination_reason: Optional[JobTerminationReason],
     ) -> None:
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -851,6 +871,7 @@ class TestRunActiveWorker:
         run_spec = get_run_spec(
             repo_id=repo.name,
             profile=Profile(name="default", stop_criteria=StopCriteria.MASTER_DONE),
+            configuration=TaskConfiguration(commands=["echo hello"], nodes=2),
         )
         run = await create_run(
             session=session,
@@ -860,13 +881,19 @@ class TestRunActiveWorker:
             run_spec=run_spec,
             status=RunStatus.RUNNING,
         )
-        # Master job (job_num=0) is done
         await create_job(
             session=session,
             run=run,
-            status=JobStatus.DONE,
+            status=master_status,
             termination_reason=JobTerminationReason.DONE_BY_RUNNER,
             job_num=0,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=worker_status,
+            termination_reason=worker_termination_reason,
+            job_num=1,
         )
         lock_run(run)
         await session.commit()
@@ -1109,6 +1136,126 @@ class TestRunActiveWorker:
         await session.refresh(run)
         # All replicas scaled down → transitions to PENDING
         assert run.status == RunStatus.PENDING
+        assert run.lock_token is None
+
+    # `stop_criteria` is about jobs within a replica, and service replicas have a single job
+    @pytest.mark.parametrize("stop_criteria", [StopCriteria.ALL_DONE, StopCriteria.MASTER_DONE])
+    @pytest.mark.parametrize("done_job_status", [JobStatus.DONE, JobStatus.TERMINATING])
+    async def test_service_resubmits_done_replica(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: RunWorker,
+        stop_criteria: StopCriteria,
+        done_job_status: JobStatus,
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            profile=Profile(name="default", stop_criteria=stop_criteria),
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo Hi!"],
+                replicas=Range[int](min=2, max=2),
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=done_job_status,
+            termination_reason=JobTerminationReason.DONE_BY_RUNNER,
+            replica_num=0,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=1,
+        )
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+        res = await session.execute(
+            select(JobModel)
+            .where(JobModel.run_id == run.id)
+            .order_by(JobModel.replica_num, JobModel.submission_num)
+        )
+        jobs = list(res.scalars().all())
+        assert [(j.replica_num, j.submission_num, j.status) for j in jobs] == [
+            (0, 0, done_job_status),
+            (0, 1, JobStatus.SUBMITTED),
+            (1, 0, JobStatus.RUNNING),
+        ]
+
+    @pytest.mark.parametrize("stop_criteria", [StopCriteria.ALL_DONE, StopCriteria.MASTER_DONE])
+    async def test_service_transitions_to_pending_when_all_replicas_done(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: RunWorker,
+        stop_criteria: StopCriteria,
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            profile=Profile(name="default", stop_criteria=stop_criteria),
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo Hi!"],
+                replicas=Range[int](min=2, max=2),
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.DONE,
+            termination_reason=JobTerminationReason.DONE_BY_RUNNER,
+            replica_num=0,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.DONE_BY_RUNNER,
+            replica_num=1,
+        )
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.PENDING
+        assert run.termination_reason is None
+        assert run.resubmission_attempt == 1
         assert run.lock_token is None
 
     async def test_noops_when_run_lock_changes_after_processing(

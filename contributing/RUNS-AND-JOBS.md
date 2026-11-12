@@ -21,12 +21,12 @@ A run can spawn one or multiple jobs, depending on the configuration. A task tha
 - STEP 2: `RunPipeline` continuously processes unfinished runs.
   - For active runs, it derives the run status from the latest job states in priority order:
     1. If any non-retryable failure is present, the run becomes `TERMINATING` with the relevant `RunTerminationReason`.
-    2. If `stop_criteria == MASTER_DONE` and the master job is done, the run becomes `TERMINATING` with `ALL_JOBS_DONE`.
-    3. Otherwise, if any job is `RUNNING`, the run becomes `RUNNING`.
-    4. Otherwise, if any job is `PROVISIONING` or `PULLING`, the run becomes `PROVISIONING`.
-    5. Otherwise, if jobs are still waiting for placement or provisioning, the run stays `SUBMITTED`.
-    6. Otherwise, if all contributing jobs are `DONE`, the run becomes `TERMINATING` with `ALL_JOBS_DONE`.
-    7. Otherwise, if no active replicas remain and the run should be retried, the run becomes `PENDING`.
+    2. Otherwise, if any job is `RUNNING`, the run becomes `RUNNING`.
+    3. Otherwise, if any job is `PROVISIONING` or `PULLING`, the run becomes `PROVISIONING`.
+    4. Otherwise, if jobs are still waiting for placement or provisioning, the run stays `SUBMITTED`.
+    5. Otherwise, if all contributing jobs are `DONE`, the run becomes `TERMINATING` with `ALL_JOBS_DONE`.
+    6. Otherwise, if no active replicas remain and the run should be retried, the run becomes `PENDING`.
+  - `stop_criteria` applies within a replica. With `MASTER_DONE`, once the replica's master job (`job_num == 0`) is `DONE` or `TERMINATING` with `DONE_BY_RUNNER`, the whole replica counts as `DONE`: the other jobs are neither waited for nor retried, and their failures are ignored.
   - Retryable replica failures are handled before the final transition is applied:
     - If a replica fails with a retryable reason while other replicas are still active, `RunPipeline` creates a new `SUBMITTED` submission for that replica and terminates the old jobs in that replica.
     - If all remaining work is retryable, the run ends up in `PENDING`.
@@ -47,6 +47,7 @@ Services' run lifecycle has some modifications:
 - During STEP 1, the service itself is registered on the gateway or the in-server proxy. If the gateway is not accessible or the domain name is taken, submission fails.
 - During STEP 2, active run processing also computes desired replica counts from gateway stats and handles scale-up, scale-down, rolling deployment, and cleanup of removed replica groups.
 - During STEP 2, jobs already marked `SCALED_DOWN` do not contribute to the run status.
+- During STEP 2, a service never ends with `ALL_JOBS_DONE`. A replica that exits with 0 is inactive, so scaling resubmits it regardless of `retry`. If all replicas are `DONE` at once, the run becomes `PENDING` instead and is resubmitted as a whole after the backoff.
 - During STEP 3, a service can stay in `PENDING` when autoscaling currently wants zero replicas.
 - During STEP 5, the terminating phase of `RunPipeline` unregisters the service from the gateway.
 
