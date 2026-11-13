@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from dstack._internal.cli.services.presets.session import PresetSession
@@ -81,3 +83,60 @@ class TestInstallPreviousRecords:
 
         assert "empty000 has no records" in capsys.readouterr().err
         assert not (workspace.path / "previous" / "empty000").exists()
+
+    def test_upgrades_pre_sweep_records_to_the_sweep_format(self, tmp_path):
+        session = _previous_session(tmp_path)
+        root = session.path
+        benchmark = {"workload": {"concurrency": 8}, "metrics": {}}
+        (root / "constraints.json").write_text(json.dumps({"max_ttft": 2000, "concurrency": 8}))
+        (root / "trials" / "1" / "trial.json").write_text(
+            json.dumps({"context_length": 8192, "benchmark": benchmark, "learned": "x"})
+        )
+        (root / "trials" / "2").mkdir()
+        # A trial that never produced a benchmark.
+        (root / "trials" / "2" / "trial.json").write_text(
+            json.dumps({"benchmark": None, "learned": "y", "failed": True})
+        )
+        (root / "final_report.json").write_text(
+            json.dumps({"success": True, "benchmark": benchmark})
+        )
+        workspace = _workspace(tmp_path)
+
+        install_previous_records(workspace, [session])
+
+        target = workspace.path / "previous" / "8d3b01aa"
+        assert json.loads((target / "constraints.json").read_text()) == {
+            "max_ttft": 2000,
+            "concurrency": [8],
+        }
+        trial = json.loads((target / "trials" / "1" / "trial.json").read_text())
+        # Same position as the field it replaces.
+        assert list(trial) == ["context_length", "benchmarks", "learned"]
+        assert trial["benchmarks"] == [benchmark]
+        failed = json.loads((target / "trials" / "2" / "trial.json").read_text())
+        assert failed["benchmarks"] is None
+        report = json.loads((target / "final_report.json").read_text())
+        assert report == {"success": True, "benchmarks": [benchmark]}
+        # The session's own records are not rewritten.
+        assert json.loads((root / "constraints.json").read_text())["concurrency"] == 8
+
+    def test_copies_sweep_records_unchanged(self, tmp_path):
+        session = _previous_session(tmp_path)
+        text = '{"benchmarks": [{"workload": {"concurrency": 4}}], "learned": "x"}'
+        (session.path / "trials" / "1" / "trial.json").write_text(text)
+        workspace = _workspace(tmp_path)
+
+        install_previous_records(workspace, [session])
+
+        copied = workspace.path / "previous" / "8d3b01aa" / "trials" / "1" / "trial.json"
+        assert copied.read_text() == text
+
+    def test_copies_an_unreadable_record_as_written(self, tmp_path):
+        session = _previous_session(tmp_path)
+        (session.path / "trials" / "1" / "trial.json").write_text('{"benchmark": {"met')
+        workspace = _workspace(tmp_path)
+
+        install_previous_records(workspace, [session])
+
+        copied = workspace.path / "previous" / "8d3b01aa" / "trials" / "1" / "trial.json"
+        assert copied.read_text() == '{"benchmark": {"met'

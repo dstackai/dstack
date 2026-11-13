@@ -32,6 +32,7 @@ class TestFormatPresetBenchmark:
         ttft.mean = 8148.3
         ttft.p50 = 8151.4
         ttft.p99 = 8334.2
+        preset.benchmarks = [preset.benchmark]
 
         output = output_module.format_preset_benchmark(preset, verbose=True)
 
@@ -41,6 +42,28 @@ class TestFormatPresetBenchmark:
         assert "ctx=32K" in output
         assert "ttft=8.15s" in output
         assert "e+03" not in output
+
+    def test_shows_a_sweep_as_ranges_and_names_the_selected_point(self):
+        preset = get_preset()
+        points = []
+        for concurrency, tpot, ttft, tokens in ((4, 30.0, 425.0, 1024), (16, 52.0, 861.0, 4096)):
+            point = preset.benchmark.model_copy(deep=True)
+            point.workload.concurrency = concurrency
+            point.metrics.tpot_ms.mean = tpot
+            point.metrics.ttft_ms.p50 = ttft
+            point.metrics.total_output_tokens = tokens
+            points.append(point)
+        preset.benchmarks = points
+        preset.benchmark = points[1]
+
+        output = output_module.format_preset_benchmark(preset, verbose=True)
+
+        assert output == "tps/user=19.2..33.3 c=16 tps=21.1..84.2 ttft=425ms..861ms ctx=32K"
+
+    def test_shows_single_values_without_a_sweep(self):
+        output = output_module.format_preset_benchmark(get_preset())
+
+        assert output == "tps/user=133 ttft=108ms ctx=32K"
 
 
 class TestFormatPresetObjective:
@@ -140,7 +163,7 @@ class TestPrintPresets:
         assert "2 months ago" in output.getvalue()
 
 
-def _session_row(session: dict) -> dict:
+def _session_row(session: dict, *, verbose: bool = False) -> dict:
     table = Table(box=None)
     for column in (
         "BASE",
@@ -154,7 +177,7 @@ def _session_row(session: dict) -> dict:
         "SUBMITTED",
     ):
         table.add_column(column)
-    _add_session(table, session)
+    _add_session(table, session, verbose=verbose)
     return {
         column.header: "".join(str(cell) for cell in column._cells) for column in table.columns
     }
@@ -171,7 +194,7 @@ class TestSessionRow:
                     "count": 2,
                     "best": {
                         "tok_s": 2339.0,
-                        "tpot_ms": 3.42,
+                        "per_user_tok_s_range": [292.0, 292.0],
                         "concurrency": 8,
                         "gpu": "A40:48GB:1",
                     },
@@ -201,6 +224,84 @@ class TestSessionRow:
         )
 
         assert row["CONSTRAINTS"] == ("[secondary]io=8K/1K prefix=90% c=162[/]")
+
+    def test_shows_a_sweep_and_the_point_the_best_trial_is_judged_by(self):
+        row = _session_row(
+            {
+                "id": "c7e18d52",
+                "status": "running",
+                "constraints": {"dataset": "spec_bench", "concurrency": [2, 4, 8, 16]},
+                "trials": {
+                    "count": 1,
+                    "best": {
+                        "tok_s": 2339.0,
+                        "per_user_tok_s_range": [292.0, 292.0],
+                        "concurrency": 8,
+                        "gpu": None,
+                    },
+                },
+            }
+        )
+
+        assert row["CONSTRAINTS"] == "[secondary]data=spec_bench c=2..16[/]"
+        assert row["BENCHMARK"].startswith("tps/user=292 c=8")
+
+    def test_shows_a_sweep_session_as_ranges(self):
+        row = _session_row(
+            {
+                "id": "6ac0bec5",
+                "status": "interrupted",
+                "constraints": {"concurrency": [4, 8, 16]},
+                "trials": {
+                    "count": 1,
+                    "best": {
+                        "tok_s": 380.0,
+                        "tok_s_range": [132.0, 380.0],
+                        "per_user_tok_s_range": [24.3, 33.3],
+                        "ttft_ms_range": [425.0, 861.0],
+                        "context_length": 98304,
+                        "concurrency": 16,
+                    },
+                },
+            },
+            verbose=True,
+        )
+
+        assert row["BENCHMARK"] == (
+            "tps/user=24.3..33.3 c=16 tps=132..380 ttft=425ms..861ms ctx=96K"
+        )
+
+    def test_a_failed_sweep_keeps_its_ranges_and_its_mark(self):
+        row = _session_row(
+            {
+                "id": "6ac0bec5",
+                "status": "failed",
+                "constraints": {"concurrency": [4, 8]},
+                "trials": {
+                    "count": 1,
+                    "best": None,
+                    "best_failed": {
+                        "tok_s": 200.0,
+                        "per_user_tok_s_range": [25.0, 33.3],
+                        "ttft_ms_range": [900.0, 1100.0],
+                        "concurrency": 4,
+                    },
+                },
+            }
+        )
+
+        assert row["BENCHMARK"] == "[secondary]*tps/user=25..33.3 c=4 ttft=900ms..1.1s[/]"
+
+    def test_shows_a_sweep_that_does_not_double_as_a_list(self):
+        row = _session_row(
+            {
+                "id": "c7e18d52",
+                "status": "running",
+                "constraints": {"dataset": "spec_bench", "concurrency": [2, 3]},
+            }
+        )
+
+        assert row["CONSTRAINTS"] == "[secondary]data=spec_bench c=2,3[/]"
 
     def test_shows_the_dataset_for_a_session_with_a_custom_dataset(self):
         row = _session_row(
@@ -511,8 +612,8 @@ class TestFailedTrials:
                     "best": None,
                     "best_failed": {
                         "tok_s": 100.0,
-                        "tpot_ms": 34.4,
-                        "ttft_ms": 4300.0,
+                        "per_user_tok_s_range": [29.1, 29.1],
+                        "ttft_ms_range": [4300.0, 4300.0],
                         "context_length": 1048576,
                         "concurrency": 4,
                         "gpu": "MI300X:192GB:1",
@@ -526,6 +627,50 @@ class TestFailedTrials:
         # Marked, not just dimmed, so it does not read as a met constraint where
         # styling is absent or invisible to the reader.
         assert "*tps/user" in row["BENCHMARK"]
+
+    def test_a_sweep_trial_record_reaches_the_row_as_ranges(self, tmp_path):
+        from dstack._internal.cli.services.presets.session import _summarize_session_trials
+
+        # The summary writes the keys the row reads; only both together prove it.
+        def point(concurrency, tokens, ttft, tpot):
+            return {
+                "workload": {"concurrency": concurrency},
+                "metrics": {
+                    "duration_seconds": 1.0,
+                    "total_output_tokens": tokens,
+                    "ttft_ms": {"p50": ttft},
+                    "tpot_ms": {"mean": tpot},
+                },
+            }
+
+        trials_dir = _write_trials(
+            tmp_path,
+            [
+                {
+                    "context_length": 98304,
+                    "benchmarks": [
+                        point(4, 132.0, 425.0, 30.0),
+                        point(8, 237.0, 691.0, 34.0),
+                        point(16, 380.0, 861.0, 41.2),
+                    ],
+                }
+            ],
+        )
+
+        trials = _summarize_session_trials(trials_dir, max_ttft=2000)
+        row = _session_row(
+            {
+                "id": "6ac0bec5",
+                "status": "interrupted",
+                "constraints": {"concurrency": [4, 8, 16], "max_ttft": 2000},
+                "trials": trials,
+            },
+            verbose=True,
+        )
+
+        assert row["BENCHMARK"] == (
+            "tps/user=24.3..33.3 c=16 tps=132..380 ttft=425ms..861ms ctx=96K"
+        )
 
 
 class TestFailedTrialSpark:

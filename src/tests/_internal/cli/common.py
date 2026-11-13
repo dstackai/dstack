@@ -171,6 +171,7 @@ def get_preset(
         ),
         context_length=context_length,
         best_trial=1,
+        benchmarks=[get_preset_benchmark()],
         benchmark=get_preset_benchmark(),
         verified_on=[
             PresetVerificationReplicaGroup(name=DEFAULT_REPLICA_GROUP_NAME, replicas=[resources])
@@ -278,7 +279,7 @@ def get_successful_preset_report(run: Run) -> PresetAgentSuccess:
             "base": "Qwen/Qwen3.5-27B",
             "model": "community/Qwen3.5-27B-GPTQ-Int4",
             "context_length": 32768,
-            "benchmark": get_preset_benchmark(),
+            "benchmarks": [get_preset_benchmark()],
         }
     )
 

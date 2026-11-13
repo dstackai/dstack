@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from dstack._internal.core.models.presets import (
     PresetBenchmark,
+    select_benchmark,
     validate_preset_file_path,
     validate_preset_file_paths,
 )
@@ -152,3 +153,32 @@ class TestPresetBenchmarkWorkload:
         benchmark = PresetBenchmark.model_validate(data)
 
         assert benchmark.workload.dataset == "random"
+
+
+def _benchmark(*, concurrency: int, tok_s: float, ttft_p50: float) -> PresetBenchmark:
+    data = get_benchmark_data(get_workload_data(concurrency=concurrency))
+    # The fixture's 2048 output tokens over `duration` give `tok_s`.
+    data["metrics"]["duration_seconds"] = 2048 / tok_s
+    data["metrics"]["ttft_ms"]["p50"] = ttft_p50
+    return PresetBenchmark.model_validate(data)
+
+
+class TestSelectBenchmark:
+    def test_picks_the_fastest_point_within_max_ttft(self):
+        over = _benchmark(concurrency=16, tok_s=600, ttft_p50=900)
+        ok = _benchmark(concurrency=8, tok_s=500, ttft_p50=300)
+
+        assert select_benchmark([ok, over], max_ttft=500) is ok
+
+    def test_falls_back_to_the_closest_ttft_when_none_passes(self):
+        # Everything breached: the record is how near it got, not how fast it ran.
+        closer = _benchmark(concurrency=8, tok_s=500, ttft_p50=900)
+        faster = _benchmark(concurrency=16, tok_s=600, ttft_p50=950)
+
+        assert select_benchmark([closer, faster], max_ttft=500) is closer
+
+    def test_breaks_a_ttft_tie_by_throughput(self):
+        slow = _benchmark(concurrency=8, tok_s=500, ttft_p50=900)
+        fast = _benchmark(concurrency=16, tok_s=600, ttft_p50=900)
+
+        assert select_benchmark([slow, fast], max_ttft=500) is fast

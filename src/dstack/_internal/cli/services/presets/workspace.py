@@ -10,7 +10,7 @@ import tempfile
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 from dstack._internal.cli.models.preset_agent import PresetSessionWorkspace
 from dstack._internal.cli.services.presets.session import (
@@ -300,7 +300,7 @@ def _copy_session_records(source_root: Path, target_root: Path) -> bool:
     for name in (_CONSTRAINTS_FILENAME, _FINAL_REPORT_FILENAME):
         if (source_root / name).is_file():
             target_root.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source_root / name, target_root / name)
+            _copy_record(source_root / name, target_root / name)
             copied = True
     for group, filenames in (
         (TRIALS_DIRNAME, ("trial.json", "task.dstack.yml")),
@@ -316,13 +316,58 @@ def _copy_session_records(source_root: Path, target_root: Path) -> bool:
             for name in filenames:
                 if (record_dir / name).is_file():
                     target_dir.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(record_dir / name, target_dir / name)
+                    _copy_record(record_dir / name, target_dir / name)
                     copied = True
             patches = record_dir / "patches"
             if group == TRIALS_DIRNAME and patches.is_dir():
                 shutil.copytree(patches, target_dir / "patches", dirs_exist_ok=True)
                 copied = True
     return copied
+
+
+# The records an agent reads through `previous/`, upgraded on copy so a
+# session recorded before concurrency sweeps reads in the format the agent
+# writes. The originals stay as they were written.
+_UPGRADED_RECORDS = (_CONSTRAINTS_FILENAME, _FINAL_REPORT_FILENAME, "trial.json")
+
+
+def _copy_record(source: Path, target: Path) -> None:
+    if source.name not in _UPGRADED_RECORDS:
+        shutil.copyfile(source, target)
+        return
+    try:
+        data = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        # A torn or foreign file is still the agent's to read as written.
+        shutil.copyfile(source, target)
+        return
+    upgraded = _upgrade_pre_sweep_record(source.name, data)
+    if upgraded is data:
+        shutil.copyfile(source, target)
+        return
+    target.write_text(json.dumps(upgraded, indent=2) + "\n", encoding="utf-8")
+
+
+def _upgrade_pre_sweep_record(name: str, data: Any) -> Any:
+    # Before the sweep, `constraints.json` held one `concurrency` and trial and
+    # final records held one `benchmark`: that one point is the whole sweep.
+    if not isinstance(data, dict):
+        return data
+    if name == _CONSTRAINTS_FILENAME:
+        concurrency = data.get("concurrency")
+        if isinstance(concurrency, int):
+            return {**data, "concurrency": [concurrency]}
+        return data
+    if "benchmark" not in data or "benchmarks" in data:
+        return data
+    upgraded = {}
+    for key, value in data.items():
+        if key == "benchmark":
+            # `null` means no benchmark could be done; it stays `null`.
+            upgraded["benchmarks"] = None if value is None else [value]
+        else:
+            upgraded[key] = value
+    return upgraded
 
 
 def _install_skills(target_dir: Path) -> None:

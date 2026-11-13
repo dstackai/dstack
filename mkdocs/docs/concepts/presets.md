@@ -33,8 +33,9 @@ trials: 5
 min_context_length: 1048576
 max_ttft: 675
 
-# The number of simultaneous requests every benchmark uses
-concurrency: 1
+# The numbers of simultaneous requests every benchmark is run at:
+# a value, a list, `2,3`, or a doubling range `2..16`
+concurrency: 2..16
 
 # The request shape every benchmark uses (defaults to 1024 and 1024)
 input_tokens: 10000
@@ -390,7 +391,6 @@ At the same time, it's recommended to create presets using your own agent — ei
 ## Limitations
 
 * Currently, the agent doesn't upload compiled binaries anywhere; patches compile at runtime
-* Doesn't support ranges for `concurrency`
 
 > Report bugs and request features on [GitHub](https://github.com/dstackai/dstack/issues), and ask questions on [Discord](https://discord.gg/u8SmfwPpMd).
 

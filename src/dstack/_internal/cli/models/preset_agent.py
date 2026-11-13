@@ -9,6 +9,7 @@ from pydantic import (
     ValidationError,
     ValidatorFunctionWrapHandler,
     WrapValidator,
+    model_validator,
 )
 
 from dstack._internal.core.models.common import CoreModel
@@ -53,7 +54,17 @@ class PresetAgentSuccess(CoreModel):
     base: Annotated[str, Field(min_length=1)]
     model: Annotated[str, Field(min_length=1)]
     context_length: PositiveInt
-    benchmark: PresetBenchmark
+    benchmarks: Annotated[list[PresetBenchmark], Field(min_length=1)]
+
+    @model_validator(mode="before")
+    @classmethod
+    def wrap_legacy_single_benchmark(cls, data: Any) -> Any:
+        # Older agents report a single `benchmark`. Wrap it in a list so
+        # the new CLI can read reports from sessions started before the upgrade.
+        if isinstance(data, dict) and "benchmark" in data and "benchmarks" not in data:
+            data = dict(data)
+            data["benchmarks"] = [data.pop("benchmark")]
+        return data
 
 
 class PresetAgentFailure(CoreModel):

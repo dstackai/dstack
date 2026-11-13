@@ -1344,6 +1344,49 @@ class TestPresetConfiguration:
         assert configuration.dataset is None
 
 
+class TestPresetConfigurationConcurrency:
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            pytest.param(10, [10], id="int"),
+            pytest.param("2,3", [2, 3], id="comma"),
+            pytest.param([3, 2, 2], [2, 3], id="list-sorted-deduped"),
+            pytest.param("2..16", [2, 4, 8, 16], id="range"),
+            pytest.param("8..8", [8], id="range-single"),
+            pytest.param(" 2 .. 8 ", [2, 4, 8], id="range-spaces"),
+        ],
+    )
+    def test_normalizes_to_list(self, value, expected):
+        conf = PresetConfiguration.model_validate(
+            {"type": "preset", "base": "m", "concurrency": value}
+        )
+
+        assert conf.concurrency == expected
+
+    @pytest.mark.parametrize(
+        ("value", "error"),
+        [
+            pytest.param("3..16", "not reachable by doubling from 3", id="range-off-chain"),
+            pytest.param("..16", "needs both ends", id="range-no-start"),
+            pytest.param("2..", "needs both ends", id="range-no-end"),
+            pytest.param("16..2", "up to its end", id="range-descending"),
+            pytest.param([], "at least 1", id="empty-list"),
+            pytest.param(0, "greater than 0", id="zero"),
+            pytest.param("2,x", "valid integer", id="comma-garbage"),
+        ],
+    )
+    def test_rejects(self, value, error):
+        with pytest.raises(ValidationError, match=error):
+            PresetConfiguration.model_validate(
+                {"type": "preset", "base": "m", "concurrency": value}
+            )
+
+    def test_stays_unset_when_omitted(self):
+        conf = PresetConfiguration.model_validate({"type": "preset", "base": "m"})
+
+        assert conf.concurrency is None
+
+
 class TestPresetConfigurationSchema:
     def test_schema_does_not_require_model(self):
         # `model` is filled from the `base`/`repo` shorthand by a before-validator,

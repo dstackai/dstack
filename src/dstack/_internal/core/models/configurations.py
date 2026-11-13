@@ -1773,12 +1773,14 @@ class PresetConfiguration(
         ),
     ] = None
     concurrency: Annotated[
-        Optional[PositiveInt],
+        Optional[list[PositiveInt]],
         Field(
+            min_length=1,
             description=(
-                "The number of simultaneous requests used for benchmarks during preset"
-                " creation. Required for creation"
-            )
+                "The numbers of simultaneous requests every benchmark is run at during"
+                " preset creation: a single value, a list, `2,3`, or a doubling range"
+                " `2..16` (2, 4, 8, 16). Required for creation"
+            ),
         ),
     ] = None
     input_tokens: Annotated[
@@ -1865,6 +1867,22 @@ class PresetConfiguration(
     def effective_baseline(self) -> bool:
         return self.baseline if self.baseline is not None else DEFAULT_BASELINE
 
+    @field_validator(
+        "concurrency",
+        mode="before",
+        json_schema_input_type=Union[PositiveInt, str, list[PositiveInt]],
+    )
+    @classmethod
+    def parse_concurrency(cls, value: Any) -> Any:
+        return _parse_concurrency_sweep(value)
+
+    @field_validator("concurrency")
+    @classmethod
+    def sort_concurrency(cls, value: Optional[list[int]]) -> Optional[list[int]]:
+        # Ascending and unique, whichever way it was written: the sweep is compared
+        # to what the agent reports, and the report is ordered the same way.
+        return sorted(set(value)) if value is not None else None
+
     @field_validator("dataset")
     @classmethod
     def validate_dataset_name(cls, value: Optional[str]) -> Optional[str]:
@@ -1943,6 +1961,33 @@ class PresetConfiguration(
             if len(value) > MAX_PROMPT_LENGTH:
                 raise ValueError(f"Prompt must be at most {MAX_PROMPT_LENGTH} characters")
         return value
+
+
+def _parse_concurrency_sweep(value: Any) -> Any:
+    # `8`, `2,3`, `[2, 3]`, or `2..16`. A range doubles from its start and must
+    # land exactly on its end, so `3..16` is rejected rather than stopping at 12
+    # or overshooting to 24. Element validation is left to the field type.
+    if value is None or isinstance(value, (bool, list)):
+        return value
+    if isinstance(value, int):
+        return [value]
+    if not isinstance(value, str):
+        return value
+    text = value.replace(" ", "")
+    if ".." not in text:
+        return text.split(",")
+    start_text, _, end_text = text.partition("..")
+    if not start_text.isdigit() or not end_text.isdigit():
+        raise ValueError("a concurrency range needs both ends, e.g. `2..16`")
+    start, end = int(start_text), int(end_text)
+    if start < 1 or end < start:
+        raise ValueError("a concurrency range must go from a positive start up to its end")
+    values = [start]
+    while values[-1] < end:
+        values.append(values[-1] * 2)
+    if values[-1] != end:
+        raise ValueError(f"concurrency range end {end} is not reachable by doubling from {start}")
+    return values
 
 
 def _validate_model(value: Any, *, field: str) -> str:
