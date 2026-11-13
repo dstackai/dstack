@@ -55,15 +55,6 @@ Field semantics:
 - `env`: the environment variable names available to runs; the values are
   already present in the environment and must never be printed or recorded.
 
-Each trial is benchmarked at every value of `concurrency`, so a trial can have
-one `output_tok_per_s` value for each concurrency. Before comparing trials,
-decide on a method to compare their `output_tok_per_s` values across
-concurrencies, and keep that method for the whole session. Report the chosen
-method via `progress` (see `# Progress`).<!--?if prompt--> If `## Additional instructions`
-says how to compare trials, use that method.<!--?end-->
-<!--!TODO: Decide whether to define a standard method for comparing trials
-across concurrency values.-->
-
 During the trials and experimentation aimed at the best performance, you may
 pick the hardware (the best available within the allowed `dstack` fleets),
 the model variant (only if `model` has `base`), the serving framework, the
@@ -176,6 +167,10 @@ continuing to improve a previous trial's idea, but when that risks settling
 into a local optimum, search for a substantially different approach rather than
 tweaking parameters further.
 
+<!--!TODO: Decide trial comparision method for trials with concurrency sweeps.
+
+With single concurrency value, each trial has only one output_tok_per_s. For preset agent comparing trials with single output_tok_per_s value  is straight forward, if trial1's output_tok_per_s is greater that trail2's then choose trial1. With concurrency sweep, each trial will have multiple output_tok_per_s values.This means with concurrency sweep, preset agent has to compare trials based output_tok_per_s sweeps. Currently we do not have a standard method for output_tok_per_s sweep comparision between trials and we let agent decide the method.-->
+
 <!--?if previous-->
   Before starting trials, analyze the previous sessions' results provided in
   `previous/` (sessions: {previous}; see `## Previous Sessions`). The
@@ -267,7 +262,7 @@ cause.
    others:
 
 ```
-{"resources": {...}, "results": [{"concurrency": ..., "benchmark": {...}, "context_length": ..., "learned": ..., "failed": ...}, ...]}
+{"resources": {...}, "result": [{"concurrency": ..., "benchmark": {...}, "context_length": ..., "learned": ..., "failed": ...}, ...]}
 ```
 
 2. In case the task is using node groups (a router group plus worker
@@ -275,7 +270,7 @@ cause.
    includes `groups`, and the fields are these and no others:
 
 ```
-{"groups": [[{...}], [{...}, {...}], [{...}]], "results": [{"concurrency": ..., "benchmark": {...}, "context_length": ..., "learned": ..., "failed": ...}, ...]}
+{"groups": [[{...}], [{...}, {...}], [{...}]], "result": [{"concurrency": ..., "benchmark": {...}, "context_length": ..., "learned": ..., "failed": ...}, ...]}
 ```
 
 - `resources`: the exact resources of the instance the task ran on, in
@@ -303,9 +298,7 @@ cause.
     [{"cpu": "192", "memory": "2048GB", "disk": "1000GB", "gpu": {"name": "H200", "memory": "141GB", "count": 8}}]
   ]
   ```
-- `results`: a list containing one entry for each value of `concurrency`
-  from `constraints.json`. Each entry contains:
-
+- `result`: a list of trial result objects, one result object for each value of `concurrency` from `constraints.json`. Each object has fields no other than below:
   - `concurrency`: the concurrency value for this result.
   - `context_length`: the largest context the trial's configuration handles
     at this concurrency, found as described in `## Benchmark`; `null` only
@@ -314,7 +307,7 @@ cause.
     for the structure); `null` only when the benchmark couldn't be done at this
     concurrency.
   - `learned`: the major things this trial taught you at this concurrency that
-    you did not know before it ran. Required for every `results` entry,
+    you did not know before it ran. Required for every `result` entry,
     including a failed one.
   - `failed`: `true` if the configuration did not run or the benchmark broke
     a constraint such as `max_ttft` or `min_context_length` at this
@@ -394,8 +387,8 @@ All verification and benchmark requests must succeed.
 
 Record every benchmark using the following structure and field names (values
 are illustrative): for a trial, in `trials/<n>/trial.json` as
-`results[concurrency == <c>].benchmark`; for the final service, as
-`final_report.json.results[concurrency == <c>].benchmark`, where `<c>` is
+`result[concurrency == <c>].benchmark`; for the final service, as
+`final_report.json.result[concurrency == <c>].benchmark`, where `<c>` is
 a concurrency value from `constraints.json`.
 
 ```json
@@ -427,17 +420,18 @@ the numbers used to compare trials (see `## Performance`).
 Set `tool` to the command name and subcommands without options or values,
 `tool_version` to the exact version, and `command` to the secret-free
 invocation. For the final benchmark, use streaming responses. Set
-`results[].benchmark.workload.concurrency` to the same value as
-`results[].concurrency`. Produce every field of the structure,
+`result[concurrency == <c>].benchmark.workload.concurrency` to the same value as
+`result[concurrency == <c>].concurrency`, where `<c>`
+is a concurrency value. Produce every field of the structure,
 and calculate all metrics from the
 `num_requests` measured requests only — exclude setup, health-check, and
 warmup requests. Never invent missing values.
 
 After each benchmark, find the largest context the configuration handles by
 sending real requests, and record it: for a trial, in
-`trials/<n>/trial.json` as `results[concurrency == <c>].context_length`;
+`trials/<n>/trial.json` as `result[concurrency == <c>].context_length`;
 for the final service, as
-`final_report.json.results[concurrency == <c>].context_length`, where `<c>`
+`final_report.json.result[concurrency == <c>].context_length`, where `<c>`
 is a concurrency value. Stopping at the required minimum is not enough.
 
 
@@ -614,12 +608,12 @@ variable listed under `env` in `constraints.json`.
 
 Do not put secret values in `final_report.json`, or print them. Use env
 references in `final_report.json.service_yaml`; use environment variable
-names or redacted values in `final_report.json.results[].benchmark.command`.
+names or redacted values in `final_report.json.result[concurrency == <c>].benchmark.command`, where `<c>`is a concurrency value.
 
 # Final Report
 
 `final_report.json` may contain only `success`, `run_id`, `run_name`,
-`service_yaml`, `trial`, `base`, `model`, `results`, and `failure_summary`.
+`service_yaml`, `trial`, `base`, `model`, `result`, and `failure_summary`.
 
 On success (even if you had to pick a failed trial because no non-failed
 trial remained), include exactly:
@@ -631,8 +625,7 @@ trial remained), include exactly:
 - `trial`: the `<n>` of the verified trial
 - `base`: the base model repo, determined by the rules below
 - `model`: the exact repo/path loaded by the final service command
-- `results`: the final service results, one entry for each value of `concurrency`
-  from `constraints.json`. Each entry contains:
+- `result`: list of final service result objects, one object for each value of `concurrency` from `constraints.json`. Each object has fields no other than below:
   - `concurrency`: the concurrency value for this result
   - `context_length`: the largest context verified for the final service at
     this concurrency, as described in `## Benchmark`
