@@ -11,6 +11,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 import yaml
+from material.plugins.blog.structure import View
 
 from mkdocs.structure.files import File
 
@@ -243,6 +244,14 @@ def _escape_html_attr(value: str) -> str:
 
 def _swagger_error(pre_token: str, post_token: str, message: str) -> str:
     return pre_token + escape(f"!! SWAGGER ERROR: {message} !!") + post_token
+
+
+def on_page_context(context, page, config, nav):
+    """Hide blog posts with `unlisted: true` from the blog index and category pages."""
+    if isinstance(page, View):
+        # In place: paginated pages share the list. Runs before the blog plugin renders views.
+        page.posts[:] = [post for post in page.posts if not post.meta.get("unlisted")]
+    return context
 
 
 def on_config(config):
