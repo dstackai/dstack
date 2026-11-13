@@ -448,6 +448,11 @@ class JobSubmission(CoreModel):
     """
     termination_reason_message: Optional[str] = None
     exit_status: Optional[int] = None
+    """`exit_status` is `-N` if the job's process was killed by signal `N`, e.g. `-9` for
+    `SIGKILL`, as in Python's `subprocess`. The process is the shell running the job's commands,
+    so this happens only if the shell has replaced itself with the command that got the signal.
+    Otherwise, the shell exits with `128 + N`. Older runners report `-1` for any signal.
+    """
     job_provisioning_data: Optional[JobProvisioningData] = None
     job_runtime_data: Optional[JobRuntimeData] = None
     error: Optional[str] = None
