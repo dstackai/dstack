@@ -71,18 +71,33 @@ func TestExecutor_HomeDir(t *testing.T) {
 	assert.Equal(t, ex.currentUser.HomeDir+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
 
-func TestExecutor_NonZeroExit(t *testing.T) {
-	ex := makeTestExecutor(t)
-	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "exit 100")
-	makeCodeTar(t, ex)
+func TestExecutor_ExitStatus(t *testing.T) {
+	testCases := []struct {
+		name     string
+		command  string
+		expected int
+	}{
+		{"exited", "exit 100", 100},
+		// $$ is the shell itself, the runner's direct child, so no shell is left to turn the
+		// signal into 128+N
+		{"killed_by_signal", "kill -KILL $$", -9},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ex := makeTestExecutor(t)
+			ex.jobSpec.Commands = append(ex.jobSpec.Commands, tc.command)
+			makeCodeTar(t, ex)
 
-	setUpTestExecutor(t, ex)
-	err := ex.Run(t.Context())
-	assert.Error(t, err)
-	assert.NotEmpty(t, ex.jobStateHistory)
-	exitStatus := ex.jobStateHistory[len(ex.jobStateHistory)-1].ExitStatus
-	assert.NotNil(t, exitStatus)
-	assert.Equal(t, 100, *exitStatus)
+			setUpTestExecutor(t, ex)
+			err := ex.Run(t.Context())
+			assert.Error(t, err)
+			require.NotEmpty(t, ex.jobStateHistory)
+			lastState := ex.jobStateHistory[len(ex.jobStateHistory)-1]
+			assert.Equal(t, schemas.JobStateFailed, lastState.State)
+			require.NotNil(t, lastState.ExitStatus)
+			assert.Equal(t, tc.expected, *lastState.ExitStatus)
+		})
+	}
 }
 
 func TestExecutor_SSHCredentials(t *testing.T) {

@@ -618,8 +618,12 @@ def _get_job_status_message(job_model: JobModel) -> str:
     if job_model.status == JobStatus.DONE:
         return "exited (0)"
     elif job_model.status == JobStatus.FAILED:
-        if job_model.termination_reason == JobTerminationReason.CONTAINER_EXITED_WITH_ERROR:
-            return f"exited ({job_model.exit_status})"
+        if (
+            job_model.termination_reason == JobTerminationReason.CONTAINER_EXITED_WITH_ERROR
+            # Not set if the job failed outside of its process, e.g. the repo setup failed
+            and job_model.exit_status is not None
+        ):
+            return f"exited ({_get_shell_exit_status(job_model.exit_status)})"
         elif (
             job_model.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         ):
@@ -639,6 +643,17 @@ def _get_job_status_message(job_model: JobModel) -> str:
         elif job_model.termination_reason == JobTerminationReason.ABORTED_BY_USER:
             return "aborted"
     return job_model.status.value
+
+
+def _get_shell_exit_status(exit_status: int) -> int:
+    """
+    Converts a signal `N`, stored as `-N`, to `128 + N`, the way shells and Docker report it.
+    A forking shell already reports the signal as `128 + N`, so this makes a kill look the same
+    whichever shell the job runs in. `-1` is kept as is: older runners report it for any signal.
+    """
+    if exit_status >= 0 or exit_status == -1:
+        return exit_status
+    return 128 - exit_status
 
 
 def _get_job_error(job_model: JobModel) -> Optional[str]:
