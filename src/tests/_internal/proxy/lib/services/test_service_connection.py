@@ -191,6 +191,31 @@ class TestServiceConnection:
 
 @pytest.mark.asyncio
 class TestServiceConnectionPool:
+    async def test_gateway_service_client_is_reused_and_closed_on_service_removal(
+        self, service, pool
+    ):
+        clients = await asyncio.gather(
+            *(pool.get_or_add_service_client(service) for _ in range(5))
+        )
+
+        assert all(client is clients[0] for client in clients)
+        assert clients[0].headers["Host"] == service.domain
+        assert not clients[0].is_closed
+
+        await pool.remove_service_client(service.project_name, service.run_name)
+
+        assert clients[0].is_closed
+        replacement = await pool.get_or_add_service_client(service)
+        assert replacement is not clients[0]
+
+    async def test_remove_all_closes_gateway_service_clients(self, service, pool):
+        client = await pool.get_or_add_service_client(service)
+
+        await pool.remove_all()
+
+        assert client.is_closed
+        assert not pool._service_clients
+
     @pytest.mark.parametrize("gateway", [False, True])
     async def test_proxy_jump_key_update_preserves_client_socket_and_reconnects_with_new_key(
         self, project, service, pool, tunnel_factory, gateway
