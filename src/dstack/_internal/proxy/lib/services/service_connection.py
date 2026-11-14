@@ -202,6 +202,8 @@ class ServiceConnectionPool:
     def __init__(self) -> None:
         # TODO(#2238): remove connections to stopped replicas in-server
         self.connections: Dict[str, ServiceConnection] = {}
+        self._service_clients: Dict[tuple[str, str], ServiceClient] = {}
+        self._service_clients_lock = asyncio.Lock()
         self._reconnect_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TUNNEL_RECONNECTS)
 
     async def get(self, replica_id: str) -> Optional[ServiceConnection]:
@@ -244,6 +246,28 @@ class ServiceConnectionPool:
         if connection is not None:
             await connection.close()
 
+    async def get_or_add_service_client(self, service: Service) -> ServiceClient:
+        if service.domain is None:
+            raise UnexpectedProxyError(f"Expected a domain for service {service.fmt()}")
+        key = (service.project_name, service.run_name)
+        async with self._service_clients_lock:
+            client = self._service_clients.get(key)
+            if client is None or client.is_closed:
+                client = ServiceClient(
+                    base_url="http://127.0.0.1",
+                    headers={"Host": service.domain},
+                    timeout=service.read_timeout,
+                )
+                self._service_clients[key] = client
+            return client
+
+    async def remove_service_client(self, project_name: str, run_name: str) -> None:
+        key = (project_name, run_name)
+        async with self._service_clients_lock:
+            client = self._service_clients.pop(key, None)
+        if client is not None:
+            await client.aclose()
+
     async def remove_all(self) -> None:
         replica_ids = list(self.connections)
         results = await asyncio.gather(
@@ -254,6 +278,15 @@ class ServiceConnectionPool:
                 logger.error(
                     "Error removing connection to service replica %s: %s", replica_ids[i], exc
                 )
+        async with self._service_clients_lock:
+            clients = list(self._service_clients.values())
+            self._service_clients.clear()
+        results = await asyncio.gather(
+            *(client.aclose() for client in clients), return_exceptions=True
+        )
+        for exc in results:
+            if isinstance(exc, Exception):
+                logger.error("Error closing HTTP client for a service: %s", exc)
 
 
 async def get_service_replica_client(
@@ -264,11 +297,7 @@ async def get_service_replica_client(
     """
     if service.domain is not None:
         # Forward to Nginx so that requests are visible to StatsCollector in the access log
-        return httpx.AsyncClient(
-            base_url="http://127.0.0.1",
-            headers={"Host": service.domain},
-            timeout=service.read_timeout,
-        )
+        return await service_conn_pool.get_or_add_service_client(service)
     # Nginx not available, forward directly to the tunnel
     replica = random.choice(service.replicas)
     connection = await service_conn_pool.get(replica.id)

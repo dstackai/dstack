@@ -129,6 +129,7 @@ async def unregister_service(
         await nginx.unregister(service)
         await repo.delete_models_by_run(project_name, run_name)
         await repo.delete_service(project_name, run_name)
+        await service_conn_pool.remove_service_client(project_name, run_name)
 
     logger.info("Service %s is unregistered now", service.fmt())
 
