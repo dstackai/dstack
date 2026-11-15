@@ -625,7 +625,8 @@ def get_nvidia_gpu_from_node_labels(
     gpu_product, _, mig_profile = gpu_product.partition(NVIDIA_MIG_PRODUCT_SEPARATOR)
     if mig_resource is not None:
         mig_profile = mig_resource.removeprefix(NVIDIA_MIG_RESOURCE_PREFIX)
-    gpu_product = gpu_product.replace("RTX-", "RTX")
+    # Join "RTX" with the model, e.g. "RTX-4090" -> "RTX4090", "RTX-PRO-6000" -> "RTXPRO6000"
+    gpu_product = gpu_product.replace("RTX-PRO-", "RTXPRO").replace("RTX-", "RTX")
     for gpu_name in NVIDIA_GPU_NAMES:
         if gpu_name.lower() in gpu_product.lower().split("-"):
             break
