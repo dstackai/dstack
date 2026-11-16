@@ -169,3 +169,29 @@ sqlite3 ~/.dstack/server/data/sqlite.db "SELECT ssh_private_key FROM gateway_com
 chmod 600 /tmp/gateway.key
 ssh -i /tmp/gateway.key ubuntu@$GATEWAY_IP_ADDR sudo journalctl -u dstack.gateway.service
 ```
+
+## Gateway usage metering (DS-002)
+
+Metering is opt-in per registered OpenAI service via the private `/api/config` field
+`usage_metering_profiles` (`service.id` → `vllm-0.19.1-prompt-details`). Legacy updates
+that omit the field preserve it; an empty map disables it. Drain changed services
+and cross a minute boundary before changing the profile.
+
+The existing Python model proxy observes backend JSON/SSE usage and obtains a verified
+user ID from server's additive `authorize_proxy` endpoint. Counters use that user ID
+and the service ID. They describe measured usage, not a payer or a charge.
+
+Gateway owns `/home/ubuntu/dstack/usage-counters.json` with an active minute and immutable
+pending batches. Atomic checkpoints and exact-ID ACK protect closed data; active
+observations since the last successful checkpoint can be lost on forced termination.
+The `.lock` sidecar enforces one process, and `.initialized` detects missing established state.
+Never delete/reset these files as a routine repair: reconcile identity/history first.
+
+Server polls `/api/usage/batches` over the existing private SSH management connection,
+commits idempotent receipts/entries, then POSTs `/api/usage/batches/ack`. No network
+work happens inside its database transaction. Old Gateways lacking this API are skipped.
+
+Public project model endpoints traverse metering; direct service hostnames still bypass it.
+Resolve that routing policy before paid use. Token quotas are outside DS-002. Local
+scenarios live in `src/tests/_internal/proxy/gateway/metering`; real-minute and real-Nginx
+checks are explicit opt-ins.

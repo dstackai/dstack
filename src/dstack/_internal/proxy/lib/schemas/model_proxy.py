@@ -8,6 +8,14 @@ class ChatMessage(CoreModel):
     content: str
 
 
+class StreamOptions(CoreModel):
+    include_usage: bool = False
+
+
+class PromptTokensDetails(CoreModel):
+    cached_tokens: Optional[int] = None
+
+
 class ChatCompletionsRequest(CoreModel):
     messages: List[ChatMessage]
     model: str
@@ -20,6 +28,7 @@ class ChatCompletionsRequest(CoreModel):
     seed: Optional[int] = None
     stop: Optional[Union[str, List[str]]] = None
     stream: bool = False
+    stream_options: Optional[StreamOptions] = None
     temperature: Optional[float] = 1.0
     top_p: Optional[float] = 1.0
     tools: List[Any] = []
@@ -44,6 +53,7 @@ class ChatCompletionsUsage(CoreModel):
     completion_tokens: int
     prompt_tokens: int
     total_tokens: int
+    prompt_tokens_details: Optional[PromptTokensDetails] = None
 
 
 class ChatCompletionsResponse(CoreModel):
@@ -63,6 +73,7 @@ class ChatCompletionsChunk(CoreModel):
     model: str
     system_fingerprint: Optional[str] = ""
     object: Literal["chat.completion.chunk"] = "chat.completion.chunk"
+    usage: Optional[ChatCompletionsUsage] = None
 
 
 class Model(CoreModel):

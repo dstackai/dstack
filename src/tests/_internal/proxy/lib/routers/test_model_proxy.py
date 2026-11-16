@@ -33,7 +33,9 @@ SAMPLE_RESPONSE = "Hello there, how may I assist you today?"
 
 
 class ChatClientStub(ChatCompletionsClient):
-    async def generate(self, request: ChatCompletionsRequest) -> ChatCompletionsResponse:
+    async def generate(
+        self, request: ChatCompletionsRequest, *, attempt=None
+    ) -> ChatCompletionsResponse:
         return ChatCompletionsResponse(
             id="chatcmpl-123",
             choices=[
@@ -55,7 +57,9 @@ class ChatClientStub(ChatCompletionsClient):
             ),
         )
 
-    async def stream(self, request: ChatCompletionsRequest) -> AsyncIterator[ChatCompletionsChunk]:
+    async def stream(
+        self, request: ChatCompletionsRequest, *, attempt=None
+    ) -> AsyncIterator[ChatCompletionsChunk]:
         for i, word in enumerate(SAMPLE_RESPONSE.split(" ")):
             if i > 0:
                 word = " " + word

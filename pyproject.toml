@@ -135,6 +135,7 @@ addopts = [
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 markers = [
+    "metering_realtime: explicit actual-minute DS-002 acceptance run",
     "shim_version",
     "dockerized",
 ]

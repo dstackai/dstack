@@ -19,6 +19,7 @@ from dstack._internal.proxy.lib.schemas.model_proxy import (
     ChatMessage,
 )
 from dstack._internal.proxy.lib.services.model_proxy.clients.base import ChatCompletionsClient
+from dstack._internal.proxy.lib.services.usage import UsageAttempt
 
 
 class TGIChatCompletions(ChatCompletionsClient):
@@ -36,7 +37,9 @@ class TGIChatCompletions(ChatCompletionsClient):
         except jinja2.TemplateError as e:
             raise ProxyError(f"Failed to compile chat template: {e}")
 
-    async def generate(self, request: ChatCompletionsRequest) -> ChatCompletionsResponse:
+    async def generate(
+        self, request: ChatCompletionsRequest, *, attempt: UsageAttempt | None = None
+    ) -> ChatCompletionsResponse:
         payload = self.get_payload(request)
         try:
             resp = await self.client.post("/generate", json=payload)
@@ -89,7 +92,9 @@ class TGIChatCompletions(ChatCompletionsClient):
             ),
         )
 
-    async def stream(self, request: ChatCompletionsRequest) -> AsyncIterator[ChatCompletionsChunk]:
+    async def stream(
+        self, request: ChatCompletionsRequest, *, attempt: UsageAttempt | None = None
+    ) -> AsyncIterator[ChatCompletionsChunk]:
         completion_id = uuid.uuid4().hex
         created = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
 

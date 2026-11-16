@@ -83,3 +83,42 @@ class TestGatewayProxyAuthProvider:
 def _get_auth_cache() -> BaseCache:
     # `aiocache.cached` sets `cache` on the wrapper at runtime, but its type doesn't declare it
     return GatewayProxyAuthProvider.is_project_member.cache  # pyright: ignore[reportAttributeAccessIssue]
+
+
+@pytest.mark.asyncio
+async def test_verified_identity_cache_is_scoped_to_provider():
+    calls = []
+
+    def handler(subject):
+        def respond(request):
+            calls.append(request.url.path)
+            return httpx.Response(200, json={"consumer_subject_id": subject})
+
+        return respond
+
+    async with (
+        httpx.AsyncClient(
+            transport=httpx.MockTransport(handler("user-a")), base_url="http://one"
+        ) as one,
+        httpx.AsyncClient(
+            transport=httpx.MockTransport(handler("user-b")), base_url="http://two"
+        ) as two,
+    ):
+        a, b = GatewayProxyAuthProvider(one), GatewayProxyAuthProvider(two)
+        subject_a = await a.resolve_subject("project", "same-token")
+        assert subject_a is not None and subject_a.consumer_subject_id == "user-a"
+        subject_b = await b.resolve_subject("project", "same-token")
+        assert subject_b is not None and subject_b.consumer_subject_id == "user-b"
+        subject_a = await a.resolve_subject("project", "same-token")
+        assert subject_a is not None and subject_a.consumer_subject_id == "user-a"
+        assert calls == ["/api/projects/project/authorize_proxy"] * 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [401, 403, 404])
+async def test_missing_or_denied_identity_never_returns_a_subject(status):
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda request: httpx.Response(status)),
+        base_url="http://server",
+    ) as client:
+        assert await GatewayProxyAuthProvider(client).resolve_subject("p", "t") is None

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.projects import Project, ProjectsInfoListOrProjectsList
+from dstack._internal.proxy.lib.schemas.usage import AuthorizedSubject
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.projects import (
@@ -220,3 +221,11 @@ async def update_project(
     )
     await session.refresh(project)
     return CustomJSONResponse(projects.project_model_to_project(project))
+
+
+@router.post("/{project_name}/authorize_proxy", response_model=AuthorizedSubject)
+async def authorize_proxy(
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMemberOrPublicAccess()),
+):
+    user, _ = user_project
+    return AuthorizedSubject(consumer_subject_id=user.id.hex)

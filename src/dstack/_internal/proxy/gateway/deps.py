@@ -1,8 +1,10 @@
+import asyncio
 from typing import Annotated, AsyncGenerator
 
 from fastapi import Depends, FastAPI, Request
 
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.services.metering import MeteringCollector
 from dstack._internal.proxy.gateway.services.nginx import Nginx
 from dstack._internal.proxy.gateway.services.stats import StatsCollector
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
@@ -22,18 +24,29 @@ class GatewayDependencyInjector(ProxyDependencyInjector):
         auth: BaseProxyAuthProvider,
         nginx: Nginx,
         stats_collector: StatsCollector,
+        metering: MeteringCollector | None = None,
     ) -> None:
         super().__init__()
         self._repo = repo
         self._auth = auth
         self._nginx = nginx
         self._stats_collector = stats_collector
+        self._metering = metering
+        self.config_lock = asyncio.Lock()
 
     async def get_repo(self) -> AsyncGenerator[BaseProxyRepo, None]:
         yield self._repo
 
     async def get_auth_provider(self) -> AsyncGenerator[BaseProxyAuthProvider, None]:
         yield self._auth
+
+    def get_usage_observer(self):
+        return self._metering or super().get_usage_observer()
+
+    def get_metering(self) -> MeteringCollector:
+        if self._metering is None:
+            raise UnexpectedProxyError("Gateway metering dependency is missing")
+        return self._metering
 
     def get_nginx(self) -> Nginx:
         return self._nginx
@@ -71,3 +84,9 @@ async def get_stats_collector(
     injector: Annotated[GatewayDependencyInjector, Depends(get_gateway_injector)],
 ) -> StatsCollector:
     return injector.get_stats_collector()
+
+
+async def get_metering(
+    injector: Annotated[GatewayDependencyInjector, Depends(get_gateway_injector)],
+) -> MeteringCollector:
+    return injector.get_metering()

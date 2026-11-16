@@ -1508,3 +1508,46 @@ class ProviderRefModel(BaseModel):
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
 
     __table_args__ = (Index("ix_provider_refs_project_id_created_at", project_id, created_at),)
+
+
+class UsageCollectorModel(BaseModel):
+    """Durable identity binding; intentionally independent of live resource deletion."""
+
+    __tablename__ = "usage_collectors"
+    collector_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    gateway_replica_id: Mapped[uuid.UUID] = mapped_column(UUIDType(binary=False), unique=True)
+
+
+class UsageBatchModel(BaseModel):
+    __tablename__ = "usage_batches"
+    __table_args__ = (
+        UniqueConstraint("collector_id", "batch_id", name="uq_usage_batches_collector_batch"),
+        UniqueConstraint(
+            "collector_id", "interval_start", name="uq_usage_batches_collector_minute"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    collector_id: Mapped[str] = mapped_column(ForeignKey("usage_collectors.collector_id"))
+    batch_id: Mapped[str] = mapped_column(String(128))
+    interval_start: Mapped[datetime] = mapped_column(NaiveDateTime)
+    interval_end: Mapped[datetime] = mapped_column(NaiveDateTime)
+    received_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    content: Mapped[str] = mapped_column(Text)
+    """Canonical normalized counters, never prompts, responses, or bearer tokens."""
+
+
+class UsageCounterModel(BaseModel):
+    __tablename__ = "usage_counters"
+
+    receipt_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("usage_batches.id"), primary_key=True)
+    consumer_subject_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    service_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    # Historical source IDs deliberately have no cascading foreign keys to users/runs.
+    prompt_tokens: Mapped[int] = mapped_column(BigInteger)
+    cached_prompt_tokens: Mapped[int] = mapped_column(BigInteger)
+    completion_tokens: Mapped[int] = mapped_column(BigInteger)
+    total_tokens: Mapped[int] = mapped_column(BigInteger)
+    unknown_usage_attempts: Mapped[int] = mapped_column(BigInteger)

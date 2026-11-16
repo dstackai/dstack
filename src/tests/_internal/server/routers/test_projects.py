@@ -2420,3 +2420,33 @@ class TestUpdateProjectVisibility:
                 }
             ]
         }
+
+
+class TestAuthorizeProxy:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("kind", ["member", "admin", "public", "denied", "invalid"])
+    async def test_returns_authenticated_actor_only_after_access_check(
+        self, session, client, kind
+    ):
+        owner = await create_user(
+            session=session, name="capacity-owner", global_role=GlobalRole.USER
+        )
+        actor = await create_user(
+            session=session,
+            name="consumer",
+            global_role=(GlobalRole.ADMIN if kind == "admin" else GlobalRole.USER),
+        )
+        project = await create_project(session=session, owner=owner, is_public=kind == "public")
+        if kind == "member":
+            await add_project_member(
+                session=session, project=project, user=actor, project_role=ProjectRole.USER
+            )
+        response = await client.post(
+            f"/api/projects/{project.name}/authorize_proxy",
+            headers=get_auth_headers("bad-token" if kind == "invalid" else actor.token),
+        )
+        if kind in ("denied", "invalid"):
+            assert response.status_code in (401, 403)
+        else:
+            assert response.status_code == 200
+            assert response.json() == {"consumer_subject_id": actor.id.hex}

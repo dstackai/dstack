@@ -1,0 +1,7 @@
+{
+  "A": {"prompt_tokens":20,"cached_prompt_tokens":5,"completion_tokens":3,"total_tokens":23,"unknown_usage_attempts":0},
+  "B": {"prompt_tokens":20,"cached_prompt_tokens":0,"completion_tokens":4,"total_tokens":24,"unknown_usage_attempts":0},
+  "C": {"prompt_tokens":11,"cached_prompt_tokens":2,"completion_tokens":7,"total_tokens":18,"unknown_usage_attempts":0},
+  "D": {"prompt_tokens":30,"cached_prompt_tokens":9,"completion_tokens":2,"total_tokens":32,"unknown_usage_attempts":0},
+  "cut": {"prompt_tokens":0,"cached_prompt_tokens":0,"completion_tokens":0,"total_tokens":0,"unknown_usage_attempts":1}
+}

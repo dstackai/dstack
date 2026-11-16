@@ -17,6 +17,11 @@ from dstack._internal.proxy.gateway.schemas.registry import (
 )
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListResponse
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
+from dstack._internal.proxy.lib.schemas.usage import (
+    UsageAckRequest,
+    UsageAckResponse,
+    UsageBatchPage,
+)
 from dstack._internal.server import settings
 
 
@@ -241,6 +246,26 @@ class GatewayClient:
             # TODO: remove after a few releases
             return []
         return TypeAdapter(list[ServiceStats]).validate_python(resp_data)
+
+    async def fetch_usage_batches(self, limit: int = 100) -> UsageBatchPage:
+        if not 1 <= limit <= 100:
+            raise ValueError("Usage page limit must be between 1 and 100")
+        response = await self._client.get(
+            self._url("/api/usage/batches"), params={"limit": limit}, timeout=10
+        )
+        response.raise_for_status()
+        return UsageBatchPage.model_validate(response.json())
+
+    async def acknowledge_usage(self, batch_ids: list[str]) -> UsageAckResponse:
+        payload = UsageAckRequest(batch_ids=batch_ids)
+        response = await self._client.post(
+            self._url("/api/usage/batches/ack"), json=payload.model_dump(), timeout=10
+        )
+        response.raise_for_status()
+        result = UsageAckResponse.model_validate(response.json())
+        if set(result.acknowledged_batch_ids) != set(batch_ids):
+            raise ValueError("Gateway acknowledged unexpected usage batch IDs")
+        return result
 
     def _url(self, path: str) -> str:
         return f"{self.base_url}/{path.lstrip('/')}"

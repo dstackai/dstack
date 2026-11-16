@@ -6,13 +6,18 @@ from dstack._internal.proxy.lib.schemas.model_proxy import (
     ChatCompletionsRequest,
     ChatCompletionsResponse,
 )
+from dstack._internal.proxy.lib.services.usage import UsageAttempt
 
 
 class ChatCompletionsClient(ABC):
     @abstractmethod
-    async def generate(self, request: ChatCompletionsRequest) -> ChatCompletionsResponse:
+    async def generate(
+        self, request: ChatCompletionsRequest, *, attempt: UsageAttempt | None = None
+    ) -> ChatCompletionsResponse:
         pass
 
     @abstractmethod
-    async def stream(self, request: ChatCompletionsRequest) -> AsyncIterator[ChatCompletionsChunk]:
+    async def stream(
+        self, request: ChatCompletionsRequest, *, attempt: UsageAttempt | None = None
+    ) -> AsyncIterator[ChatCompletionsChunk]:
         yield

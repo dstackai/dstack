@@ -7,7 +7,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
+from dstack._internal.proxy.lib.schemas.usage import AuthorizedSubject
 from dstack._internal.proxy.lib.services.service_connection import ServiceConnectionPool
+from dstack._internal.proxy.lib.services.usage import UsageObserver
 
 
 class ProxyDependencyInjector(ABC):
@@ -31,6 +33,9 @@ class ProxyDependencyInjector(ABC):
     @abstractmethod
     def get_auth_provider(self) -> AsyncGenerator[BaseProxyAuthProvider, None]:
         pass
+
+    def get_usage_observer(self) -> UsageObserver:
+        return UsageObserver()
 
     async def get_service_connection_pool(self) -> ServiceConnectionPool:
         return self._service_conn_pool
@@ -72,6 +77,14 @@ class ProxyAuthContext:
         self._project_name = project_name
         self._token = token
         self._provider = provider
+        self._subject: AuthorizedSubject | None = None
+
+    async def require_subject(self) -> AuthorizedSubject:
+        if self._subject is None and self._token is not None:
+            self._subject = await self._provider.resolve_subject(self._project_name, self._token)
+        if self._subject is None:
+            raise ProxyError("Verified identity is required for metered inference", 403)
+        return self._subject
 
     async def enforce(self) -> None:
         if self._token is None or not await self._provider.is_project_member(
