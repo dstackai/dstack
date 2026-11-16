@@ -637,6 +637,9 @@ def get_nvidia_gpu_from_node_labels(
     # A100 may come in two variants
     if "40GB" in gpu_product:
         gpu_memory = 40 * 1024
+    # RTX PRO 5000 may come in two variants
+    if gpu_name == "RTXPRO5000":
+        gpu_memory = (72 if "72GB" in gpu_product else 48) * 1024
     if mig_profile:
         mig_memory = _get_mig_memory_mib(mig_profile)
         if mig_memory is None:

@@ -78,6 +78,12 @@ class TestGetNvidiaGPUFromNodeLabels:
                 96,
                 id="rtx-pro-6000-server",
             ),
+            # The two RTX PRO 5000 variants share the name; only the 72GB one has its memory
+            # in the product name
+            pytest.param("NVIDIA-RTX-PRO-5000-Blackwell", "RTXPRO5000", 48, id="rtx-pro-5000"),
+            pytest.param(
+                "NVIDIA-RTX-PRO-5000-72GB-Blackwell", "RTXPRO5000", 72, id="rtx-pro-5000-72gb"
+            ),
             pytest.param("NVIDIA-RTX-PRO-4500-Blackwell", "RTXPRO4500", 32, id="rtx-pro-4500"),
             pytest.param("NVIDIA-GeForce-RTX-4090", "RTX4090", 24, id="rtx-4090"),
         ],
