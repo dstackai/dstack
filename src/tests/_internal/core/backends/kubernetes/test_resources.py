@@ -65,6 +65,39 @@ class TestGetNvidiaGPUFromNodeLabels:
     @pytest.mark.parametrize(
         ["product", "expected_name", "expected_memory_gb"],
         [
+            # The label set by GPU Feature Discovery v0.20.1
+            pytest.param(
+                "NVIDIA-RTX-PRO-6000-Blackwell-Max-Q-Workstation-Edition",
+                "RTXPRO6000",
+                96,
+                id="rtx-pro-6000-max-q",
+            ),
+            pytest.param(
+                "NVIDIA-RTX-PRO-6000-Blackwell-Server-Edition",
+                "RTXPRO6000",
+                96,
+                id="rtx-pro-6000-server",
+            ),
+            # The two RTX PRO 5000 variants share the name; only the 72GB one has its memory
+            # in the product name
+            pytest.param("NVIDIA-RTX-PRO-5000-Blackwell", "RTXPRO5000", 48, id="rtx-pro-5000"),
+            pytest.param(
+                "NVIDIA-RTX-PRO-5000-72GB-Blackwell", "RTXPRO5000", 72, id="rtx-pro-5000-72gb"
+            ),
+            pytest.param("NVIDIA-RTX-PRO-4500-Blackwell", "RTXPRO4500", 32, id="rtx-pro-4500"),
+            pytest.param("NVIDIA-GeForce-RTX-4090", "RTX4090", 24, id="rtx-4090"),
+        ],
+    )
+    def test_returns_rtx_gpu(self, product: str, expected_name: str, expected_memory_gb: int):
+        assert get_nvidia_gpu_from_node_labels({"nvidia.com/gpu.product": product}) == Gpu(
+            vendor=AcceleratorVendor.NVIDIA,
+            name=expected_name,
+            memory_mib=expected_memory_gb * 1024,
+        )
+
+    @pytest.mark.parametrize(
+        ["product", "expected_name", "expected_memory_gb"],
+        [
             # The label from NVIDIA's "MIG Support in Kubernetes" docs
             pytest.param("A100-SXM4-40GB-MIG-1g.5gb", "A100", 5, id="a100-40gb"),
             # The label set by GPU Operator v26.7.2 on GKE
