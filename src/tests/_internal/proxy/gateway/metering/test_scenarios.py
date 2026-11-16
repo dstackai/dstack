@@ -46,7 +46,12 @@ async def close_minute(h):
 
 async def two_intervals(h):
     driver = TrafficDriver(h.gateway_url, artifact_dir=h.state)
-    receiver = MockReceiver(h.gateway_url, h.state / "receiver.sqlite")
+    receiver = MockReceiver(
+        h.gateway_url,
+        h.state / "receiver.sqlite",
+        gateway_replica_id="replica-a",
+        gateway_id="gateway-a",
+    )
     evidence: dict = {"started_at": datetime.now(timezone.utc).isoformat()}
     try:
         for i in range(10):
@@ -97,7 +102,12 @@ async def test_two_intervals_and_ack(harness):
 async def test_selective_ack_during_traffic(harness):
     h = harness
     d = TrafficDriver(h.gateway_url, artifact_dir=h.state)
-    r = MockReceiver(h.gateway_url, h.state / "receiver.sqlite")
+    r = MockReceiver(
+        h.gateway_url,
+        h.state / "receiver.sqlite",
+        gateway_replica_id="replica-a",
+        gateway_id="gateway-a",
+    )
     try:
         await send(h, d, "P")
         await close_minute(h)
@@ -246,20 +256,34 @@ async def test_receiver_outage_and_retry(harness):
         pending = (await h.batches())["batches"]
         assert len(pending) == 2
         async with httpx.AsyncClient(base_url=h.gateway_url, transport=LostReply("GET")) as client:
-            r = MockReceiver(h.gateway_url, ledger, client)
+            r = MockReceiver(
+                h.gateway_url,
+                ledger,
+                client,
+                gateway_replica_id="replica-a",
+                gateway_id="gateway-a",
+            )
             with pytest.raises(httpx.ReadError):
                 await r.collect_once(1)
             assert r.receipt_ids() == [] and (await h.batches())["batches"] == pending
             first = await r.collect_once(1, acknowledge=False)
             await r.close()
-        r = MockReceiver(h.gateway_url, ledger)
+        r = MockReceiver(
+            h.gateway_url, ledger, gateway_replica_id="replica-a", gateway_id="gateway-a"
+        )
         replay = await r.collect_once(1, acknowledge=False)
         assert replay.replayed_ids == first.committed_ids
         await r.close()
         async with httpx.AsyncClient(
             base_url=h.gateway_url, transport=LostReply("POST")
         ) as client:
-            r = MockReceiver(h.gateway_url, ledger, client)
+            r = MockReceiver(
+                h.gateway_url,
+                ledger,
+                client,
+                gateway_replica_id="replica-a",
+                gateway_id="gateway-a",
+            )
             with pytest.raises(httpx.ReadError):
                 await r.acknowledge_committed(first.committed_ids)
             assert len((await h.batches())["batches"]) == 1
@@ -277,7 +301,12 @@ async def test_receiver_outage_and_retry(harness):
 async def test_gateway_restart_persistence(harness, kill):
     h = harness
     d = TrafficDriver(h.gateway_url, artifact_dir=h.state)
-    r = MockReceiver(h.gateway_url, h.state / "receiver.sqlite")
+    r = MockReceiver(
+        h.gateway_url,
+        h.state / "receiver.sqlite",
+        gateway_replica_id="replica-a",
+        gateway_id="gateway-a",
+    )
     try:
         await send(h, d, "P")
         await close_minute(h)
@@ -291,7 +320,12 @@ async def test_gateway_restart_persistence(harness, kill):
         await h.restart(kill)
         assert (await h.batches()) == page
         d = TrafficDriver(h.gateway_url, artifact_dir=h.state)
-        r = MockReceiver(h.gateway_url, h.state / "receiver.sqlite")
+        r = MockReceiver(
+            h.gateway_url,
+            h.state / "receiver.sqlite",
+            gateway_replica_id="replica-a",
+            gateway_id="gateway-a",
+        )
         await r.collect_once()
         await send(h, d, "R", case="C")
         await close_minute(h)
@@ -335,3 +369,53 @@ async def test_two_intervals_real_minutes(tmp_path):
         await two_intervals(h)
     finally:
         await h.stop()
+
+
+@pytest.mark.asyncio
+async def test_subject_service_totals_across_two_gateway_replicas(tmp_path):
+    # Separate processes exercise source attribution through actual HTTP endpoints,
+    # not just synthetic pages passed straight into the receiver.
+    gateways = [Harness(tmp_path / f"gateway-{i}") for i in range(2)]
+    drivers, receivers = [], []
+    try:
+        for i, h in enumerate(gateways):
+            await h.start()
+            driver = TrafficDriver(h.gateway_url)
+            drivers.append(driver)
+            receivers.append(
+                MockReceiver(
+                    h.gateway_url,
+                    tmp_path / "shared.sqlite",
+                    gateway_replica_id=f"replica-{i}",
+                    gateway_id="logical-gateway",
+                )
+            )
+            await send(h, driver, f"request-{i}", case="A")
+            await h.advance_clock()
+            page = await h.batches()
+            assert page["schema_version"] == 2 and "collector_id" not in page
+            await receivers[-1].collect_once()
+            assert not (await h.batches())["batches"]
+        assert receivers[0].totals()[PAIR] == dict(
+            prompt_tokens=40,
+            cached_prompt_tokens=10,
+            completion_tokens=6,
+            total_tokens=46,
+            unknown_usage_attempts=0,
+        )
+        rows = (
+            receivers[0]
+            .db.execute(
+                "SELECT gateway_id,COUNT(DISTINCT gateway_replica_id),COUNT(*) "
+                "FROM receipts GROUP BY gateway_id"
+            )
+            .fetchall()
+        )
+        assert rows == [("logical-gateway", 2, 2)]
+    finally:
+        for driver in drivers:
+            await driver.close()
+        for receiver in receivers:
+            await receiver.close()
+        for h in gateways:
+            await h.stop()

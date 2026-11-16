@@ -18,6 +18,7 @@ from dstack._internal.proxy.gateway.schemas.registry import (
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListResponse
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
 from dstack._internal.proxy.lib.schemas.usage import (
+    LegacyUsageBatchPage,
     UsageAckRequest,
     UsageAckResponse,
     UsageBatchPage,
@@ -254,7 +255,13 @@ class GatewayClient:
             self._url("/api/usage/batches"), params={"limit": limit}, timeout=10
         )
         response.raise_for_status()
-        return UsageBatchPage.model_validate(response.json())
+        payload = response.json()
+        if isinstance(payload, dict) and payload.get("schema_version", 1) == 1:
+            legacy = LegacyUsageBatchPage.model_validate(payload)
+            return UsageBatchPage.model_validate(
+                legacy.model_dump(exclude={"schema_version", "collector_id"})
+            )
+        return UsageBatchPage.model_validate(payload)
 
     async def acknowledge_usage(self, batch_ids: list[str]) -> UsageAckResponse:
         payload = UsageAckRequest(batch_ids=batch_ids)

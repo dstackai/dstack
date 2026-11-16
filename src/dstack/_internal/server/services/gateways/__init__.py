@@ -158,7 +158,8 @@ def emit_gateway_replica_status_change_event(
 
 GATEWAY_CONNECT_ATTEMPTS = 30
 GATEWAY_CONNECT_DELAY = 10
-GATEWAY_CONFIGURE_ATTEMPTS = 50
+# Allow slow first-boot Certbot/package downloads during this local experiment.
+GATEWAY_CONFIGURE_ATTEMPTS = 300
 GATEWAY_CONFIGURE_DELAY = 3
 
 

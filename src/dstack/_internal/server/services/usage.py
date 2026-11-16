@@ -10,7 +10,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.proxy.lib.schemas.usage import UsageBatch
-from dstack._internal.server.models import UsageBatchModel, UsageCollectorModel, UsageCounterModel
+from dstack._internal.server.models import UsageBatchModel, UsageCounterModel
 
 
 class UsageConflict(ValueError):
@@ -25,12 +25,13 @@ class ReceiptResult:
 
 
 async def ingest_usage_batch(
-    session: AsyncSession, gateway_replica_id: uuid.UUID, collector_id: str, batch: UsageBatch
+    session: AsyncSession,
+    gateway_replica_id: uuid.UUID,
+    gateway_id: uuid.UUID | None,
+    batch: UsageBatch,
 ) -> ReceiptResult:
     # Validate even callers that constructed an unchecked model_copy().
     batch = UsageBatch.model_validate(batch.model_dump())
-    if not collector_id or len(collector_id) > 128:
-        raise ValueError("Invalid collector identity")
     content = batch.model_dump(mode="json")
     content["entries"].sort(key=lambda entry: (entry["consumer_subject_id"], entry["service_id"]))
     canonical = json.dumps(content, sort_keys=True, separators=(",", ":"))
@@ -48,47 +49,44 @@ async def ingest_usage_batch(
     dialect_insert = (
         pg_insert if session.get_bind().dialect.name == "postgresql" else sqlite_insert
     )
-    # INSERT first avoids a read-to-write upgrade and handles cross-process races in Postgres.
-    await session.execute(
-        dialect_insert(UsageCollectorModel)
-        .values(collector_id=collector_id, gateway_replica_id=gateway_replica_id)
-        .on_conflict_do_nothing()
-    )
-    owner = await session.scalar(
-        select(UsageCollectorModel.gateway_replica_id).where(
-            UsageCollectorModel.collector_id == collector_id
-        )
-    )
-    if owner != gateway_replica_id:
-        raise UsageConflict("Collector identity reset or moved to another Gateway")
-
-    receipt_id = uuid.uuid4()
-    created = await session.scalar(
-        dialect_insert(UsageBatchModel)
-        .values(
-            id=receipt_id,
-            collector_id=collector_id,
-            batch_id=batch.batch_id,
-            interval_start=batch.interval_start,
-            interval_end=batch.interval_end,
-            content=canonical,
-        )
-        .on_conflict_do_nothing()
-        .returning(UsageBatchModel.id)
-    )
-    if created is None:
-        existing = await session.scalar(
-            select(UsageBatchModel.content).where(
-                UsageBatchModel.collector_id == collector_id,
-                UsageBatchModel.batch_id == batch.batch_id,
+    batch_record_id = uuid.uuid4()
+    created = None
+    if gateway_id is not None:
+        # INSERT first avoids SQLite read-to-write upgrades and serializes PG conflicts.
+        created = await session.scalar(
+            dialect_insert(UsageBatchModel)
+            .values(
+                id=batch_record_id,
+                gateway_replica_id=gateway_replica_id,
+                gateway_id=gateway_id,
+                batch_id=batch.batch_id,
+                interval_start=batch.interval_start,
+                interval_end=batch.interval_end,
+                content=canonical,
             )
+            .on_conflict_do_nothing()
+            .returning(UsageBatchModel.id)
         )
-        if existing != canonical:
-            raise UsageConflict("Conflicting batch content or duplicate minute under a new ID")
+    if created is None:
+        existing = (
+            await session.execute(
+                select(UsageBatchModel.content, UsageBatchModel.gateway_id).where(
+                    UsageBatchModel.gateway_replica_id == gateway_replica_id,
+                    UsageBatchModel.batch_id == batch.batch_id,
+                )
+            )
+        ).one_or_none()
+        if existing is None or existing.content != canonical:
+            raise UsageConflict("Missing source, conflicting content or duplicate minute")
+        if gateway_id is not None and existing.gateway_id not in (None, gateway_id):
+            raise UsageConflict("Historical Gateway identity cannot change")
         return ReceiptResult(batch.batch_id, inserted=False)
     if batch.entries:
         await session.execute(
             insert(UsageCounterModel),
-            [{"receipt_id": receipt_id, **entry.model_dump()} for entry in batch.entries],
+            [
+                {"usage_baches_id": batch_record_id, **entry.model_dump()}
+                for entry in batch.entries
+            ],
         )
     return ReceiptResult(batch.batch_id, inserted=True)

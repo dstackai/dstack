@@ -66,9 +66,7 @@ class UsageBatch(UsageModel):
         return self
 
 
-class UsageCheckpoint(UsageModel):
-    schema_version: Literal[1] = 1
-    collector_id: Identifier
+class _UsageCheckpoint(UsageModel):
     active_batch: UsageBatch
     pending_batches: list[UsageBatch] = Field(default_factory=list)
 
@@ -85,9 +83,18 @@ class UsageCheckpoint(UsageModel):
         return self
 
 
-class UsageBatchPage(UsageModel):
+class UsageCheckpoint(_UsageCheckpoint):
+    schema_version: Literal[2] = 2
+
+
+class LegacyUsageCheckpoint(_UsageCheckpoint):
+    """Read-only local format used before source identity moved to server."""
+
     schema_version: Literal[1] = 1
     collector_id: Identifier
+
+
+class _UsageBatchPage(UsageModel):
     batches: list[UsageBatch] = Field(default_factory=list, max_length=100)
     has_more: bool = False
 
@@ -96,6 +103,17 @@ class UsageBatchPage(UsageModel):
         if len({batch.batch_id for batch in self.batches}) != len(self.batches):
             raise ValueError("Duplicate batch ID")
         return self
+
+
+class UsageBatchPage(_UsageBatchPage):
+    schema_version: Literal[2] = 2
+
+
+class LegacyUsageBatchPage(_UsageBatchPage):
+    """Read-only compatibility for Gateways upgraded after the server."""
+
+    schema_version: Literal[1] = 1
+    collector_id: Identifier
 
 
 class UsageAckRequest(UsageModel):

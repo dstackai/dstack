@@ -30,21 +30,46 @@ class ReceiptReport:
 
 
 class MockReceiver:
-    def __init__(self, url: str, ledger: Path, client: httpx.AsyncClient | None = None):
-        self.client = client or httpx.AsyncClient(base_url=url, timeout=10)
-        self._owns_client = client is None
+    def __init__(
+        self,
+        url: str,
+        ledger: Path,
+        client: httpx.AsyncClient | None = None,
+        *,
+        gateway_replica_id: str,
+        gateway_id: str,
+    ):
+        if not gateway_replica_id or not gateway_id:
+            raise ValueError("Test receiver requires explicit source identities")
+        self.gateway_replica_id = gateway_replica_id
+        self.gateway_id = gateway_id
         self.db = sqlite3.connect(ledger)
+        tables = {
+            row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        columns = {row[1] for row in self.db.execute("PRAGMA table_info(receipts)")}
+        entry_columns = {row[1] for row in self.db.execute("PRAGMA table_info(entries)")}
+        if (
+            "metadata" in tables
+            or ("receipts" in tables and not {"gateway_replica_id", "gateway_id"} <= columns)
+            or ("entries" in tables and "gateway_replica_id" not in entry_columns)
+        ):
+            self.db.close()
+            raise ValueError(
+                "Unsupported legacy receiver ledger; convert explicitly or use a new test ledger"
+            )
         self.db.executescript("""
-            CREATE TABLE IF NOT EXISTS metadata (collector_id TEXT PRIMARY KEY);
             CREATE TABLE IF NOT EXISTS receipts (
-              collector_id TEXT, batch_id TEXT, content TEXT NOT NULL,
-              PRIMARY KEY (collector_id,batch_id));
+              gateway_replica_id TEXT, batch_id TEXT, gateway_id TEXT NOT NULL, content TEXT NOT NULL,
+              PRIMARY KEY (gateway_replica_id,batch_id));
             CREATE TABLE IF NOT EXISTS entries (
-              collector_id TEXT, batch_id TEXT, subject TEXT, service TEXT,
+              gateway_replica_id TEXT, batch_id TEXT, subject TEXT, service TEXT,
               prompt_tokens INTEGER, cached_prompt_tokens INTEGER,
               completion_tokens INTEGER, total_tokens INTEGER, unknown_usage_attempts INTEGER,
-              PRIMARY KEY (collector_id,batch_id,subject,service));
+              PRIMARY KEY (gateway_replica_id,batch_id,subject,service));
         """)
+        self.client = client or httpx.AsyncClient(base_url=url, timeout=10)
+        self._owns_client = client is None
 
     async def collect_once(self, limit: int = 100, acknowledge: bool = True) -> ReceiptReport:
         response = await self.client.get("/api/usage/batches", params={"limit": limit})
@@ -60,32 +85,28 @@ class MockReceiver:
     def commit_page(self, page: UsageBatchPage) -> tuple[list[str], list[str]]:
         new, replay = [], []
         with self.db:
-            bound = self.db.execute("SELECT collector_id FROM metadata").fetchone()
-            if bound and bound[0] != page.collector_id:
-                raise ValueError("Collector identity changed; reconcile")
-            self.db.execute("INSERT OR IGNORE INTO metadata VALUES (?)", (page.collector_id,))
             for batch in page.batches:
                 content = json.dumps(
                     batch.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
                 )
                 existing = self.db.execute(
-                    "SELECT content FROM receipts WHERE collector_id=? AND batch_id=?",
-                    (page.collector_id, batch.batch_id),
+                    "SELECT content,gateway_id FROM receipts WHERE gateway_replica_id=? AND batch_id=?",
+                    (self.gateway_replica_id, batch.batch_id),
                 ).fetchone()
                 if existing:
-                    if existing[0] != content:
+                    if existing != (content, self.gateway_id):
                         raise ValueError("Same batch ID has conflicting content")
                     replay.append(batch.batch_id)
                     continue
                 self.db.execute(
-                    "INSERT INTO receipts VALUES (?,?,?)",
-                    (page.collector_id, batch.batch_id, content),
+                    "INSERT INTO receipts VALUES (?,?,?,?)",
+                    (self.gateway_replica_id, batch.batch_id, self.gateway_id, content),
                 )
                 for entry in batch.entries:
                     self.db.execute(
                         "INSERT INTO entries VALUES (?,?,?,?,?,?,?,?,?)",
                         (
-                            page.collector_id,
+                            self.gateway_replica_id,
                             batch.batch_id,
                             entry.consumer_subject_id,
                             entry.service_id,
@@ -105,7 +126,11 @@ class MockReceiver:
 
     def receipt_ids(self) -> list[str]:
         return [
-            row[0] for row in self.db.execute("SELECT batch_id FROM receipts ORDER BY batch_id")
+            row[0]
+            for row in self.db.execute(
+                "SELECT batch_id FROM receipts WHERE gateway_replica_id=? ORDER BY batch_id",
+                (self.gateway_replica_id,),
+            )
         ]
 
     def totals(self) -> dict[tuple[str, str], dict[str, int]]:
@@ -123,7 +148,12 @@ class MockReceiver:
 
 
 async def _run(args) -> None:
-    receiver = MockReceiver(args.url, Path(args.ledger))
+    receiver = MockReceiver(
+        args.url,
+        Path(args.ledger),
+        gateway_replica_id=args.gateway_replica_id,
+        gateway_id=args.gateway_id,
+    )
     try:
         while True:
             report = await receiver.collect_once(args.limit, acknowledge=not args.no_ack)
@@ -141,6 +171,8 @@ def main() -> None:
         "--url", required=True, help="Private Gateway management URL / local SSH forward"
     )
     parser.add_argument("--ledger", required=True)
+    parser.add_argument("--gateway-replica-id", required=True)
+    parser.add_argument("--gateway-id", required=True)
     parser.add_argument("--limit", type=int, default=100)
     parser.add_argument("--no-ack", action="store_true")
     parser.add_argument("--watch", action="store_true")

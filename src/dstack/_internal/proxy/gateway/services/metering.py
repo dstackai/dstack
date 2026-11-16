@@ -68,9 +68,7 @@ class MeteringCollector(UsageObserver):
                 return
             saved = await asyncio.to_thread(self.store.load)
             now = self.clock.utc_now()
-            self._state = saved or UsageCheckpoint(
-                collector_id=uuid.uuid4().hex, active_batch=self._new_batch(now)
-            )
+            self._state = saved or UsageCheckpoint(active_batch=self._new_batch(now))
             self._entries = {entry.key: entry for entry in self._state.active_batch.entries}
             self._published = {batch.batch_id for batch in self._state.pending_batches}
             self._pending_bytes = sum(
@@ -152,7 +150,6 @@ class MeteringCollector(UsageObserver):
                 raise ProxyError("Usage metering is not initialized", 404)
             batches = [b for b in self._state.pending_batches if b.batch_id in self._published]
             return UsageBatchPage(
-                collector_id=self._state.collector_id,
                 batches=batches[:limit],
                 has_more=len(batches) > limit,
             ).model_copy(deep=True)

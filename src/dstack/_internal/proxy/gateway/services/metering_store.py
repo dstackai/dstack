@@ -5,11 +5,14 @@ import fcntl
 import json
 import os
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Any
 
 from dstack._internal.proxy.lib.cancellation import await_completion
-from dstack._internal.proxy.lib.schemas.usage import UsageCheckpoint
+from dstack._internal.proxy.lib.schemas.usage import LegacyUsageCheckpoint, UsageCheckpoint
+
+_INITIALIZED = "usage-state-v2"
 
 
 class MeteringStore:
@@ -35,10 +38,36 @@ class MeteringStore:
             raw = source.read(self.max_bytes + 1)
         if len(raw) > self.max_bytes:
             raise ValueError("Usage checkpoint exceeds size limit")
-        state = UsageCheckpoint.model_validate(json.loads(raw, object_pairs_hook=_unique_object))
-        if self._marker.exists() and self._marker.read_text() != state.collector_id:
-            raise ValueError("Usage collector identity mismatch")
+        data = json.loads(raw, object_pairs_hook=_unique_object)
+        if not isinstance(data, dict):
+            raise ValueError("Usage checkpoint must be an object")
+        marker = self._read_marker()
+        if data.get("schema_version", 1) == 1:
+            legacy = LegacyUsageCheckpoint.model_validate(data)
+            if marker is not None and marker != legacy.collector_id:
+                raise ValueError("Legacy usage identity mismatch")
+            state = UsageCheckpoint.model_validate(
+                legacy.model_dump(exclude={"schema_version", "collector_id"})
+            )
+            self._save(state)
+        else:
+            state = UsageCheckpoint.model_validate(data)
+            if marker != _INITIALIZED:
+                # Recovery after checkpoint replacement but before marker replacement.
+                self._save(state)
         return state
+
+    def _read_marker(self) -> str | None:
+        if not self._marker.exists():
+            return None
+        marker = self._marker.read_text()
+        if marker != _INITIALIZED:
+            try:
+                if uuid.UUID(marker).hex != marker:
+                    raise ValueError("Non-canonical legacy marker")
+            except ValueError as exc:
+                raise ValueError("Invalid usage initialized marker") from exc
+        return marker
 
     async def save(self, state: UsageCheckpoint) -> None:
         # Deep copy before crossing the thread boundary; the writer owns a consistent snapshot.
@@ -71,11 +100,10 @@ class MeteringStore:
         raw = state.model_dump_json().encode()
         if len(raw) > self.max_bytes:
             raise OSError("Usage checkpoint exceeds storage limit")
-        if self._marker.exists() and self._marker.read_text() != state.collector_id:
-            raise ValueError("Refusing to replace collector identity")
+        marker = self._read_marker()
         self._atomic_write(self.path, raw)
-        if not self._marker.exists():
-            self._atomic_write(self._marker, state.collector_id.encode())
+        if marker != _INITIALIZED:
+            self._atomic_write(self._marker, _INITIALIZED.encode())
 
     @staticmethod
     def _atomic_write(path: Path, raw: bytes) -> None:

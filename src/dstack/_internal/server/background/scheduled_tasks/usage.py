@@ -9,7 +9,7 @@ import httpx
 from sqlalchemy import select
 
 from dstack._internal.server.db import get_db, get_session_ctx
-from dstack._internal.server.models import GatewayReplicaModel
+from dstack._internal.server.models import GatewayModel, GatewayReplicaModel
 from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
 from dstack._internal.server.services.usage import ingest_usage_batch
@@ -26,15 +26,30 @@ async def collect_gateway_usage() -> None:
     async with get_session_ctx() as session:
         rows = (
             await session.execute(
-                select(GatewayReplicaModel.id, GatewayReplicaModel.ip_address).where(
-                    GatewayReplicaModel.active == True
+                select(
+                    GatewayReplicaModel.id,
+                    GatewayReplicaModel.ip_address,
+                    GatewayReplicaModel.gateway_id,
+                ).where(GatewayReplicaModel.active == True)
+            )
+        ).all()
+        legacy_rows = (
+            await session.execute(
+                select(GatewayModel.gateway_replica_id, GatewayModel.id).where(
+                    GatewayModel.gateway_replica_id.is_not(None)
                 )
             )
         ).all()
-    identities: dict[str, list[uuid.UUID]] = defaultdict(list)
-    for replica_id, address in rows:
+    legacy_parents: dict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)
+    for replica_id, gateway_id in legacy_rows:
+        legacy_parents[replica_id].add(gateway_id)
+    identities: dict[str, list[tuple[uuid.UUID, uuid.UUID | None]]] = defaultdict(list)
+    for replica_id, address, gateway_id in rows:
+        parents = legacy_parents[replica_id] | ({gateway_id} if gateway_id else set())
         if address is not None:
-            identities[address].append(replica_id)
+            # Retain ambiguous entries so no other replica at this address is selected.
+            for parent in parents or {None}:
+                identities[address].append((replica_id, parent))
     semaphore = asyncio.Semaphore(8)
 
     async def collect(connection: GatewayConnection) -> None:
@@ -45,7 +60,7 @@ async def collect_gateway_usage() -> None:
         async with semaphore:
             try:
                 async with asyncio.timeout(COLLECTION_TIMEOUT):
-                    await _collect_connection(connection, candidates[0])
+                    await _collect_connection(connection, *candidates[0])
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code not in (404, 405):
                     logger.warning(
@@ -62,7 +77,9 @@ async def collect_gateway_usage() -> None:
     )
 
 
-async def _collect_connection(connection: GatewayConnection, replica_id: uuid.UUID) -> None:
+async def _collect_connection(
+    connection: GatewayConnection, replica_id: uuid.UUID, gateway_id: uuid.UUID | None
+) -> None:
     for _ in range(MAX_PAGES):
         async with connection.client() as client:
             page = await client.fetch_usage_batches(PAGE_SIZE)
@@ -72,7 +89,7 @@ async def _collect_connection(connection: GatewayConnection, replica_id: uuid.UU
         async with _ingestion_lock():
             async with get_session_ctx() as session:
                 for batch in page.batches:
-                    await ingest_usage_batch(session, replica_id, page.collector_id, batch)
+                    await ingest_usage_batch(session, replica_id, gateway_id, batch)
             # get_session_ctx commits and closes before leaving this block.
         ids = [batch.batch_id for batch in page.batches]
         async with connection.client() as client:

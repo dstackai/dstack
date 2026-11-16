@@ -96,7 +96,7 @@ class TestUsageContracts:
         with pytest.raises(ValidationError):
             UsageBatch.model_validate(batch.model_dump() | {"entries": [entry, entry]})
         with pytest.raises(ValidationError):
-            UsageCheckpoint(collector_id="c", active_batch=batch, pending_batches=[batch])
+            UsageCheckpoint(active_batch=batch, pending_batches=[batch])
         with pytest.raises(ValidationError):
             UsageBatch.model_validate(
                 batch.model_dump() | {"interval_end": start + timedelta(seconds=30)}
