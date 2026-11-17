@@ -452,14 +452,16 @@ class TestServiceConnectionPool:
 @pytest.mark.asyncio
 class TestCountSocketConnections:
     async def test_counts_connections_accepted_on_the_socket(self):
-        # A real socket, since the /proc/net/unix format is what this test is about
-        with TemporaryDirectory() as tmp_dir, socket.socket(socket.AF_UNIX) as server:
+        # A real socket, since the /proc/net/unix format is what this test is about.
+        # Pyright doesn't know the test is skipped on Windows, which has no AF_UNIX.
+        af_unix = socket.AF_UNIX  # pyright: ignore[reportAttributeAccessIssue]
+        with TemporaryDirectory() as tmp_dir, socket.socket(af_unix) as server:
             path = Path(tmp_dir) / "replica.sock"
             server.bind(str(path))
             server.listen()
             assert await service_connection._count_socket_connections(path) == 0
 
-            clients = [socket.socket(socket.AF_UNIX) for _ in range(2)]
+            clients = [socket.socket(af_unix) for _ in range(2)]
             accepted = []
             try:
                 for client in clients:
