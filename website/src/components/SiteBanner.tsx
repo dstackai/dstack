@@ -3,8 +3,8 @@ import { BLOG_URL } from '../routes';
 // Top announcement banner, mirroring the one on the MkDocs docs site. It sits above the top
 // nav; the two stick to the top together (see .site-header). Update the copy/href here when
 // the announcement changes.
-const BANNER_TEXT = 'Serve Fastest Qwen3.8-Flash-Next Coding Agents on 4xH200';
-const BANNER_HREF = `${BLOG_URL}/qwen38-flash-next-coding-agents/`;
+const BANNER_TEXT = 'Serve GLM-5.3 Coding Agents Faster and Cheaper on GB200 NVL72';
+const BANNER_HREF = `${BLOG_URL}/glm53-gb200-nvl72-coding-agents/`;
 
 export function SiteBanner() {
   return (
