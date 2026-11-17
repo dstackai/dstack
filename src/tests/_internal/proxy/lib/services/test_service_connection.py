@@ -1,6 +1,10 @@
 import asyncio
+import socket
+import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import AsyncIterator
-from unittest.mock import create_autospec
+from unittest.mock import AsyncMock, create_autospec
 
 import pytest
 import pytest_asyncio
@@ -378,6 +382,97 @@ class TestServiceConnectionPool:
         assert active == 0
         assert not pool.connections
         assert sum(t.aopen.await_count - 1 for t in tunnels) == peak
+
+    async def test_drained_removal_closes_connection_once_socket_is_idle(
+        self, project, service, pool, tunnel_factory, monitor_clock, monkeypatch
+    ):
+        tunnel = tunnel_factory.return_value
+        closed = asyncio.Event()
+        tunnel.aclose.side_effect = closed.set
+        count = AsyncMock(side_effect=[2, 0])
+        monkeypatch.setattr(service_connection, "_count_socket_connections", count)
+        replica = service.replicas[0]
+        connection = await pool.get_or_add(project, service, replica)
+
+        await pool.remove(replica.id, drain=True)
+
+        # Gone from the pool right away, but the tunnel stays open while it is in use
+        assert await pool.get(replica.id) is None
+        assert await monitor_clock.tick() == service_connection.REPLICA_DRAIN_GRACE_PERIOD
+        tunnel.aclose.assert_not_awaited()
+        assert await monitor_clock.tick() == service_connection.REPLICA_DRAIN_POLL_INTERVAL
+        await asyncio.wait_for(closed.wait(), timeout=1)
+        count.assert_awaited_with(connection.app_socket_path)
+        assert count.await_count == 2
+
+    @pytest.mark.parametrize("connections", [1, None], ids=["in-use", "unknown"])
+    async def test_drained_removal_closes_connection_after_timeout(
+        self, project, service, pool, tunnel_factory, monitor_clock, monkeypatch, connections
+    ):
+        monkeypatch.setattr(service_connection, "REPLICA_DRAIN_GRACE_PERIOD", 5)
+        monkeypatch.setattr(service_connection, "REPLICA_DRAIN_POLL_INTERVAL", 1)
+        monkeypatch.setattr(service_connection, "REPLICA_DRAIN_TIMEOUT", 7)
+        monkeypatch.setattr(
+            service_connection,
+            "_count_socket_connections",
+            AsyncMock(return_value=connections),
+        )
+        tunnel = tunnel_factory.return_value
+        closed = asyncio.Event()
+        tunnel.aclose.side_effect = closed.set
+        replica = service.replicas[0]
+        await pool.get_or_add(project, service, replica)
+
+        await pool.remove(replica.id, drain=True)
+
+        assert [await monitor_clock.tick() for _ in range(2)] == [5, 1]
+        tunnel.aclose.assert_not_awaited()
+        assert await monitor_clock.tick() == 1
+        await asyncio.wait_for(closed.wait(), timeout=1)
+        assert monitor_clock.pending.empty()
+
+    async def test_remove_all_closes_draining_connections_without_waiting(
+        self, project, service, pool, tunnel_factory, monitor_clock, monkeypatch
+    ):
+        monkeypatch.setattr(
+            service_connection, "_count_socket_connections", AsyncMock(return_value=1)
+        )
+        tunnel = tunnel_factory.return_value
+        replica = service.replicas[0]
+        await pool.get_or_add(project, service, replica)
+        await pool.remove(replica.id, drain=True)
+        await _yield_to_event_loop()
+
+        await pool.remove_all()
+
+        tunnel.aclose.assert_awaited_once()
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="reads /proc/net/unix")
+@pytest.mark.asyncio
+class TestCountSocketConnections:
+    async def test_counts_connections_accepted_on_the_socket(self):
+        # A real socket, since the /proc/net/unix format is what this test is about
+        with TemporaryDirectory() as tmp_dir, socket.socket(socket.AF_UNIX) as server:
+            path = Path(tmp_dir) / "replica.sock"
+            server.bind(str(path))
+            server.listen()
+            assert await service_connection._count_socket_connections(path) == 0
+
+            clients = [socket.socket(socket.AF_UNIX) for _ in range(2)]
+            accepted = []
+            try:
+                for client in clients:
+                    client.connect(str(path))
+                    accepted.append(server.accept()[0])
+                assert await service_connection._count_socket_connections(path) == 2
+            finally:
+                for sock in clients + accepted:
+                    sock.close()
+            assert await service_connection._count_socket_connections(path) == 0
+
+    async def test_missing_socket_has_no_connections(self, tmp_path):
+        assert await service_connection._count_socket_connections(tmp_path / "missing") == 0
 
 
 class _MonitorClock:
