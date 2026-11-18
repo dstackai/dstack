@@ -42,6 +42,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.testing.common import (
     create_backend,
+    create_fleet,
     create_instance,
     create_job,
     create_project,
@@ -449,7 +450,13 @@ class TestOrphanCleanupWorker:
 
     @pytest.mark.parametrize(
         "activity",
-        ["provider_ref_issued", "instance_started", "instance_finished", "job_finished"],
+        [
+            "provider_ref_issued",
+            "instance_started",
+            "instance_finished",
+            "job_finished",
+            "job_finished_in_imported_fleet",
+        ],
     )
     async def test_cleans_up_backend_with_activity_after_clean_at(
         self, test_db, session: AsyncSession, worker, activity: str
@@ -466,12 +473,17 @@ class TestOrphanCleanupWorker:
             clean_at=clean_at,
             clean_mode=settings.ORPHAN_CLEANUP_MODE,
         )
-        if activity == "job_finished":
-            repo = await create_repo(session=session, project_id=project.id)
-            run = await create_run(session=session, project=project, repo=repo, user=user)
+        if activity in ("job_finished", "job_finished_in_imported_fleet"):
+            fleet = await create_fleet(session=session, project=project)
+            run_project = project
+            if activity == "job_finished_in_imported_fleet":
+                run_project = await create_project(session=session, owner=user, name="importer")
+            repo = await create_repo(session=session, project_id=run_project.id)
+            run = await create_run(session=session, project=run_project, repo=repo, user=user)
             await create_job(
                 session=session,
                 run=run,
+                fleet=fleet,
                 status=JobStatus.FAILED,
                 last_processed_at=after_clean_at,
             )
@@ -516,6 +528,18 @@ class TestOrphanCleanupWorker:
             project,
             InstanceStatus.IDLE,
             created_at=clean_at - timedelta(minutes=10),
+        )
+        # The project's job in a fleet imported from another project does not use its backends
+        exporter_project = await create_project(session=session, owner=user, name="exporter")
+        imported_fleet = await create_fleet(session=session, project=exporter_project)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        await create_job(
+            session=session,
+            run=run,
+            fleet=imported_fleet,
+            status=JobStatus.FAILED,
+            last_processed_at=clean_at + timedelta(minutes=10),
         )
         compute = _ListingCompute()
         item = await _lock(session, orphan_cleanup)

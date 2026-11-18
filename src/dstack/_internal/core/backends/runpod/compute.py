@@ -129,6 +129,7 @@ class RunpodCompute(
         run: Run,
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
+        project_name: str,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
@@ -137,7 +138,7 @@ class RunpodCompute(
         extra_authorized_keys: list[str],
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
-            project_name=run.project_name,
+            project_name=project_name,
             instance_name=get_job_instance_name(run, job),
             ssh_keys=[],
             user=run.user,
@@ -277,6 +278,7 @@ class RunpodCompute(
         run: Run,
         job_configurations: List[JobConfiguration],
         instance_offer: InstanceOfferWithAvailability,
+        project_name: str,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         placement_group: Optional[PlacementGroup],
@@ -290,7 +292,7 @@ class RunpodCompute(
         master_job_volumes = master_job_configuration.volumes
         all_volumes_names = set(v.name for jc in job_configurations for v in jc.volumes)
         instance_config = InstanceConfiguration(
-            project_name=run.project_name,
+            project_name=project_name,
             instance_name=get_job_instance_name(run, master_job),
             ssh_keys=[],
             user=run.user,

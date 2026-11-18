@@ -20,7 +20,7 @@ for running tasks, dev environments, and services. Imported resources appear wit
 Currently, [fleets](fleets.md) and [gateways](gateways.md) can be exported.
 
 ??? info "Limitations"
-    - Importer projects can only use the existing instances of imported [backend fleets](fleets.md#backend-fleets). New instances are not provisioned for importers' runs.
+    - [Container-based](backends.md#container-based) backends of the exporter project cannot be used for fleet importers' runs.
     - Runs that mount [network volumes](volumes.md#network-volumes) cannot use imported backend fleets.
 
 ??? info "Required role"
