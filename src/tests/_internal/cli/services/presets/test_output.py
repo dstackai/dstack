@@ -505,6 +505,83 @@ class TestFailedTrials:
         assert "*tps/user" in row["BENCHMARK"]
 
 
+class TestSweepRow:
+    def test_shows_the_passing_sweep_of_the_best_trial_as_ranges(self, tmp_path):
+        from dstack._internal.cli.services.presets.session import _summarize_session_trials
+
+        # The trial broke `max_ttft` at 192 only, so the row ranges over 48 and 96.
+        trial = PresetTrial(
+            result=[
+                get_trial_result(
+                    tok_s=100, tpot_ms=10.0, ttft_ms=400.0, concurrency=48, context_length=32768
+                ),
+                get_trial_result(
+                    tok_s=180, tpot_ms=20.0, ttft_ms=800.0, concurrency=96, context_length=32768
+                ),
+                get_trial_result(
+                    tok_s=200,
+                    tpot_ms=40.0,
+                    ttft_ms=6000.0,
+                    concurrency=192,
+                    context_length=32768,
+                    failed=True,
+                ),
+            ]
+        )
+        summary = _summarize_session_trials(_write_trials(tmp_path, [trial]))
+
+        row = _session_row(
+            get_session_entry(
+                trials=summary, constraints=get_preset_constraints(concurrency=[48, 96, 192])
+            )
+        )
+
+        assert row["CONSTRAINTS"] == "[secondary]io=1K/1K c=48..96[/]"
+        assert row["BENCHMARK"] == "tps/user=50..100 ttft=400ms..800ms ctx=32K"
+
+    def test_falls_back_to_the_whole_failed_sweep_when_nothing_passed(self, tmp_path):
+        from dstack._internal.cli.services.presets.session import _summarize_session_trials
+
+        trial = PresetTrial(
+            result=[
+                get_trial_result(
+                    tok_s=100,
+                    tpot_ms=10.0,
+                    ttft_ms=400.0,
+                    concurrency=48,
+                    context_length=32768,
+                    failed=True,
+                ),
+                get_trial_result(
+                    tok_s=180,
+                    tpot_ms=20.0,
+                    ttft_ms=800.0,
+                    concurrency=96,
+                    context_length=32768,
+                    failed=True,
+                ),
+                get_trial_result(
+                    tok_s=200,
+                    tpot_ms=40.0,
+                    ttft_ms=6000.0,
+                    concurrency=192,
+                    context_length=32768,
+                    failed=True,
+                ),
+            ]
+        )
+        summary = _summarize_session_trials(_write_trials(tmp_path, [trial]))
+
+        row = _session_row(
+            get_session_entry(
+                trials=summary, constraints=get_preset_constraints(concurrency=[48, 96, 192])
+            )
+        )
+
+        assert row["CONSTRAINTS"] == "[secondary]io=1K/1K c=48..192[/]"
+        assert row["BENCHMARK"] == "[secondary]*tps/user=25..100 ttft=400ms..6s ctx=32K[/]"
+
+
 class TestFailedTrialSpark:
     def test_a_trial_that_broke_a_constraint_is_charted_but_not_the_best(self):
         # Its number is real, so it earns a bar rather than a `·`, and green goes

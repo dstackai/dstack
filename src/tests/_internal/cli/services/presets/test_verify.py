@@ -241,6 +241,39 @@ class TestBuildVerifiedPreset:
                 created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
             )
 
+    def test_accepts_a_sweep_benchmarked_at_some_concurrencies_only(self, tmp_path):
+        # Of the requested 48, 96 and 192, the agent could benchmark 48 only.
+        run = get_running_service_run()
+
+        preset = build_verified_preset(
+            run=run,
+            preset_configuration=_sweep_configuration(),
+            report=_sweep_report(run, measured=(48,)),
+            workspace_path=tmp_path,
+            session_path=tmp_path,
+            preset_id="ab12cd34",
+            name=None,
+            created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+
+        assert [r.concurrency for r in preset.result] == [48, 96, 192]
+        assert [r.benchmark is not None for r in preset.result] == [True, False, False]
+
+    def test_rejects_a_sweep_with_no_completed_benchmark(self, tmp_path):
+        run = get_running_service_run()
+
+        with pytest.raises(CLIError, match="no completed benchmark"):
+            build_verified_preset(
+                run=run,
+                preset_configuration=_sweep_configuration(),
+                report=_sweep_report(run, measured=()),
+                workspace_path=tmp_path,
+                session_path=tmp_path,
+                preset_id="ab12cd34",
+                name=None,
+                created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+            )
+
     def test_verifies_a_benchmark_on_the_requested_dataset(self, tmp_path):
         run = get_running_service_run()
         report = _dataset_report(run, dataset="spec_bench")
@@ -425,6 +458,33 @@ def _dataset_report(run: Run, **workload: Any) -> PresetAgentSuccess:
             **workload,
         },
     )
+
+
+def _sweep_configuration() -> PresetConfiguration:
+    return PresetConfiguration.model_validate(
+        {
+            "type": "preset",
+            "base": "Qwen/Qwen3.5-27B",
+            "min_context_length": 8192,
+            "max_ttft": 5000,
+            "trials": 2,
+            "concurrency": [48, 96, 192],
+        }
+    )
+
+
+def _sweep_report(run: Run, *, measured: tuple[int, ...]) -> PresetAgentSuccess:
+    """A report over the sweep 48, 96, 192 with a benchmark at `measured` only."""
+    result = []
+    for concurrency in (48, 96, 192):
+        benchmark = None
+        if concurrency in measured:
+            benchmark = get_preset_benchmark()
+            benchmark.workload = benchmark.workload.model_copy(update={"concurrency": concurrency})
+        result.append(
+            PresetResult(concurrency=concurrency, context_length=32768, benchmark=benchmark)
+        )
+    return get_successful_preset_report(run).model_copy(update={"result": result})
 
 
 def _report_with_workload(run: Run, workload: dict[str, Any]) -> PresetAgentSuccess:
