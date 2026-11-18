@@ -1,6 +1,7 @@
 from typing import List, Optional, Type, Union
 
 from dstack._internal.core.backends.base.configurator import Configurator
+from dstack._internal.core.errors import BackendNotAvailable
 from dstack._internal.core.models.backends.base import BackendType
 
 _CONFIGURATOR_CLASSES: List[Type[Configurator]] = []
@@ -223,3 +224,12 @@ def register_configurator(configurator: Type[Configurator]):
     Can be used to extend dstack functionality.
     """
     _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP[configurator.TYPE] = configurator
+
+
+def check_backend_type_available(backend_type: BackendType):
+    if backend_type not in list_available_backend_types():
+        raise BackendNotAvailable(
+            f"Backend {backend_type.value} not available."
+            " Ensure that backend dependencies are installed."
+            f" Available backends: {[b.value for b in list_available_backend_types()]}."
+        )

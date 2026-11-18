@@ -216,7 +216,13 @@ class InstanceFetcher(Fetcher[InstancePipelineItem]):
                                 # because the fleet pipeline cannot reclaim stale instance locks.
                                 or_(
                                     InstanceModel.fleet_id.is_(None),
-                                    FleetModel.lock_owner.is_(None),
+                                    and_(
+                                        FleetModel.lock_owner.is_(None),
+                                        or_(
+                                            FleetModel.lock_expires_at.is_(None),
+                                            FleetModel.lock_expires_at < now,
+                                        ),
+                                    ),
                                 ),
                                 InstanceModel.lock_expires_at.is_(None),
                             ),
@@ -485,6 +491,13 @@ async def _apply_process_result(
                 instance_model.termination_reason_message,
             ),
         )
+        for message in result.event_messages:
+            events.emit(
+                session,
+                message,
+                actor=events.SystemActor(),
+                targets=[events.Target.from_model(instance_model)],
+            )
         _emit_instance_health_change_event(
             session=session,
             instance_model=instance_model,

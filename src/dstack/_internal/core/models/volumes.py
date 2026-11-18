@@ -2,10 +2,9 @@ import uuid
 from datetime import datetime
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Self, Tuple, Union
 
 from pydantic import Field, RootModel, ValidationError, field_validator
-from typing_extensions import Annotated, Self
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.backends.base import BackendType

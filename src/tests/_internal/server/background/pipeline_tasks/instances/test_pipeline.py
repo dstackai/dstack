@@ -240,16 +240,22 @@ class TestInstanceFetcher:
         await session.refresh(instance)
         assert instance.lock_owner == InstancePipeline.__name__
 
-    async def test_fetch_excludes_fresh_instances_when_fleet_is_waiting_for_instance_locks(
-        self, test_db, session: AsyncSession, fetcher: InstanceFetcher
+    @pytest.mark.parametrize("lease", ["pipeline", "key-update", "expired-key-update"])
+    async def test_fetch_respects_fleet_processing_and_key_update_leases(
+        self, test_db, session: AsyncSession, fetcher: InstanceFetcher, lease
     ):
         project = await create_project(session=session)
         fleet = await create_fleet(session=session, project=project)
         stale = get_current_datetime() - dt.timedelta(minutes=1)
 
-        fleet.lock_owner = FleetPipeline.__name__
+        fleet.lock_owner = FleetPipeline.__name__ if lease == "pipeline" else None
         fleet.lock_token = None
-        fleet.lock_expires_at = None
+        fleet.lock_expires_at = (
+            None
+            if lease == "pipeline"
+            else get_current_datetime()
+            + dt.timedelta(seconds=-1 if lease == "expired-key-update" else 60)
+        )
 
         instance = await create_instance(
             session=session,
@@ -263,10 +269,14 @@ class TestInstanceFetcher:
 
         items = await fetcher.fetch(limit=10)
 
-        assert items == []
+        assert [item.id for item in items] == (
+            [instance.id] if lease == "expired-key-update" else []
+        )
 
         await session.refresh(instance)
-        assert instance.lock_owner is None
+        assert instance.lock_owner == (
+            InstancePipeline.__name__ if lease == "expired-key-update" else None
+        )
 
 
 @pytest.mark.asyncio

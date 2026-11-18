@@ -1,10 +1,9 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional, Self
 from urllib.parse import urlparse
 
 from pydantic import UUID4, ConfigDict, Field, model_validator
-from typing_extensions import Annotated, Self
 
 from dstack._internal.core.backends.profile_options import AnyBackendProfileOptions
 from dstack._internal.core.models.backends.base import BackendType
@@ -43,7 +42,6 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import Memory, ResourcesSpec
-from dstack._internal.core.models.routers import RouterType
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint
 from dstack._internal.utils import common as common_utils
@@ -450,6 +448,11 @@ class JobSubmission(CoreModel):
     """
     termination_reason_message: Optional[str] = None
     exit_status: Optional[int] = None
+    """`exit_status` is `-N` if the job's process was killed by signal `N`, e.g. `-9` for
+    `SIGKILL`, as in Python's `subprocess`. The process is the shell running the job's commands,
+    so this happens only if the shell has replaced itself with the command that got the signal.
+    Otherwise, the shell exits with `128 + N`. Older runners report `-1` for any signal.
+    """
     job_provisioning_data: Optional[JobProvisioningData] = None
     job_runtime_data: Optional[JobRuntimeData] = None
     error: Optional[str] = None
@@ -628,31 +631,6 @@ class RunSpec(CoreModel):
         if merged_profile.creation_policy is None:
             merged_profile.creation_policy = CreationPolicy.REUSE_OR_CREATE
         self.merged_profile = merged_profile
-        return self
-
-    @model_validator(mode="after")
-    def _validate_dynamo_no_retry(self) -> Self:
-        """Reject `retry` for services with a Dynamo router replica group.
-        Dynamo workers cache the router's internal IP at provisioning time. A
-        retry would produce a new router and likely a new internal_ip, leaving workers bound
-        to a router that no longer exists.
-        """
-        merged_profile = self.merged_profile
-        cfg = self.configuration
-        if merged_profile is None or merged_profile.retry is None:
-            return self
-        if not isinstance(cfg, ServiceConfiguration):
-            return self
-        for g in cfg.replica_groups:
-            if g.router is not None and g.router.type == RouterType.DYNAMO:
-                raise ValueError(
-                    "Retry cannot be configured for services with a Dynamo "
-                    "router replica group. The router's address must remain "
-                    "stable for the life of the run; allowing retry would "
-                    "leave workers bound to a router that no longer exists. "
-                    "Remove `retry` from the profile/configuration and "
-                    "re-apply."
-                )
         return self
 
 

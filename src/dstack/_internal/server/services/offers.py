@@ -1,5 +1,7 @@
+import asyncio
 import heapq
 import itertools
+import time
 from collections.abc import Container, Iterable, Iterator
 from typing import List, Literal, Optional, Tuple, TypeVar, Union
 
@@ -13,6 +15,9 @@ from dstack._internal.core.backends.features import (
     BACKENDS_WITH_PRIVILEGED_SUPPORT,
     BACKENDS_WITH_RESERVATION_SUPPORT,
 )
+from dstack._internal.core.errors import (
+    BackendError,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
@@ -23,13 +28,14 @@ from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import Volume, VolumeConfigurationWithRegion
-from dstack._internal.server.models import ProjectModel
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.utils.common import run_async
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 async def get_offers_by_requirements(
-    project: ProjectModel,
+    backends: List[Backend],
     profile: Profile,
     requirements: Requirements,
     exclude_not_available=False,
@@ -44,8 +50,11 @@ async def get_offers_by_requirements(
     full_offers: bool = False,
     unallocated_resources: bool = False,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
-    backends: List[Backend] = await backends_services.get_project_backends(project=project)
-
+    """
+    Returns offers of `backends` matching the requirements. The caller must lease `backends`
+    (see `services.backends.cache.lease_project_backends()`) and must not use the returned backends
+    after the lease is released.
+    """
     backend_types: Optional[list[BackendType]] = profile.backends
     regions: Optional[list[str]] = profile.regions
     availability_zones: Optional[list[str]] = profile.availability_zones
@@ -99,7 +108,7 @@ async def get_offers_by_requirements(
     if backend_types is not None:
         backends = [b for b in backends if b.TYPE in backend_types or b.TYPE == BackendType.DSTACK]
 
-    offers = await backends_services.get_backend_offers(
+    offers = await get_backend_offers(
         backends=backends,
         requirements=requirements,
         full_offers=full_offers,
@@ -289,3 +298,57 @@ def _get_shareable_offers(
         new_offer = offer.model_copy()
         new_offer.total_blocks = total_blocks
         yield (backend, new_offer)
+
+
+async def get_backend_offers(
+    backends: List[Backend],
+    requirements: Requirements,
+    full_offers: bool,
+    unallocated_resources: bool,
+    exclude_not_available: bool = False,
+) -> Iterable[Tuple[Backend, InstanceOfferWithAvailability]]:
+    """
+    Returns a lazy iterable of backend offers satisfying `requirements` sorted by price.
+    """
+
+    def get_filtered_offers_with_backends(
+        backend: Backend,
+        offers: Iterable[InstanceOfferWithAvailability],
+    ) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
+        for offer in offers:
+            if not exclude_not_available or offer.availability.is_available():
+                yield (backend, offer)
+
+    logger.debug("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
+    tasks = [
+        run_async(get_offers_tracked, backend, requirements, full_offers, unallocated_resources)
+        for backend in backends
+    ]
+    offers_by_backend: list[Iterable[tuple[Backend, InstanceOfferWithAvailability]]] = []
+    for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):
+        if isinstance(result, BackendError):
+            logger.warning(
+                "Failed to get offers from backend %s: %s",
+                backend.TYPE,
+                repr(result),
+            )
+            continue
+        elif isinstance(result, BaseException):
+            logger.error(
+                "Got exception when requesting offers from backend %s",
+                backend.TYPE,
+                exc_info=result,
+            )
+            continue
+        offers_by_backend.append(get_filtered_offers_with_backends(backend, result))
+    return merge_offer_iterables(*offers_by_backend)
+
+
+def get_offers_tracked(
+    backend: Backend, requirements: Requirements, full_offers: bool, unallocated_resources: bool
+) -> Iterator[InstanceOfferWithAvailability]:
+    start = time.time()
+    res = backend.compute().get_offers(requirements, full_offers, unallocated_resources)
+    duration = time.time() - start
+    logger.debug("Got offers from %s in %.6fs", backend.TYPE.value, duration)
+    return res

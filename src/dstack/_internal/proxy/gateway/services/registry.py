@@ -122,11 +122,13 @@ async def unregister_service(
 
         logger.debug("Unregistering service %s", service.fmt())
 
+        await nginx.unregister(service)
+        # Only after the reload, so that Nginx stops routing requests to the replicas
         await stop_replica_connections(
             ids=(r.id for r in service.replicas),
             service_conn_pool=service_conn_pool,
+            drain=True,
         )
-        await nginx.unregister(service)
         await repo.delete_models_by_run(project_name, run_name)
         await repo.delete_service(project_name, run_name)
 
@@ -212,6 +214,73 @@ async def register_replica(
     logger.info("Replica %s in service %s is registered now", replica.id, service.fmt())
 
 
+async def update_replica_proxy_jump_keys(
+    updates: list[schemas.ReplicaProxyJumpKeyUpdate],
+    repo: GatewayProxyRepo,
+    service_conn_pool: ServiceConnectionPool,
+) -> dict[str, str]:
+    """Replace replicas' SSH fleet `proxy_jump` keys in one gateway synchronization batch.
+
+    Keep existing tunnels, registrations, and Nginx configuration. Save successful
+    replacements once, including across services/projects. Return failures by job ID
+    so one removed replica or failed key-file write cannot block the other updates.
+    Update only existing pooled connections; save keys for missing connections without opening them.
+    Repeating the same keys is a no-op; the next sync retries any remaining differences.
+    """
+    by_service: dict[tuple[str, str], dict[str, schemas.ReplicaProxyJumpKeyUpdate]] = {}
+    for item in updates:
+        by_service.setdefault((item.project_name.lower(), item.run_name.lower()), {})[
+            item.job_id
+        ] = item
+    failures = {}
+    changed_services = []
+    async with lock:
+        for (project_name, run_name), pending in by_service.items():
+            service = await repo.get_service(project_name, run_name)
+            if service is None:
+                for job_id in pending:
+                    failures[job_id] = f"Service {project_name}/{run_name} not found"
+                continue
+            replicas = list(service.replicas)
+            changed = False
+            for index, replica in enumerate(replicas):
+                item = pending.pop(replica.id, None)
+                if item is None:
+                    continue
+                if replica.ssh_head_proxy is None:
+                    failures[replica.id] = "Replica has no proxy_jump"
+                    continue
+                if replica.ssh_head_proxy_private_key == item.ssh_proxy_jump_private_key:
+                    continue
+                # A fresh Replica discards its cached old public key. Preserve the
+                # unchanged Replica objects so polling does not reparse their keys.
+                updated_replica = models.Replica(
+                    **{
+                        **replica.model_dump(),
+                        "ssh_head_proxy_private_key": item.ssh_proxy_jump_private_key,
+                    }
+                )
+                try:
+                    connection = await service_conn_pool.get(replica.id)
+                    if connection is not None:
+                        await connection.update_proxy_jump_key(updated_replica)
+                except Exception as exc:
+                    logger.warning(
+                        "Could not update replica %s proxy_jump SSH key: %r", replica.id, exc
+                    )
+                    failures[replica.id] = "Could not update proxy_jump key"
+                    continue
+                replicas[index] = updated_replica
+                changed = True
+            for job_id in pending:
+                failures[job_id] = f"Replica not found in service {project_name}/{run_name}"
+            if changed:
+                changed_services.append(service.model_copy(update={"replicas": tuple(replicas)}))
+        if changed_services:
+            await repo.set_services(changed_services)
+    return failures
+
+
 async def unregister_replica(
     project_name: str,
     run_name: str,
@@ -277,18 +346,16 @@ async def apply_service(
     nginx: Nginx,
     service_conn_pool: ServiceConnectionPool,
 ) -> dict[models.Replica, BaseException]:
+    removed_replica_ids = []
     if old_service is not None:
         if service.domain != old_service.domain:
             raise UnexpectedProxyError(
                 f"Did not expect service {service.fmt()}"
                 f" domain name to change ({old_service.domain} -> {service.domain})"
             )
-        await stop_replica_connections(
-            ids=(
-                replica.id for replica in old_service.replicas if replica not in service.replicas
-            ),
-            service_conn_pool=service_conn_pool,
-        )
+        removed_replica_ids = [
+            replica.id for replica in old_service.replicas if replica not in service.replicas
+        ]
     replica_conns, replica_failures = await get_or_add_replica_connections(
         service, repo, service_conn_pool
     )
@@ -303,6 +370,10 @@ async def apply_service(
     ]
     service_config = await get_nginx_service_config(service, replica_configs)
     await nginx.register(service_config, (await repo.get_config()).acme_settings)
+    # Only after the reload, so that Nginx stops routing requests to the removed replicas
+    await stop_replica_connections(
+        ids=removed_replica_ids, service_conn_pool=service_conn_pool, drain=True
+    )
     return replica_failures
 
 
@@ -335,10 +406,17 @@ async def get_or_add_replica_connections(
 
 
 async def stop_replica_connections(
-    ids: Iterable[str], service_conn_pool: ServiceConnectionPool
+    ids: Iterable[str], service_conn_pool: ServiceConnectionPool, drain: bool = False
 ) -> None:
-    tasks = map(service_conn_pool.remove, ids)
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    """
+    With `drain`, return right away and close each connection once requests already sent
+    through it finish. See `ServiceConnectionPool.remove`.
+    """
+    ids = list(ids)
+    results = await asyncio.gather(
+        *(service_conn_pool.remove(replica_id, drain=drain) for replica_id in ids),
+        return_exceptions=True,
+    )
     for replica_id, exc in zip(ids, results):
         if isinstance(exc, Exception):
             logger.error("Error stopping connection to replica %s: %s", replica_id, exc)

@@ -43,7 +43,7 @@ groups:
   - name: frontend
     replicas: 1
     # The vLLM image provides vLLM's GLM tool call and reasoning parsers
-    image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.5.1
+    image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.6.2
     commands:
       - export ETCD_ENDPOINTS=http://${{ groups[0].replicas[0].IP_ADDRESS }}:2379
       - |
@@ -65,7 +65,7 @@ groups:
     scaling:
       metric: rps
       target: 3
-    image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.5.1
+    image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.6.2
     commands:
       - export ETCD_ENDPOINTS=http://${{ groups[0].replicas[0].IP_ADDRESS }}:2379
       - export VLLM_NIXL_SIDE_CHANNEL_HOST=$DSTACK_MASTER_NODE_IP
@@ -86,7 +86,7 @@ groups:
     scaling:
       metric: rps
       target: 2
-    image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.5.1
+    image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.6.2
     commands:
       - export ETCD_ENDPOINTS=http://${{ groups[0].replicas[0].IP_ADDRESS }}:2379
       - export VLLM_NIXL_SIDE_CHANNEL_HOST=$DSTACK_MASTER_NODE_IP
@@ -102,6 +102,10 @@ groups:
 
 port: 8000
 model: zai-org/GLM-4.5-Air-FP8
+
+# Resubmit a failed replica, such as etcd, instead of failing the whole run
+retry:
+  on_events: [error, interruption]
 ```
 
 </div>

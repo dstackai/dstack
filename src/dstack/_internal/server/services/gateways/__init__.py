@@ -17,11 +17,13 @@ import dstack._internal.utils.random_names as random_names
 from dstack._internal.core.backends.base.compute import (
     get_dstack_gateway_install_command,
 )
+from dstack._internal.core.backends.configurators import check_backend_type_available
 from dstack._internal.core.backends.features import (
     BACKENDS_WITH_GATEWAY_SUPPORT,
     BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT,
 )
 from dstack._internal.core.errors import (
+    BackendNotAvailable,
     GatewayError,
     ResourceNotExistsError,
     ServerClientError,
@@ -64,9 +66,9 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services import events
-from dstack._internal.server.services.backends import (
-    check_backend_type_available,
-    get_project_backend_with_model_by_type_or_error,
+from dstack._internal.server.services.backends import cache as backends_cache
+from dstack._internal.server.services.backends.store import (
+    get_project_backend_model_by_type_or_error,
 )
 from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
@@ -253,7 +255,13 @@ async def create_gateway(
         _validate_gateway_configuration(effective_configuration)
     configuration = effective_configuration
 
-    backend_model, _ = await get_project_backend_with_model_by_type_or_error(
+    # Leasing the backend also checks that it can be initialized, not just that it's configured.
+    async with backends_cache.lease_project_backend_by_type(
+        project=project, backend_type=configuration.backend
+    ) as backend:
+        if backend is None:
+            raise BackendNotAvailable()
+    backend_model = await get_project_backend_model_by_type_or_error(
         project=project, backend_type=configuration.backend
     )
 

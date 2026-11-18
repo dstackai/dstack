@@ -3,15 +3,11 @@
 import json
 import os
 import re
+import tomllib
 from pathlib import Path
 from typing import Literal, Optional, get_args
 
 from pydantic import ValidationError
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10
-    import tomli as tomllib  # type: ignore[import-not-found, no-redef]
 
 from dstack._internal.cli.models.preset_agent import CodexStreamEvent, PresetAgentInfo
 from dstack._internal.cli.services.presets.agents.base import (

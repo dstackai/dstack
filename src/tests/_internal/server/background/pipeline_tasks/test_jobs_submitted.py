@@ -88,6 +88,7 @@ from dstack._internal.server.testing.common import (
     get_run_spec,
     get_ssh_fleet_configuration,
     get_volume_provisioning_data,
+    mock_lease,
 )
 from dstack._internal.utils.common import get_current_datetime, get_or_error
 
@@ -428,9 +429,11 @@ class TestJobSubmittedWorker:
         job = await create_job(session=session, run=run)
 
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data(
@@ -511,12 +514,14 @@ class TestJobSubmittedWorker:
         )
 
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = compute_mock
-            m.return_value = [backend_mock]
             compute_mock.get_offers.return_value = [offer]
             compute_mock.run_job.return_value = get_job_provisioning_data(
                 dockerized=True,
@@ -608,9 +613,11 @@ class TestJobSubmittedWorker:
         fleet.lock_owner = "OtherPipeline:cluster-master"
         await session.commit()
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.AWS
             offer_1 = get_instance_offer_with_availability(
                 backend=BackendType.AWS,
@@ -674,7 +681,7 @@ class TestJobSubmittedWorker:
         )
         previous_last_processed_at = job.last_processed_at
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+        with patch("dstack._internal.server.services.backends.cache.lease_project_backends") as m:
             await _process_job(session=session, worker=worker, job_model=job)
             m.assert_not_called()
 
@@ -732,9 +739,11 @@ class TestJobSubmittedWorker:
         fleet.lock_owner = "OtherPipeline:cluster-master"
         await session.commit()
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.AWS
             offer_1 = get_instance_offer_with_availability(
                 backend=BackendType.AWS,
@@ -783,12 +792,14 @@ class TestJobSubmittedWorker:
         job = await create_job(session=session, run=run, instance_assigned=True)
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = compute_mock
-            m.return_value = [backend_mock]
             compute_mock.get_offers.return_value = [offer]
             compute_mock.run_job.return_value = get_job_provisioning_data(
                 backend=BackendType.AWS,
@@ -836,12 +847,14 @@ class TestJobSubmittedWorker:
         job = await create_job(session=session, run=run, instance_assigned=True)
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = compute_mock
-            m.return_value = [backend_mock]
             compute_mock.get_offers.return_value = [offer]
             compute_mock.are_placement_groups_compatible_with_reservation.return_value = compatible
             compute_mock.run_job.return_value = get_job_provisioning_data(
@@ -905,12 +918,14 @@ class TestJobSubmittedWorker:
         job = await create_job(session=session, run=run, instance_assigned=True)
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = compute_mock
-            m.return_value = [backend_mock]
             compute_mock.get_offers.return_value = [offer]
             compute_mock.is_suitable_placement_group.side_effect = (
                 lambda placement_group, _: placement_group.name == selected_pg.name
@@ -963,12 +978,14 @@ class TestJobSubmittedWorker:
         job = await create_job(session=session, run=run, instance_assigned=True)
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = compute_mock
-            m.return_value = [backend_mock]
             compute_mock.get_offers.return_value = [offer]
             compute_mock.is_suitable_placement_group.return_value = False
             compute_mock.create_placement_group.return_value = (
@@ -1019,7 +1036,7 @@ class TestJobSubmittedWorker:
         previous_last_processed_at = job.last_processed_at
         await session.commit()
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+        with patch("dstack._internal.server.services.backends.cache.lease_project_backends") as m:
             await _process_job(session=session, worker=worker, job_model=job)
             m.assert_not_called()
 
@@ -1058,9 +1075,11 @@ class TestJobSubmittedWorker:
         fleet.lock_owner = f"{JobSubmittedPipeline.__name__}:{job.id}"
         await session.commit()
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers.return_value = [
                 get_instance_offer_with_availability(backend=BackendType.AWS)
@@ -1752,8 +1771,9 @@ class TestJobSubmittedWorker:
         res = await session.execute(select(InstanceModel))
         assert res.scalars().all() == []
 
+    @pytest.mark.parametrize("fleet_type", ["cloud", "ssh"])
     async def test_assigns_job_to_imported_fleet(
-        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker, fleet_type: str
     ):
         exporter_user = await create_user(
             session, name="exporter-user", global_role=GlobalRole.USER
@@ -1768,11 +1788,11 @@ class TestJobSubmittedWorker:
             session, name="importer-project", owner=importer_user
         )
         repo = await create_repo(session=session, project_id=importer_project.id)
-        fleet = await create_fleet(
-            session=session,
-            project=exporter_project,
-            spec=get_fleet_spec(get_ssh_fleet_configuration()),
-        )
+        if fleet_type == "cloud":
+            fleet_spec = get_fleet_spec()
+        else:
+            fleet_spec = get_fleet_spec(get_ssh_fleet_configuration())
+        fleet = await create_fleet(session=session, project=exporter_project, spec=fleet_spec)
         instance = await create_instance(
             session=session,
             project=exporter_project,
@@ -1800,6 +1820,204 @@ class TestJobSubmittedWorker:
         assert job.instance_assigned
         assert job.instance is not None and job.instance.id == instance.id
         assert job.fleet_id == fleet.id
+
+    @pytest.mark.parametrize(
+        ("imported_idle_instances", "expected_fleet"),
+        [
+            pytest.param(1, "own", id="imported-fleet-too-small"),
+            pytest.param(2, "imported", id="imported-fleet-fits"),
+        ],
+    )
+    async def test_selects_imported_cloud_fleet_only_if_idle_instances_fit_run(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobSubmittedWorker,
+        imported_idle_instances: int,
+        expected_fleet: str,
+    ):
+        user = await create_user(session=session)
+        exporter_project = await create_project(
+            session=session, name="exporter-project", owner=user
+        )
+        importer_project = await create_project(
+            session=session, name="importer-project", owner=user
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        imported_fleet_spec = get_fleet_spec()
+        imported_fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=4)
+        imported_fleet = await create_fleet(
+            session=session, project=exporter_project, spec=imported_fleet_spec
+        )
+        for instance_num in range(imported_idle_instances):
+            await create_instance(
+                session=session,
+                project=exporter_project,
+                fleet=imported_fleet,
+                status=InstanceStatus.IDLE,
+                instance_num=instance_num,
+                price=1,
+            )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[imported_fleet],
+        )
+        own_fleet_spec = get_fleet_spec()
+        own_fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=2)
+        own_fleet = await create_fleet(
+            session=session, project=importer_project, spec=own_fleet_spec
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=ServiceConfiguration(
+                port=8080, commands=["echo"], replicas=Range[int](min=2, max=2)
+            ),
+        )
+        run = await create_run(
+            session=session, project=importer_project, repo=repo, user=user, run_spec=run_spec
+        )
+        job = await create_job(session=session, run=run, replica_num=0)
+
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS, price=2)
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        if expected_fleet == "own":
+            assert job.fleet_id == own_fleet.id
+        else:
+            assert job.fleet_id == imported_fleet.id
+
+    async def test_does_not_provision_new_capacity_in_imported_cloud_fleet(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        user = await create_user(session=session)
+        exporter_project = await create_project(
+            session=session, name="exporter-project", owner=user
+        )
+        importer_project = await create_project(
+            session=session, name="importer-project", owner=user
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=2)
+        fleet = await create_fleet(session=session, project=exporter_project, spec=fleet_spec)
+        await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        run = await create_run(session=session, project=importer_project, repo=repo, user=user)
+        job = await create_job(session=session, run=run)
+
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS)
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        backend_mock.compute.return_value.get_offers.assert_not_called()
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert job.termination_reason_message == "Fleet is at capacity"
+        assert not job.instance_assigned
+        res = await session.execute(
+            select(InstanceModel).where(
+                InstanceModel.fleet_id == fleet.id,
+                InstanceModel.deleted == False,
+            )
+        )
+        assert len(res.scalars().all()) == 1
+
+    @pytest.mark.parametrize(
+        "run_pinned_to_fleet",
+        [
+            pytest.param(False, id="new-run"),
+            # Volumes can be added by a rolling deployment after the run was placed
+            pytest.param(True, id="run-pinned-to-imported-fleet"),
+        ],
+    )
+    async def test_does_not_assign_job_with_volumes_to_imported_fleet(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobSubmittedWorker,
+        run_pinned_to_fleet: bool,
+    ):
+        user = await create_user(session=session)
+        exporter_project = await create_project(
+            session=session, name="exporter-project", owner=user
+        )
+        importer_project = await create_project(
+            session=session, name="importer-project", owner=user
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        volume = await create_volume(
+            session=session,
+            project=importer_project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(),
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        fleet = await create_fleet(session=session, project=exporter_project)
+        await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration.volumes = [VolumeMountPoint(name=volume.name, path="/volume")]
+        run = await create_run(
+            session=session,
+            project=importer_project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet if run_pinned_to_fleet else None,
+        )
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert not job.instance_assigned
 
     async def test_assigns_job_to_specific_fleet(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
@@ -1854,9 +2072,11 @@ class TestJobSubmittedWorker:
         job = await create_job(session=session, run=run)
 
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers.return_value = [offer]
 
@@ -1932,7 +2152,7 @@ class TestJobSubmittedWorker:
         )
         job = await create_job(session=session, run=run)
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+        with patch("dstack._internal.server.services.backends.cache.lease_project_backends") as m:
             await _process_job(session=session, worker=worker, job_model=job)
 
         # Backend offers must not be requested with the reuse policy.
@@ -1974,9 +2194,11 @@ class TestJobSubmittedWorker:
         job = await create_job(session=session, run=run)
 
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers.return_value = [offer]
 
@@ -2027,12 +2249,14 @@ class TestJobSubmittedWorker:
         await session.commit()
 
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = compute_mock
-            m.return_value = [backend_mock]
             compute_mock.get_offers.return_value = [offer]
             compute_mock.run_job.side_effect = BackendError("boom")
 
@@ -2058,12 +2282,14 @@ class TestJobSubmittedWorker:
         job = await create_job(session=session, run=run)
 
         offer = get_instance_offer_with_availability(backend=BackendType.AWS, region="us-east-1")
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = compute_mock
-            m.return_value = [backend_mock]
             compute_mock.get_offers.return_value = [offer]
             compute_mock.run_job.side_effect = BackendError("InsufficientInstanceCapacity")
 
@@ -2111,11 +2337,13 @@ class TestJobSubmittedWorker:
         )
 
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value = compute_mock
-            m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.RUNPOD
             compute_mock.get_offers.return_value = [offer]
             compute_mock.run_jobs.return_value = get_compute_group_provisioning_data(
@@ -2181,11 +2409,13 @@ class TestJobSubmittedWorker:
         )
 
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value = compute_mock
-            m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.RUNPOD
             compute_mock.get_offers.return_value = [offer]
             compute_mock.run_job.return_value = get_job_provisioning_data(
@@ -2457,9 +2687,11 @@ class TestJobSubmittedWorker:
             instance_assigned=True,
         )
 
-        with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
-            backend_mock = Mock()
-            m.return_value = backend_mock
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.attach_volume.return_value = VolumeAttachmentData()
@@ -2528,9 +2760,11 @@ class TestJobSubmittedWorker:
         )
         await session.commit()
 
-        with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
-            backend_mock = Mock()
-            m.return_value = backend_mock
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
 
@@ -2546,6 +2780,56 @@ class TestJobSubmittedWorker:
         assert volume.lock_token is not None
         assert volume.lock_expires_at is not None
         backend_mock.compute.return_value.attach_volume.assert_not_called()
+
+    async def test_terminates_job_when_volume_backend_is_not_available(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(),
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+            busy_blocks=1,
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration.volumes = [VolumeMountPoint(name=volume.name, path="/volume")]
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance=instance,
+            instance_assigned=True,
+        )
+
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(None),
+        ):
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        await session.refresh(volume)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.VOLUME_ERROR
+        assert job.termination_reason_message == "Failed to attach volume: backend not available"
+        assert volume.lock_owner is None
 
     async def test_reclaims_stale_related_volume_lock(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
@@ -2588,9 +2872,11 @@ class TestJobSubmittedWorker:
         volume.lock_owner = f"{JobSubmittedPipeline.__name__}:{job.id}"
         await session.commit()
 
-        with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
-            backend_mock = Mock()
-            m.return_value = backend_mock
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.attach_volume.return_value = VolumeAttachmentData()
@@ -2639,9 +2925,11 @@ class TestJobSubmittedWorker:
         job = await create_job(session=session, run=run, instance_assigned=True)
 
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.RUNPOD
             backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data(
@@ -2704,11 +2992,13 @@ class TestJobSubmittedWorker:
         )
 
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value = compute_mock
-            m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.RUNPOD
             compute_mock.get_offers.return_value = [offer]
             compute_mock.run_jobs.return_value = get_compute_group_provisioning_data(
@@ -2771,9 +3061,11 @@ class TestJobSubmittedWorker:
             job = await create_job(session=session, run=run, instance_assigned=True)
 
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.RUNPOD
             backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data(
@@ -2829,9 +3121,11 @@ class TestJobSubmittedWorker:
             job = await create_job(session=session, run=run, instance_assigned=True)
 
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.RUNPOD
             backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data(

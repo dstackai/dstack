@@ -19,8 +19,8 @@ from dstack._internal.server.schemas.backends import (
     UpdateBackendYAMLRequest,
 )
 from dstack._internal.server.security.permissions import ProjectAdmin
-from dstack._internal.server.services import backends
 from dstack._internal.server.services.backends import handlers as backends_handlers
+from dstack._internal.server.services.backends import store as backends_store
 from dstack._internal.server.services.config import (
     ServerConfigManager,
     create_backend_config_yaml,
@@ -58,7 +58,7 @@ async def create_backend(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
     _, project = user_project
-    config = await backends.create_backend(session=session, project=project, config=body)
+    config = await backends_store.create_backend(session=session, project=project, config=body)
     if settings.SERVER_CONFIG_ENABLED:
         await ServerConfigManager().sync_config(session=session)
     return CustomJSONResponse(config)
@@ -71,7 +71,7 @@ async def update_backend(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
     _, project = user_project
-    config = await backends.update_backend(session=session, project=project, config=body)
+    config = await backends_store.update_backend(session=session, project=project, config=body)
     if settings.SERVER_CONFIG_ENABLED:
         await ServerConfigManager().sync_config(session=session)
     return CustomJSONResponse(config)
@@ -101,7 +101,7 @@ async def get_backend_config_info(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
     _, project = user_project
-    config = await backends.get_backend_config(project=project, backend_type=backend_name)
+    config = await backends_store.get_backend_config(project=project, backend_type=backend_name)
     if config is None:
         raise ResourceNotExistsError()
     return CustomJSONResponse(config)

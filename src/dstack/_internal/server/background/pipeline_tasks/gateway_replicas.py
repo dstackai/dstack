@@ -7,17 +7,25 @@ from typing import Any, Optional, Sequence
 from httpx import HTTPStatusError
 from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import InstrumentedAttribute, joinedload, load_only, with_loader_criteria
+from sqlalchemy.orm import (
+    InstrumentedAttribute,
+    joinedload,
+    load_only,
+    raiseload,
+    with_loader_criteria,
+)
 from sqlalchemy.sql.base import ExecutableOption
 
 from dstack._internal.core.backends.base.compute import (
     ComputeWithGatewayLoadBalancerSupport,
     ComputeWithGatewaySupport,
 )
-from dstack._internal.core.errors import BackendError, BackendNotAvailable, GatewayError
+from dstack._internal.core.errors import BackendError, GatewayError
 from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
+from dstack._internal.core.models.instances import RemoteConnectionInfo
 from dstack._internal.core.models.runs import JobSpec, JobStatus, RunStatus, ServiceSpec
+from dstack._internal.proxy.gateway.schemas.registry import ReplicaProxyJumpKeyUpdate
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem
 from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks.base import (
@@ -45,9 +53,9 @@ from dstack._internal.server.models import (
     ServiceRegistrationModel,
     ServiceReplicaRegistrationModel,
 )
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services import gateways as gateways_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.gateways import (
     get_gateway_configuration,
     get_gateway_lb_configuration,
@@ -67,6 +75,7 @@ from dstack._internal.server.services.services import (
     should_configure_service_https_on_gateway_replica,
 )
 from dstack._internal.server.utils import tracing
+from dstack._internal.utils import ssh as ssh_utils
 from dstack._internal.utils.common import get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -454,45 +463,45 @@ async def _provision_gateway_replica(
     gateway_model: GatewayModel,
     replica_model: GatewayReplicaModel,
 ) -> _GatewayReplicaUpdateMap:
-    try:
-        (_, backend) = await backends_services.get_project_backend_with_model_by_id_or_error(
-            project=gateway_model.project, backend_id=replica_model.backend_id
-        )
-    except BackendNotAvailable:
-        return _GatewayReplicaUpdateMap(
-            status=GatewayReplicaStatus.TERMINATED,
-            status_message="Backend not available",
-            active=False,
-            deleted=True,
-        )
+    async with backends_cache.lease_project_backend_by_id(
+        project=gateway_model.project, backend_id=replica_model.backend_id
+    ) as backend:
+        if backend is None:
+            return _GatewayReplicaUpdateMap(
+                status=GatewayReplicaStatus.TERMINATED,
+                status_message="Backend not available",
+                active=False,
+                deleted=True,
+            )
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithGatewaySupport)
+        replica_configuration = get_gateway_replica_configuration(replica_model, gateway_model)
 
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithGatewaySupport)
-    replica_configuration = get_gateway_replica_configuration(replica_model, gateway_model)
-
-    logger.debug("%s: creating gateway replica", fmt(replica_model))
-    try:
-        gpd = await run_async(
-            compute.create_gateway_replica, replica_configuration, gateway_model.backend_data
-        )
-    except BackendError as e:
-        status_message = f"Backend error: {repr(e)}"
-        if len(e.args) > 0:
-            status_message = str(e.args[0])
-        return _GatewayReplicaUpdateMap(
-            status=GatewayReplicaStatus.TERMINATED,
-            status_message=status_message,
-            active=False,
-            deleted=True,
-        )
-    except Exception:
-        logger.exception("%s: unexpected error when creating gateway replica", fmt(replica_model))
-        return _GatewayReplicaUpdateMap(
-            status=GatewayReplicaStatus.TERMINATED,
-            status_message="Unexpected error",
-            active=False,
-            deleted=True,
-        )
+        logger.debug("%s: creating gateway replica", fmt(replica_model))
+        try:
+            gpd = await run_async(
+                compute.create_gateway_replica, replica_configuration, gateway_model.backend_data
+            )
+        except BackendError as e:
+            status_message = f"Backend error: {repr(e)}"
+            if len(e.args) > 0:
+                status_message = str(e.args[0])
+            return _GatewayReplicaUpdateMap(
+                status=GatewayReplicaStatus.TERMINATED,
+                status_message=status_message,
+                active=False,
+                deleted=True,
+            )
+        except Exception:
+            logger.exception(
+                "%s: unexpected error when creating gateway replica", fmt(replica_model)
+            )
+            return _GatewayReplicaUpdateMap(
+                status=GatewayReplicaStatus.TERMINATED,
+                status_message="Unexpected error",
+                active=False,
+                deleted=True,
+            )
 
     return _GatewayReplicaUpdateMap(
         status=GatewayReplicaStatus.PROVISIONING,
@@ -580,26 +589,25 @@ async def _register_replica_with_load_balancer(
     """
     if replica_model.instance_id is None:
         return "instance_id is None, cannot register with load balancer"
-    try:
-        (_, backend) = await backends_services.get_project_backend_with_model_by_id_or_error(
-            project=gateway_model.project, backend_id=replica_model.backend_id
-        )
-    except BackendNotAvailable:
-        return "Backend not available"
-    compute = backend.compute()
-    if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
-        return "Backend does not support load balancer operations"
-    lb_configuration = get_gateway_lb_configuration(gateway_model)
-    try:
-        await run_async(
-            compute.register_gateway_replica_with_load_balancer,
-            replica_model.instance_id,
-            lb_configuration,
-            gateway_model.backend_data,
-        )
-    except Exception:
-        logger.exception("%s: error registering with load balancer", fmt(replica_model))
-        return "Error registering with load balancer"
+    async with backends_cache.lease_project_backend_by_id(
+        project=gateway_model.project, backend_id=replica_model.backend_id
+    ) as backend:
+        if backend is None:
+            return "Backend not available"
+        compute = backend.compute()
+        if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
+            return "Backend does not support load balancer operations"
+        lb_configuration = get_gateway_lb_configuration(gateway_model)
+        try:
+            await run_async(
+                compute.register_gateway_replica_with_load_balancer,
+                replica_model.instance_id,
+                lb_configuration,
+                gateway_model.backend_data,
+            )
+        except Exception:
+            logger.exception("%s: error registering with load balancer", fmt(replica_model))
+            return "Error registering with load balancer"
     logger.info("%s: registered with load balancer", fmt(replica_model))
     return None
 
@@ -678,32 +686,57 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
                 logger.warning("%s: failed to list services: %r", fmt(replica_model), e)
             await _commit_update(item, replica_model, update_map={})
             return
+    run_filters = (
+        RunModel.gateway_id == gateway_model.id,
+        RunModel.deleted == False,
+        RunModel.status.not_in(RunStatus.finished_statuses() + [RunStatus.TERMINATING]),
+    )
+    job_filters = (JobModel.status == JobStatus.RUNNING, JobModel.registered == True)
     stmt = (
         select(RunModel)
-        .where(
-            RunModel.gateway_id == gateway_model.id,
-            RunModel.deleted == False,
-            RunModel.status.not_in(RunStatus.finished_statuses() + [RunStatus.TERMINATING]),
-        )
+        .where(*run_filters)
         .options(
             load_only(RunModel.id),
-            joinedload(RunModel.jobs).load_only(JobModel.id),
-            with_loader_criteria(
-                JobModel,
-                and_(
-                    JobModel.status == JobStatus.RUNNING,
-                    JobModel.registered == True,
-                ),
-            ),
+            joinedload(RunModel.jobs).load_only(JobModel.id, JobModel.instance_id),
+            with_loader_criteria(JobModel, and_(*job_filters)),
         )
     )
     async with get_session_ctx() as session:
         res = await session.execute(stmt)
         expected_runs = res.scalars().unique().all()
-        plan = _plan_state_sync(
-            currently_registered=currently_registered_services,
-            expected=expected_runs,
+        # Fetch SSH connection data once per instance, not once per service replica.
+        # Cloud instances have no remote_connection_info and return no key data.
+        res = await session.execute(
+            select(InstanceModel.id, InstanceModel.remote_connection_info).where(
+                InstanceModel.remote_connection_info.is_not(None),
+                InstanceModel.id.in_(
+                    select(JobModel.instance_id)
+                    .join(RunModel, JobModel.run_id == RunModel.id)
+                    .where(*run_filters, *job_filters)
+                ),
+            )
         )
+        instance_connection_info = res.all()
+
+    # Parse keys and compare gateway state without holding a DB connection.
+    instance_proxy_jump_public_keys = {}
+    for instance_id, connection_info in instance_connection_info:
+        rci = validate_json_extra_ignore(RemoteConnectionInfo, get_or_error(connection_info))
+        if rci.ssh_proxy is not None:
+            key = get_or_error(rci.ssh_proxy_keys)[0]
+            public_key = " ".join(key.public.split()[:2])
+            # Existing API requests may provide only the private key.
+            if not public_key:
+                public_key = await run_async(
+                    ssh_utils.get_public_key_from_private_key, get_or_error(key.private)
+                )
+            instance_proxy_jump_public_keys[instance_id] = public_key
+    plan = _plan_state_sync(
+        currently_registered=currently_registered_services,
+        expected=expected_runs,
+        instance_proxy_jump_public_keys=instance_proxy_jump_public_keys,
+    )
+    async with get_session_ctx() as session:
         run_models_by_id, job_models_by_id = await _load_runs_and_jobs_for_state_sync(
             session, plan
         )
@@ -912,6 +945,48 @@ async def _perform_state_sync(
                 result.failed_replica_registrations[replica_id] = "Unexpected error"
                 continue
             result.registered_replicas.add(replica_id)
+    # Send all replacements together. The gateway keeps working tunnels open and
+    # saves its state once, rather than rewriting the full state for each replica.
+    key_updates = []
+    for run_id, job_ids in plan.update_replica_proxy_jump_keys.items():
+        run = run_models_by_id.get(run_id)
+        if run is None:
+            continue
+        for job_id in job_ids:
+            job = job_models_by_id.get(job_id)
+            if job is None or job.instance is None:
+                continue
+            rci = get_instance_remote_connection_info(job.instance)
+            if rci is None or rci.ssh_proxy is None:
+                continue
+            key_updates.append(
+                ReplicaProxyJumpKeyUpdate(
+                    project_name=run.project.name,
+                    run_name=run.run_name,
+                    job_id=job_id.hex,
+                    ssh_proxy_jump_private_key=get_or_error(
+                        get_or_error(rci.ssh_proxy_keys)[0].private
+                    ),
+                )
+            )
+    if key_updates:
+        try:
+            async with connection.client() as client:
+                failures = await client.update_replica_proxy_jump_keys(key_updates)
+        except Exception as exc:
+            logger.warning(
+                "%s: could not update service proxy_jump SSH keys: %r", fmt(replica_model), exc
+            )
+        else:
+            for job_id, error in failures.items():
+                logger.warning(
+                    "%s: could not update replica %s proxy_jump SSH key: %s",
+                    fmt(replica_model),
+                    job_id,
+                    error,
+                )
+        # Poll actual gateway keys again next time, including after a lost response
+        # or a partial failure. No separate retry state is required.
     return result
 
 
@@ -1226,12 +1301,15 @@ async def _load_runs_and_jobs_for_state_sync(
     run_ids = (
         plan.register_services
         | plan.register_replicas.keys()
+        | plan.update_replica_proxy_jump_keys.keys()
         | {s.id for s in plan.unregister_services if s.id is not None}
     )
     run_models_by_id: dict[uuid.UUID, RunModel] = {}
     if run_ids:
         res = await session.execute(
-            select(RunModel).where(RunModel.id.in_(run_ids)).options(joinedload(RunModel.project))
+            select(RunModel)
+            .where(RunModel.id.in_(run_ids))
+            .options(joinedload(RunModel.project), raiseload(RunModel.jobs))
         )
         run_models_by_id = {run.id: run for run in res.unique().scalars().all()}
 
@@ -1239,6 +1317,8 @@ async def _load_runs_and_jobs_for_state_sync(
     for replica_ids in plan.register_replicas.values():
         job_ids |= replica_ids
     for replica_ids in plan.unregister_replicas.values():
+        job_ids |= replica_ids
+    for replica_ids in plan.update_replica_proxy_jump_keys.values():
         job_ids |= replica_ids
     job_models_by_id: dict[uuid.UUID, JobModel] = {}
     if job_ids:
@@ -1371,6 +1451,8 @@ class _StateSyncPlan:
     register_replicas: dict[uuid.UUID, set[uuid.UUID]] = field(default_factory=dict)
     unregister_replicas: dict[_ServiceRef, set[uuid.UUID]] = field(default_factory=dict)
     set_run_ids: dict[_ServiceRef, uuid.UUID] = field(default_factory=dict)
+    update_replica_proxy_jump_keys: dict[uuid.UUID, set[uuid.UUID]] = field(default_factory=dict)
+    """Run IDs mapped to registered job IDs whose saved gateway proxy_jump key needs replacing."""
 
 
 @dataclass
@@ -1388,7 +1470,9 @@ class _StateSyncResult:
 
 
 def _plan_state_sync(
-    currently_registered: list[ServiceListItem], expected: Sequence[RunModel]
+    currently_registered: list[ServiceListItem],
+    expected: Sequence[RunModel],
+    instance_proxy_jump_public_keys: dict[uuid.UUID, str],
 ) -> _StateSyncPlan:
     plan = _StateSyncPlan()
     expected_run_id_to_run = {run.id: run for run in expected}
@@ -1422,6 +1506,17 @@ def _plan_state_sync(
             expected_job_ids = {job.id for job in run.jobs}
             plan.register_replicas[run.id] = expected_job_ids - currently_registered_job_ids
             plan.unregister_replicas[service_ref] = currently_registered_job_ids - expected_job_ids
+            gateway_proxy_jump_public_keys = {
+                uuid.UUID(r.id): r.ssh_proxy_jump_public_key for r in service.replicas
+            }
+            for job in run.jobs:
+                if job.id not in currently_registered_job_ids or job.instance_id is None:
+                    continue
+                public_key = instance_proxy_jump_public_keys.get(job.instance_id)
+                if public_key is None:
+                    continue
+                if gateway_proxy_jump_public_keys[job.id] != public_key:
+                    plan.update_replica_proxy_jump_keys.setdefault(run.id, set()).add(job.id)
         else:
             plan.unregister_services.add(service_ref)
             plan.unregister_replicas[service_ref] = {
@@ -1467,46 +1562,48 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
     mark_terminated_update_map = _GatewayReplicaUpdateMap(
         status=GatewayReplicaStatus.TERMINATED, active=False, deleted=True
     )
-    try:
-        (_, backend) = await backends_services.get_project_backend_with_model_by_id_or_error(
-            project=gateway_model.project,
-            backend_id=replica_model.backend_id,
-        )
-    except BackendNotAvailable:
-        logger.error(
-            "%s: backend not available, cannot terminate. Marking TERMINATED without termination",
-            fmt(replica_model),
-        )
-        await _commit_update(item, replica_model, mark_terminated_update_map)
-        return
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithGatewaySupport)
-    replica_configuration = get_gateway_replica_configuration(replica_model, gateway_model)
-    if replica_model.instance_id is None:
-        logger.warning(
-            "%s: instance_id is None, skipping gateway replica termination", fmt(replica_model)
-        )
-        await _commit_update(item, replica_model, mark_terminated_update_map)
-        return
-    if _is_legacy_aws_acm_gateway_with_pending_migration(gateway_model):
-        await _commit_update(item, replica_model, update_map={})
-        return
+    async with backends_cache.lease_project_backend_by_id(
+        project=gateway_model.project,
+        backend_id=replica_model.backend_id,
+    ) as backend:
+        if backend is None:
+            logger.error(
+                "%s: backend not available, cannot terminate."
+                " Marking TERMINATED without termination",
+                fmt(replica_model),
+            )
+            await _commit_update(item, replica_model, mark_terminated_update_map)
+            return
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithGatewaySupport)
+        replica_configuration = get_gateway_replica_configuration(replica_model, gateway_model)
+        if replica_model.instance_id is None:
+            logger.warning(
+                "%s: instance_id is None, skipping gateway replica termination", fmt(replica_model)
+            )
+            await _commit_update(item, replica_model, mark_terminated_update_map)
+            return
+        if _is_legacy_aws_acm_gateway_with_pending_migration(gateway_model):
+            await _commit_update(item, replica_model, update_map={})
+            return
 
-    if gateway_model.hostname is not None:
-        await _deregister_gateway_replica_from_load_balancer(compute, gateway_model, replica_model)
+        if gateway_model.hostname is not None:
+            await _deregister_gateway_replica_from_load_balancer(
+                compute, gateway_model, replica_model
+            )
 
-    logger.debug("%s: terminating gateway replica", fmt(replica_model))
-    try:
-        await run_async(
-            compute.terminate_gateway_replica,
-            replica_model.instance_id,
-            replica_configuration,
-            replica_model.backend_data,
-        )
-    except Exception:
-        logger.exception("%s: error when terminating gateway replica", fmt(replica_model))
-        await _commit_update(item, replica_model, update_map={})
-        return
+        logger.debug("%s: terminating gateway replica", fmt(replica_model))
+        try:
+            await run_async(
+                compute.terminate_gateway_replica,
+                replica_model.instance_id,
+                replica_configuration,
+                replica_model.backend_data,
+            )
+        except Exception:
+            logger.exception("%s: error when terminating gateway replica", fmt(replica_model))
+            await _commit_update(item, replica_model, update_map={})
+            return
 
     if replica_model.ip_address is not None:
         await gateway_connections_pool.remove(replica_model.ip_address)

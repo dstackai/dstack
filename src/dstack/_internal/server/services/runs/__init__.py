@@ -8,9 +8,9 @@ from typing import List, Optional
 
 import pydantic
 from apscheduler.triggers.cron import CronTrigger
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, joinedload, raiseload, selectinload
+from sqlalchemy.orm import joinedload, raiseload, selectinload
 
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.errors import (
@@ -186,7 +186,7 @@ async def list_user_runs(
     username: Optional[str],
     only_active: bool,
     include_jobs: bool,
-    job_submissions_limit: Optional[int],
+    job_submissions_limit: int,
     prev_submitted_at: Optional[datetime],
     prev_run_id: Optional[uuid.UUID],
     limit: int,
@@ -302,6 +302,9 @@ async def list_projects_run_models(
             if prev_run_id is None:
                 filters.append(RunModel.submitted_at > prev_submitted_at)
             else:
+                # Redundant with the OR below, but unlike the OR it lets the database
+                # start the index scan at the cursor instead of scanning from the start.
+                filters.append(RunModel.submitted_at >= prev_submitted_at)
                 filters.append(
                     or_(
                         RunModel.submitted_at > prev_submitted_at,
@@ -314,6 +317,7 @@ async def list_projects_run_models(
             if prev_run_id is None:
                 filters.append(RunModel.submitted_at < prev_submitted_at)
             else:
+                filters.append(RunModel.submitted_at <= prev_submitted_at)
                 filters.append(
                     or_(
                         RunModel.submitted_at < prev_submitted_at,
@@ -344,7 +348,7 @@ async def _list_job_models_by_run_id(
     session: AsyncSession,
     run_models: List[RunModel],
     include_jobs: bool,
-    job_submissions_limit: Optional[int],
+    job_submissions_limit: int,
     return_in_api: bool,
 ) -> dict[uuid.UUID, List[JobModel]]:
     """
@@ -371,106 +375,61 @@ async def _list_job_models_by_run_id(
 async def _list_job_models(
     session: AsyncSession,
     run_ids: List[uuid.UUID],
-    job_submissions_limit: Optional[int],
+    job_submissions_limit: int,
     include_probes: bool,
 ) -> List[JobModel]:
     """
     List job models for runs list responses.
 
-    When job_submissions_limit is set, include up to job_submissions_limit latest
-    submissions per job plus the latest terminated submission per job. This gives
-    run_model_to_run enough data without loading every historical submission.
+    Return at most job_submissions_limit latest submissions of each job: those whose
+    submission_num is within job_submissions_limit of the job's latest submission_num.
+    A job gets fewer if its submission numbers have gaps, which happens when submissions
+    are deleted. Also return the latest submission with a termination reason, which
+    run_model_to_run needs for status messages such as `retrying`.
     """
     options = []
     if include_probes:
         options.append(joinedload(JobModel.probes))
-    if job_submissions_limit is None:
-        # With no job_submissions_limit, return full submission history. This
-        # can be slow. UI/CLI list views pass a limit, but API callers may omit it.
-        res = await session.execute(
-            select(JobModel)
-            .where(JobModel.run_id.in_(run_ids))
-            .options(*options)
-            .order_by(
-                JobModel.run_id,
-                JobModel.replica_num,
-                JobModel.job_num,
-                JobModel.submission_num,
-            )
-        )
-        return list(res.unique().scalars().all())
-
-    requested_jobs = await _list_latest_job_models_per_job(
-        session=session,
-        run_ids=run_ids,
-        limit_per_job=max(job_submissions_limit, 1),
-        include_probes=include_probes,
-    )
-    # Also load rows needed to preserve run.status_message, e.g. `retrying`.
-    status_message_jobs = await _list_latest_job_models_per_job(
-        session=session,
-        run_ids=run_ids,
-        limit_per_job=1,
-        include_probes=False,
-        only_with_termination_reason=True,
-    )
-
-    # Merge the two job lists by ID because the same row may appear in both.
-    jobs_by_id = {job.id: job for job in requested_jobs}
-    for job in status_message_jobs:
-        jobs_by_id.setdefault(job.id, job)
-    return sorted(
-        jobs_by_id.values(),
-        key=lambda j: (j.run_id, j.replica_num, j.job_num, j.submission_num),
-    )
-
-
-async def _list_latest_job_models_per_job(
-    session: AsyncSession,
-    run_ids: List[uuid.UUID],
-    limit_per_job: int,
-    include_probes: bool,
-    only_with_termination_reason: bool = False,
-) -> List[JobModel]:
-    """
-    List up to N newest submissions for each job.
-
-    A newer submission has a higher submission_num. The SQL window applies the
-    per-job limit in the database instead of loading all retries and slicing them
-    in Python.
-    """
-    row_number = (
-        func.row_number()
-        .over(
-            partition_by=(JobModel.run_id, JobModel.replica_num, JobModel.job_num),
-            order_by=JobModel.submission_num.desc(),
-        )
-        .label("row_number")
-    )
-    filters = [JobModel.run_id.in_(run_ids)]
-    if only_with_termination_reason:
-        filters.append(JobModel.termination_reason.isnot(None))
-    jobs_sq = (
+    limit = max(job_submissions_limit, 1)
+    latest = (
         select(
-            JobModel,
-            row_number,
+            JobModel.run_id,
+            JobModel.replica_num,
+            JobModel.job_num,
+            func.max(JobModel.submission_num).label("submission_num"),
+            func.max(
+                case((JobModel.termination_reason.isnot(None), JobModel.submission_num))
+            ).label("terminated_submission_num"),
         )
-        .where(*filters)
+        .where(JobModel.run_id.in_(run_ids))
+        .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
         .subquery()
     )
-    job_alias = aliased(JobModel, jobs_sq)
-    options = []
-    if include_probes:
-        options.append(joinedload(job_alias.probes))
     res = await session.execute(
-        select(job_alias)
-        .where(jobs_sq.c.row_number <= limit_per_job)
+        select(JobModel)
+        .join(
+            latest,
+            and_(
+                JobModel.run_id == latest.c.run_id,
+                JobModel.replica_num == latest.c.replica_num,
+                JobModel.job_num == latest.c.job_num,
+            ),
+        )
+        .where(
+            # Redundant with the join, but lets Postgres hash-join the jobs with `latest`
+            # instead of looking up each job's run separately.
+            JobModel.run_id.in_(run_ids),
+            or_(
+                JobModel.submission_num > latest.c.submission_num - limit,
+                JobModel.submission_num == latest.c.terminated_submission_num,
+            ),
+        )
         .options(*options)
         .order_by(
-            job_alias.run_id,
-            job_alias.replica_num,
-            job_alias.job_num,
-            job_alias.submission_num,
+            JobModel.run_id,
+            JobModel.replica_num,
+            JobModel.job_num,
+            JobModel.submission_num,
         )
     )
     return list(res.unique().scalars().all())

@@ -11,3 +11,4 @@ class Mocks:
     run_certbot: AnyMock
     open_conn: AnyMock
     close_conn: AnyMock
+    wait_until_idle: AnyMock

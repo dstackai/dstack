@@ -41,7 +41,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.schemas.projects import MemberSetting
 from dstack._internal.server.services import events, users
 from dstack._internal.server.services import templates as templates_service
-from dstack._internal.server.services.backends import (
+from dstack._internal.server.services.backends.store import (
     get_backend_config_without_creds_from_backend_model,
 )
 from dstack._internal.server.services.locking import (
@@ -137,6 +137,9 @@ async def list_user_accessible_projects(
             if prev_id is None:
                 pagination_filters.append(ProjectModel.created_at > prev_created_at)
             else:
+                # Redundant with the OR below, but unlike the OR it lets the database
+                # start the index scan at the cursor instead of scanning from the start.
+                pagination_filters.append(ProjectModel.created_at >= prev_created_at)
                 pagination_filters.append(
                     or_(
                         ProjectModel.created_at > prev_created_at,
@@ -149,6 +152,7 @@ async def list_user_accessible_projects(
             if prev_id is None:
                 pagination_filters.append(ProjectModel.created_at < prev_created_at)
             else:
+                pagination_filters.append(ProjectModel.created_at <= prev_created_at)
                 pagination_filters.append(
                     or_(
                         ProjectModel.created_at < prev_created_at,

@@ -315,9 +315,8 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 
 		// todo fail reason?
 		log.Error(ctx, "Exec failed", "err", err)
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
-			ex.SetJobStateWithExitStatus(ctx, schemas.JobStateFailed, exitError.ExitCode())
+		if exitStatus, ok := jobExitStatus(err); ok {
+			ex.SetJobStateWithExitStatus(ctx, schemas.JobStateFailed, exitStatus)
 		} else {
 			ex.SetJobState(ctx, schemas.JobStateFailed)
 		}
@@ -715,6 +714,30 @@ func watchLogQuota(stopJob context.CancelFunc, quotaExceeded <-chan struct{}) (s
 		}
 	}()
 	return func() { close(done) }
+}
+
+// jobExitStatus extracts the job's exit status from the error execJob returned: the status
+// itself if the job process exited, or the negated signal number if a signal killed it, as in
+// Python's subprocess. The stops the runner initiates never get here, Run handles them first.
+//
+// The job process is the shell running the job's commands, so the signal reaches the runner only
+// if the shell exec'd the command that got it. If the shell forked, it exits with 128+N instead.
+func jobExitStatus(err error) (int, bool) {
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		return 0, false
+	}
+	ws, ok := exitErr.Sys().(syscall.WaitStatus)
+	if !ok {
+		return 0, false
+	}
+	switch {
+	case ws.Exited():
+		return ws.ExitStatus(), true
+	case ws.Signaled():
+		return -int(ws.Signal()), true
+	}
+	return 0, false
 }
 
 // setupGitCredentials must be called from Run after setJobUser

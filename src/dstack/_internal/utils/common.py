@@ -9,12 +9,11 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
-from typing import Any, Final, Iterable, List, Optional, TypeVar, Union
+from typing import Any, Final, Iterable, List, Optional, ParamSpec, TypeVar, Union
 from urllib.parse import urlparse
 from uuid import UUID
 
 from pydantic import TypeAdapter
-from typing_extensions import ParamSpec
 
 from dstack._internal.core.models.duration import Duration
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
@@ -89,8 +88,8 @@ def parse_datetime(value: str) -> datetime:
     """
     Parse a datetime the way the API parses one: an ISO 8601 string or a Unix timestamp.
 
-    Unlike `datetime.fromisoformat()` on Python 3.10, accepts the `Z` suffix and fractional
-    seconds of any precision. Raises `ValueError` if `value` is not a datetime.
+    Accepts the `Z` suffix and fractional seconds of any precision. Raises `ValueError` if
+    `value` is not a datetime.
     """
     return _DATETIME_ADAPTER.validate_strings(value)
 

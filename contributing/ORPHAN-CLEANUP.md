@@ -53,6 +53,7 @@ When instance termination gives up after retrying, the log says that orphan clea
 
 - Resources are not cleaned up if the backend credentials change or the backend is deleted.
 - Compute groups, placement groups, volumes and gateways are not covered. `OwnerType` only has `INSTANCE`.
+- A backend may skip internal resources it lacks permissions to list (e.g. Kubernetes secrets without the `list` verb). The cleanup still counts as clean, so such resources left without their owners are found only by cleanups after the permission is granted and the project has new activity.
 - Resources are recognized as `dstack`'s by the `provider_ref` tag or name alone. A resource that copies them from a `dstack` instance, e.g. a VM created with "Launch more like this" on AWS or "Create similar" on GCP, is classified as an orphan of that instance and deleted in `delete` mode.
 - `ProviderRefModel` records are never deleted yet. There is one per fleet instance and per placeholder instance, i.e. per job submission that provisions new capacity.
 - On dstack Sky, each project's `dstack` backend lists the shared base backend accounts, so listings repeat per project. Cleaning up each shared account once is a possible optimization.

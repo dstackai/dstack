@@ -29,7 +29,7 @@ from dstack._internal.server.models import (
     PlacementGroupModel,
     ProjectModel,
 )
-from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.placement import placement_group_model_to_placement_group
@@ -245,32 +245,33 @@ async def _delete_placement_group(
             "Failed to delete placement group %s. provisioning_data is None.", placement_group.name
         )
         return _get_deleted_result()
-    backend = await backends_services.get_project_backend_by_type(
+    async with backends_cache.lease_project_backend_by_type(
         project=placement_group_model.project,
         backend_type=placement_group.provisioning_data.backend,
-    )
-    if backend is None:
-        # TODO: Retry deletion
-        logger.error(
-            "Failed to delete placement group %s. Backend not available. Please delete it manually.",
-            placement_group.name,
-        )
-        return _get_deleted_result()
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithPlacementGroupSupport)
-    try:
-        await run_async(compute.delete_placement_group, placement_group)
-    except PlacementGroupInUseError:
-        logger.info(
-            "Placement group %s is still in use. Skipping deletion for now.", placement_group.name
-        )
-        return _DeleteResult()
-    except Exception:
-        # TODO: Retry deletion
-        logger.exception(
-            "Got exception when deleting placement group %s. Please delete it manually.",
-            placement_group.name,
-        )
+    ) as backend:
+        if backend is None:
+            # TODO: Retry deletion
+            logger.error(
+                "Failed to delete placement group %s. Backend not available. Please delete it manually.",
+                placement_group.name,
+            )
+            return _get_deleted_result()
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithPlacementGroupSupport)
+        try:
+            await run_async(compute.delete_placement_group, placement_group)
+        except PlacementGroupInUseError:
+            logger.info(
+                "Placement group %s is still in use. Skipping deletion for now.",
+                placement_group.name,
+            )
+            return _DeleteResult()
+        except Exception:
+            # TODO: Retry deletion
+            logger.exception(
+                "Got exception when deleting placement group %s. Please delete it manually.",
+                placement_group.name,
+            )
     return _get_deleted_result()
 
 

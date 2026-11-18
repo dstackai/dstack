@@ -2,7 +2,7 @@ import ipaddress
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Self, Union
 
 from pydantic import (
     ConfigDict,
@@ -12,7 +12,6 @@ from pydantic import (
     model_serializer,
     model_validator,
 )
-from typing_extensions import Annotated, Literal, Self
 
 from dstack._internal.core.backends.profile_options import AnyBackendProfileOptions
 from dstack._internal.core.models.backends.base import BackendType

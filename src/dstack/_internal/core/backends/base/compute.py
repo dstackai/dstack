@@ -204,6 +204,14 @@ class Compute(ABC):
         """
         pass
 
+    def close(self) -> None:
+        """
+        Releases resources that are not freed by garbage collection, e.g. SDK clients that run
+        background threads. The compute must not be used after `close()`.
+        It is called from async code in executor, so it can block. Must be idempotent.
+        """
+        pass
+
 
 class ComputeWithAllOffersCached(ABC):
     """
@@ -494,6 +502,8 @@ class ComputeWithResourceListingSupport(ABC):
         fails, return no groups of the region and report it in `ResourceListing.failures`.
         Otherwise, `primary_id=None` may be reported for resources of a tracked owner
         whose owner resource was not listed, and they would be deleted.
+        Internal resources that the backend lacks permissions to list may be skipped with
+        a warning instead, if deleting their group deletes them anyway.
         Raise if nothing could be listed.
         """
         pass

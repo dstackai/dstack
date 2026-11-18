@@ -1,7 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field
-from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.server.services.encryption.keys.base import EncryptionKey

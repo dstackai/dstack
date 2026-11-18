@@ -16,3 +16,10 @@ class Backend(ABC):
         Returns Compute instance.
         """
         pass
+
+    def close(self) -> None:
+        """
+        Releases resources held by the backend. The backend must not be used after `close()`.
+        See `Compute.close()`.
+        """
+        self.compute().close()

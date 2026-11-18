@@ -54,6 +54,7 @@ from dstack._internal.server.testing.common import (
     get_private_key_string,
     get_remote_connection_info,
     get_ssh_fleet_configuration,
+    mock_lease,
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
 
@@ -2248,9 +2249,11 @@ class TestGetPlan:
             )
         ]
         spec = get_fleet_spec()
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers.return_value = offers
             response = await client.post(
@@ -2291,9 +2294,11 @@ class TestGetPlan:
         spec = get_fleet_spec(
             conf=get_fleet_configuration(nodes=FleetNodesSpec(min=0, target=0, max=1))
         )
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.RUNPOD
             backend_mock.compute.return_value.get_offers.return_value = [offer]
             response = await client.post(
@@ -2327,9 +2332,11 @@ class TestGetPlan:
         spec = get_fleet_spec(
             conf=get_fleet_configuration(nodes=FleetNodesSpec(min=0, target=1, max=1))
         )
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.RUNPOD
             backend_mock.compute.return_value.get_offers.return_value = [offer]
             response = await client.post(

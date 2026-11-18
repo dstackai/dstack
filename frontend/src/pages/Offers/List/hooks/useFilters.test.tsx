@@ -9,14 +9,21 @@ let mockRememberedProject: string | null;
 const mockSetRememberedProject = jest.fn();
 let mockProjectsData: { data: { project_name: string }[] } | undefined;
 const mockGetProject = jest.fn();
+const mockGetProjects = jest.fn();
+const mockUseGetProjectsQuery = jest.fn();
 
 jest.mock('hooks/useLocalStorageState', () => ({
     useLocalStorageState: () => [mockRememberedProject, mockSetRememberedProject],
 }));
 jest.mock('services/fleet', () => ({ useLazyGetProjectFleetsQuery: () => [jest.fn()] }));
+jest.mock('App/slice', () => ({ selectUserName: jest.fn() }));
+jest.mock('hooks/useAppSelector', () => ({ __esModule: true, default: () => 'alice' }));
 jest.mock('services/project', () => ({
-    useLazyGetProjectsQuery: () => [jest.fn()],
-    useGetProjectsQuery: () => ({ data: mockProjectsData }),
+    useLazyGetProjectsQuery: () => [mockGetProjects],
+    useGetProjectsQuery: (...args: unknown[]) => {
+        mockUseGetProjectsQuery(...args);
+        return { data: mockProjectsData };
+    },
     useLazyGetProjectQuery: () => [mockGetProject],
 }));
 let filters: ReturnType<typeof useFilters>;
@@ -43,11 +50,26 @@ beforeEach(() => {
     mockRememberedProject = null;
     mockProjectsData = undefined;
     mockGetProject.mockReset();
+    mockGetProjects.mockReset();
+    mockUseGetProjectsQuery.mockReset();
 });
 
 afterEach(() => act(() => renderer.unmount()));
 
 describe('Offer filters', () => {
+    test("auto-selects and suggests only the user's projects", async () => {
+        mockGetProjects.mockReturnValue({ unwrap: () => Promise.resolve({ data: [{ project_name: 'main' }] }) });
+        renderFilters('/');
+        expect(mockUseGetProjectsQuery).toHaveBeenCalledWith({ username: 'alice', limit: 2 }, { skip: false });
+
+        await act(async () => {
+            await filters.handleLoadItems!({
+                detail: { filteringProperty: { key: 'project_name' }, filteringText: 'ma' },
+            } as never);
+        });
+        expect(mockGetProjects).toHaveBeenCalledWith(expect.objectContaining({ username: 'alice', name_pattern: 'ma' }));
+    });
+
     test('remembers the selected project', () => {
         renderFilters('/?project_name=main');
         expect(mockSetRememberedProject).toHaveBeenCalledWith('main');

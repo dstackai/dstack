@@ -18,6 +18,9 @@ With the latest update, `dstack` added native support for NVIDIA Dynamo with Pre
 
 <!-- more -->
 
+!!! note "Deprecation notice"
+    The `DSTACK_ROUTER_INTERNAL_IP` environment variable used in this blog post is no longer supported. For the modern approach, see the [NVIDIA Dynamo example](../../docs/examples/inference/dynamo.md).
+
 ## About NVIDIA Dynamo
 
 [NVIDIA Dynamo](https://docs.nvidia.com/dynamo/getting-started/introduction) is an open-source, high-throughput, low-latency inference framework for serving generative AI workloads in distributed environments. It adds a system-level layer above inference engines such as SGLang, vLLM, and TensorRT-LLM, coordinating them across GPUs and nodes.

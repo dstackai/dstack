@@ -55,7 +55,9 @@
         "quickstart": "Quickstart",
         "ask_ai": "Ask AI",
         "new": "New",
-        "full_view": "Full view"
+        "full_view": "Full view",
+        "show_token": "Show token",
+        "hide_token": "Hide token"
     },
 
     "auth": {

@@ -522,9 +522,7 @@ class JobModel(PipelineModelMixin, BaseModel):
     )
     project: Mapped["ProjectModel"] = relationship()
 
-    run_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("runs.id", ondelete="CASCADE"), index=True
-    )
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
     run: Mapped["RunModel"] = relationship()
 
     fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
@@ -619,6 +617,14 @@ class JobModel(PipelineModelMixin, BaseModel):
             last_processed_at.asc(),
             postgresql_where=status.not_in(JobStatus.finished_statuses()),
             sqlite_where=status.not_in(JobStatus.finished_statuses()),
+        ),
+        # Serves lookups by `run_id` and finding the latest submissions of each job.
+        Index(
+            "ix_jobs_run_id_replica_num_job_num_submission_num",
+            run_id,
+            replica_num,
+            job_num,
+            submission_num,
         ),
     )
 

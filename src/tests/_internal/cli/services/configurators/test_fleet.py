@@ -26,6 +26,8 @@ from dstack._internal.core.models.fleets import (
     FleetSpec,
     FleetStatus,
     InstanceGroupPlacement,
+    SSHHostParams,
+    SSHProxyParams,
 )
 from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.profiles import Profile
@@ -179,6 +181,69 @@ class TestApplyPlanMessages:
         assert "  - nodes" in output
         confirm_ask.assert_called_once_with("Update the fleet in-place?")
 
+    @pytest.mark.parametrize(
+        "per_host,proxy_jump",
+        [(False, False), (False, True), (True, False), (True, True)],
+    )
+    def test_identifies_the_changed_ssh_key_without_printing_key_material(
+        self, monkeypatch, per_host, proxy_jump
+    ):
+        console, confirm_ask = patch_console_and_confirm(monkeypatch)
+        current = get_ssh_fleet_spec()
+        ssh = current.configuration.ssh_config
+        assert ssh is not None
+        target = ssh
+        path = "ssh_config"
+        if per_host:
+            target = SSHHostParams(hostname="10.0.0.100")
+            ssh.hosts = [target]
+            path += ".hosts[0]"
+        if proxy_jump:
+            jump = SSHProxyParams(hostname="head", user="ubuntu", identity_file="old-key")
+            target.proxy_jump = jump
+            target = jump
+            path += ".proxy_jump"
+        target.identity_file = "old-key"
+        target.ssh_key = SSHKey(public="old-public-key", private="old-private-key")
+        new = current.model_copy(deep=True)
+        changed = new.configuration.ssh_config
+        assert changed is not None
+        if per_host:
+            changed = changed.hosts[0]
+            assert isinstance(changed, SSHHostParams)
+        if proxy_jump:
+            changed = changed.proxy_jump
+        assert changed is not None
+        changed.identity_file = "new-key"
+        changed.ssh_key = SSHKey(public="new-public-key", private="new-private-key")
+
+        plan = create_fleet_plan(current_spec=current, spec=new, action=ApplyAction.UPDATE)
+        FleetConfigurator(Mock())._apply_plan(plan, get_command_args())
+
+        output = console.export_text()
+        label = f"{path}.identity_file"
+        assert f"  - {label}\n" in output
+        assert "ssh_key" not in output
+        assert "public-key" not in output
+        assert "private-key" not in output
+        confirm_ask.assert_called_once_with("Update the fleet in-place?")
+
+    @pytest.mark.parametrize("field,value", [("user", "other-user"), ("port", 2222)])
+    def test_identifies_ssh_route_changes_requiring_recreation(self, monkeypatch, field, value):
+        console, confirm_ask = patch_console_and_confirm(monkeypatch)
+        current = get_ssh_fleet_spec()
+        new = current.model_copy(deep=True)
+        assert new.configuration.ssh_config is not None
+        setattr(new.configuration.ssh_config, field, value)
+        plan = create_fleet_plan(current_spec=current, spec=new, action=ApplyAction.CREATE)
+
+        FleetConfigurator(Mock())._apply_plan(plan, get_command_args())
+
+        output = console.export_text()
+        assert "Detected changes that cannot be updated in-place:" in output
+        assert f"  - ssh_config.{field}\n" in output
+        confirm_ask.assert_called_once_with("Re-create the fleet?")
+
     def test_prints_recreate_diff(self, monkeypatch: pytest.MonkeyPatch):
         console, confirm_ask = patch_console_and_confirm(monkeypatch)
         current_spec = get_cloud_fleet_spec(placement=InstanceGroupPlacement.ANY)
@@ -240,7 +305,7 @@ class TestRenderFleetSpecDiff:
             == dedent(
                 """
                 - Configuration properties:
-                  - ssh_config
+                  - ssh_config.hosts
                 """
             ).lstrip()
         )

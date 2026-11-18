@@ -1,6 +1,6 @@
 import math
 from collections.abc import Mapping
-from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Annotated, Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 import gpuhunt
 from pydantic import (
@@ -14,7 +14,6 @@ from pydantic import (
 )
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import CoreSchema, core_schema
-from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.utils.common import pretty_resources

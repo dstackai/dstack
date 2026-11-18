@@ -145,6 +145,7 @@ Refer to examples:
 Go to `compute.py` and implement `Compute` methods.
 Optionally, extend and implement `ComputeWith*` classes to support additional features such as fleets, volumes, gateways, placement groups, etc. For example, extend `ComputeWithCreateInstanceSupport` to support fleets.
 To support the cleanup of orphaned resources, extend `ComputeWithResourceListingSupport` as described in [Orphan cleanup support](#32-orphan-cleanup-support).
+If the compute holds resources that garbage collection does not free, such as SDK clients that run background threads, implement `Compute.close()` to release them. The server caches backends and calls `close()` once a backend is no longer used.
 
 Refer to examples:
 [verda](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/verda/compute.py),

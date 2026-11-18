@@ -1,7 +1,8 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.datastructures import URL
 from fastapi.responses import RedirectResponse, Response
-from typing_extensions import Annotated
 
 from dstack._internal.proxy.lib.deps import (
     ProxyAuth,

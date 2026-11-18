@@ -2,7 +2,6 @@ from typing import Dict, Iterable, List, Literal, Optional, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gpus import BackendGpu, BackendGpus, CpuGroup, GpuGroup
@@ -189,7 +188,7 @@ async def _get_gpu_offers(
     skip_backend_offers = profile.creation_policy == CreationPolicy.REUSE
 
     instance_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]]
-    backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]]
+    backend_offers: list[InstanceOfferWithAvailability]
     if profile.instances is not None:
         instance_offers = await get_targeted_instance_offers(
             session=session,
@@ -218,7 +217,7 @@ async def _get_gpu_offers(
             full_offers=full_offers,
             unallocated_resources=unallocated_resources,
         )
-    return [offer for _, offer in instance_offers] + [offer for _, offer in backend_offers]
+    return [offer for _, offer in instance_offers] + backend_offers
 
 
 def _process_offers_into_backend_gpus(

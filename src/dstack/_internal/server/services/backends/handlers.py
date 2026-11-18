@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server.models import ProjectModel
-from dstack._internal.server.services.backends import delete_backends
+from dstack._internal.server.services.backends.store import delete_backends
 from dstack._internal.server.services.fleets import list_project_fleet_models
 from dstack._internal.server.services.volumes import list_project_volumes
 from dstack._internal.utils.logging import get_logger

@@ -1,8 +1,10 @@
 import logging
 from textwrap import dedent
 from typing import Optional, Union
+from unittest.mock import Mock
 
 import pytest
+from kubernetes import client
 
 from dstack._internal.core.backends.kubernetes.models import (
     KubeconfigConfig,
@@ -13,7 +15,9 @@ from dstack._internal.core.backends.kubernetes.models import (
 from dstack._internal.core.backends.kubernetes.utils import (
     Cluster,
     get_clusters_from_backend_config,
+    list_all_objects,
 )
+from dstack._internal.core.errors import ComputeError
 
 
 class TestGetClustersFromBackendConfig:
@@ -316,3 +320,32 @@ class TestGetClustersFromBackendConfig:
         api_client = clusters[0].api_client
         assert api_client.configuration.retries == 5  # pyright: ignore[reportAttributeAccessIssue]
         assert getattr(api_client, "_ApiClient__request_timeout", None) == 7
+
+
+class TestListAllObjects:
+    def test_follows_continue_tokens(self):
+        method = Mock(
+            side_effect=[
+                Mock(items=["a", "b"], metadata=client.V1ListMeta(_continue="next")),
+                Mock(items=["c"], metadata=client.V1ListMeta(_continue=None)),
+            ]
+        )
+
+        objects = list_all_objects(method, namespace="ns", label_selector="key")
+
+        assert objects == ["a", "b", "c"]
+        assert [c.kwargs for c in method.call_args_list] == [
+            {"namespace": "ns", "label_selector": "key", "limit": 500, "_continue": None},
+            {"namespace": "ns", "label_selector": "key", "limit": 500, "_continue": "next"},
+        ]
+
+    def test_raises_if_continue_tokens_never_end(self):
+        method = Mock(
+            __name__="list_namespaced_pod",
+            return_value=Mock(items=["a"], metadata=client.V1ListMeta(_continue="next")),
+        )
+
+        with pytest.raises(ComputeError, match="list_namespaced_pod.*limit of 1000 pages"):
+            list_all_objects(method, namespace="ns", label_selector="key")
+
+        assert method.call_count == 1000

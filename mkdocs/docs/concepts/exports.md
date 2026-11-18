@@ -17,7 +17,11 @@ Once an export is created, the importer projects can see the exported resources 
 for running tasks, dev environments, and services. Imported resources appear with a project prefix
 (e.g., `team-a/my-fleet`) to distinguish them from the project's own resources.
 
-Currently, [SSH fleets](fleets.md#ssh-fleets) and [gateways](gateways.md) can be exported.
+Currently, [fleets](fleets.md) and [gateways](gateways.md) can be exported.
+
+??? info "Limitations"
+    - Importer projects can only use the existing instances of imported [backend fleets](fleets.md#backend-fleets). New instances are not provisioned for importers' runs.
+    - Runs that mount [network volumes](volumes.md#network-volumes) cannot use imported backend fleets.
 
 ??? info "Required role"
     The user creating or updating an export must have the project admin role on both the exporter project and

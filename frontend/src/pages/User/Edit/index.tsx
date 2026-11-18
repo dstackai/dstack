@@ -115,6 +115,7 @@ export const UserEdit: React.FC = () => {
 
                 {data && (
                     <UserForm
+                        key={data.username}
                         initialValues={data}
                         onSubmit={onSubmitHandler}
                         loading={isUserUpdating}
