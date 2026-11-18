@@ -68,9 +68,11 @@ AnyPresetAgentResult = Union[PresetAgentSuccess, PresetAgentFailure]
 
 
 class PresetTrialBenchmark(PresetBenchmark):
-    """A trial's benchmark as the agent recorded it. The preset-quality rules of
-    `PresetBenchmark.validate_metrics` apply to the final report; a trial may
-    have failed requests, and the listing still shows what it measured."""
+    """A trial's benchmark, which the agent writes into `trials/<n>/trial.json`
+    after benchmarking the trial at a concurrency, read by the CLI for
+    `dstack preset list`. `PresetBenchmark.validate_metrics` is overridden
+    because its rule is for the final report; applied to `trial.json` it would
+    drop the whole trial from the listing."""
 
     @model_validator(mode="after")
     def validate_metrics(self) -> Self:
@@ -79,8 +81,10 @@ class PresetTrialBenchmark(PresetBenchmark):
 
 class PresetTrialResult(CoreModel):
     """One `result` entry of `trials/<n>/trial.json`, as the system prompt
-    defines it. `learned` is left out because the agent writes it for its own reading
-    in later sessions, and not used by the CLI"""
+    defines it: the agent writes one per concurrency in `constraints.json` once
+    the trial is benchmarked, and the CLI reads them for `dstack preset list`.
+    The entry's `learned` field is left out: the CLI does not use it, because
+    the agent writes it for its own reading in later sessions."""
 
     concurrency: Optional[PositiveInt] = None
     context_length: Optional[PositiveInt] = None
@@ -89,7 +93,9 @@ class PresetTrialResult(CoreModel):
 
 
 class PresetTrial(CoreModel):
-    """The `trials/<n>/trial.json` record as defined in the system_prompt.md."""
+    """The `trials/<n>/trial.json` record as defined in the system_prompt.md.
+    The agent writes it once trial `<n>` is benchmarked, and its presence is
+    what marks the trial completed; the CLI reads it for `dstack preset list`."""
 
     resources: Optional[dict[str, Any]] = None
     groups: Optional[list[list[dict[str, Any]]]] = None

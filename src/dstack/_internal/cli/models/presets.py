@@ -53,8 +53,7 @@ class PresetListOutput(CoreModel):
 
 
 class PresetTrialsSummary(CoreModel):
-    """What the session row of `dstack preset list` shows about a session's
-    completed trials."""
+    """Built by the CLI for `dstack preset list`."""
 
     count: int
     # The trial with the highest tok/s that met the constraints.
@@ -73,6 +72,8 @@ class PresetTrialsSummary(CoreModel):
 
 
 class PresetSessionEntry(CoreModel):
+    """Built by the CLI for `dstack preset list`."""
+
     id: str
     state: PresetSessionState
     name: Optional[str]

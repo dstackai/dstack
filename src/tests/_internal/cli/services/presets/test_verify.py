@@ -21,7 +21,7 @@ from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.files import FilePathMapping
-from dstack._internal.core.models.presets import PresetWorkload
+from dstack._internal.core.models.presets import PresetResult, PresetWorkload
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.runs import Run
 from dstack._internal.utils.common import get_or_error
@@ -60,8 +60,9 @@ class TestBuildVerifiedPreset:
             verification_replica_groups=base.verified_on,
             base_model="Qwen/Qwen3.5-27B",
             repo="community/Qwen3.5-27B-GPTQ-Int4",
-            context_length=32768,
-            benchmark=get_preset_benchmark(),
+            result=[
+                PresetResult(concurrency=1, context_length=32768, benchmark=get_preset_benchmark())
+            ],
             configuration=configuration,
             best_trial=1,
             preset_id="8f3a12c4",
@@ -76,12 +77,12 @@ class TestBuildVerifiedPreset:
         assert preset.configuration.spot_policy is None
         assert "secret" not in preset.model_dump_json()
 
-    def test_successful_report_requires_benchmark(self):
+    def test_successful_report_requires_result(self):
         run = get_running_service_run()
         data = get_successful_preset_report(run).model_dump()
-        data.pop("benchmark")
+        data.pop("result")
 
-        with pytest.raises(ValidationError, match="benchmark"):
+        with pytest.raises(ValidationError, match="result"):
             validate_extra_ignore(AnyPresetAgentResult, data)
 
     def test_builds_portable_self_contained_preset(self, tmp_path):
@@ -109,7 +110,7 @@ class TestBuildVerifiedPreset:
 
         assert preset.base == "Qwen/Qwen3.5-27B"
         assert preset.repo == "community/Qwen3.5-27B-GPTQ-Int4"
-        assert preset.context_length == 32768
+        assert preset.result[0].context_length == 32768
         assert preset.created_at == created_at
         assert preset.service.name is None
         assert preset.service.gateway is None
@@ -202,8 +203,9 @@ class TestBuildVerifiedPreset:
         # The stored workload states the request: no dataset was asked for, so
         # none is recorded — the tool's own name for its generated data stays in
         # `command` — while the requested prefix survives into the record.
-        assert preset.benchmark.workload.dataset is None
-        assert preset.benchmark.workload.shared_prefix_tokens == 130048
+        workload = get_or_error(preset.result[0].benchmark).workload
+        assert workload.dataset is None
+        assert workload.shared_prefix_tokens == 130048
 
     def test_rejects_a_benchmark_without_the_requested_shared_prefix(self, tmp_path):
         run = get_running_service_run()
@@ -226,7 +228,7 @@ class TestBuildVerifiedPreset:
         run = get_running_service_run()
 
         with pytest.raises(
-            CLIError, match="concurrency of 8 does not match the requested concurrency of 4"
+            CLIError, match=r"concurrency of 8 does not match the requested concurrency of \[4\]"
         ):
             build_verified_preset(
                 run=run,
@@ -256,7 +258,7 @@ class TestBuildVerifiedPreset:
             created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
 
-        assert preset.benchmark.workload.dataset == "spec_bench"
+        assert get_or_error(preset.result[0].benchmark).workload.dataset == "spec_bench"
 
     def test_stores_a_dataset_benchmark_without_a_stray_shared_prefix(self, tmp_path):
         # The mirror of the synthetic case: a dataset defines its own requests,
@@ -282,8 +284,9 @@ class TestBuildVerifiedPreset:
             created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
 
-        assert preset.benchmark.workload.dataset == "spec_bench"
-        assert preset.benchmark.workload.shared_prefix_tokens == 0
+        workload = get_or_error(preset.result[0].benchmark).workload
+        assert workload.dataset == "spec_bench"
+        assert workload.shared_prefix_tokens == 0
 
     # A named dataset is the one dataset name the report and the request share, so
     # the report either echoes it or does not answer the request.
@@ -346,22 +349,23 @@ class TestLoadPresetAgentReport:
         run = get_running_service_run()
         data = get_successful_preset_report(run).model_dump()
         data["run_id"] = str(data["run_id"])
-        data["benchmark"]["command"] = (
+        data["result"][0]["benchmark"]["command"] = (
             "python bench.py --header 'Authorization: Bearer sk-live-0123456789abcdef'"
         )
 
         report = self._load(tmp_path, data, redacted_values=("sk-live-0123456789abcdef",))
 
         assert isinstance(report, PresetAgentSuccess)
-        assert report.benchmark is not None
-        assert report.benchmark.command.endswith("Bearer [redacted]'")
-        assert "sk-live" not in report.benchmark.command
+        benchmark = report.result[0].benchmark
+        assert benchmark is not None
+        assert benchmark.command.endswith("Bearer [redacted]'")
+        assert "sk-live" not in benchmark.command
 
     def test_still_rejects_unknown_bearer_token(self, tmp_path):
         run = get_running_service_run()
         data = get_successful_preset_report(run).model_dump()
         data["run_id"] = str(data["run_id"])
-        data["benchmark"]["command"] = (
+        data["result"][0]["benchmark"]["command"] = (
             "curl -H 'Authorization: Bearer sk-unknown-9876543210fedcba'"
         )
 
@@ -374,7 +378,7 @@ class TestLoadPresetAgentReport:
         run = get_running_service_run()
         data = get_successful_preset_report(run).model_dump()
         data["run_id"] = str(data["run_id"])
-        data["benchmark"]["command"] = (
+        data["result"][0]["benchmark"]["command"] = (
             "./benchenv/bin/python bench_service.py --base $DSTACK_SERVER_URL/x"
             " (auth via DSTACK_TOKEN bearer header from env)"
         )
@@ -382,8 +386,9 @@ class TestLoadPresetAgentReport:
         report = self._load(tmp_path, data, redacted_values=())
 
         assert isinstance(report, PresetAgentSuccess)
-        assert report.benchmark is not None
-        assert "bearer header" in report.benchmark.command
+        benchmark = report.result[0].benchmark
+        assert benchmark is not None
+        assert "bearer header" in benchmark.command
 
 
 def _shared_prefix_configuration() -> PresetConfiguration:
@@ -425,4 +430,11 @@ def _dataset_report(run: Run, **workload: Any) -> PresetAgentSuccess:
 def _report_with_workload(run: Run, workload: dict[str, Any]) -> PresetAgentSuccess:
     benchmark = get_preset_benchmark()
     benchmark.workload = PresetWorkload.model_validate(workload)
-    return get_successful_preset_report(run).model_copy(update={"benchmark": benchmark})
+    # The entry states the same concurrency as its benchmark, so the test
+    # exercises the request check and not the entry/benchmark consistency one.
+    entry = PresetResult(
+        concurrency=benchmark.workload.concurrency,
+        context_length=32768,
+        benchmark=benchmark,
+    )
+    return get_successful_preset_report(run).model_copy(update={"result": [entry]})
