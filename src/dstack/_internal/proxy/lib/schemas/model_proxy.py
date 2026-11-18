@@ -61,7 +61,7 @@ class ChatCompletionsResponse(CoreModel):
     choices: List[ChatCompletionsChoice]
     created: int
     model: str
-    system_fingerprint: str = ""
+    system_fingerprint: Optional[str] = ""
     object: Literal["chat.completion"] = "chat.completion"
     usage: ChatCompletionsUsage
 

@@ -162,8 +162,15 @@ class MeteredInjector(ProxyTestDependencyInjector):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("stream", [False, True])
-async def test_model_handler_finalizes_verified_usage(tmp_path, monkeypatch, stream):
+@pytest.mark.parametrize(
+    "stream,metadata",
+    [
+        pytest.param(False, {}, id="json"),
+        pytest.param(False, {"system_fingerprint": None}, id="json-null-fingerprint"),
+        pytest.param(True, {}, id="stream"),
+    ],
+)
+async def test_model_handler_finalizes_verified_usage(tmp_path, monkeypatch, stream, metadata):
     clock = FakeClock()
     collector = MeteringCollector(
         MeteringStore(tmp_path / "usage.json"), clock=clock, profiles={"s": VLLM_PROFILE}
@@ -184,6 +191,7 @@ async def test_model_handler_finalizes_verified_usage(tmp_path, monkeypatch, str
     app.state.proxy_dependency_injector = MeteredInjector(repo, collector)
     app.include_router(model_router, prefix="/models")
     response = {"id": "answer", "created": 1, "model": "test", "choices": [], "usage": USAGE}
+    response.update(metadata)
     wire = ("data: " + json.dumps(response) + "\n\ndata: [DONE]\n\n").encode()
     async with httpx.AsyncClient(
         transport=httpx.MockTransport(
@@ -218,7 +226,10 @@ async def test_model_handler_finalizes_verified_usage(tmp_path, monkeypatch, str
             if stream:
                 assert '"cached_tokens":5' in result.text
             else:
-                assert result.json()["usage"]["prompt_tokens_details"]["cached_tokens"] == 5
+                assert result.json()["system_fingerprint"] == metadata.get(
+                    "system_fingerprint", ""
+                )
+                assert result.json()["usage"] == USAGE
     clock.advance()
     await collector.rotate_if_due()
     batches = (await collector.get_batches()).batches
