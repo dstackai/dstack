@@ -590,10 +590,7 @@ In case the service is using a router (see `## Cluster Placement`), run the
 final benchmark inside the router replica, directly against the router engine.
 Attach to it via `dstack attach <run name> --replica <replica num> --job <job num>`.
 
-If the service or its benchmark cannot be completed, stop that service,
-pick the next-best trial, and repeat, until a service is verified or there
-are no unverified trials left. Report the result accordingly (see
-`# Final Report`).
+If the service cannot be completed or none of its benchmarks at the concurrency values from `constraints.json` can be completed, stop that service, pick the next-best trial, and repeat, until a service is verified or there are no unverified trials left. Report the result accordingly (see `# Final Report`).
 
 When you report success, leave the final `dstack` service running: the
 caller verifies the live run and stops it afterwards.
@@ -628,9 +625,10 @@ trial remained), include exactly:
 - `result`: list of final service result objects, one object for each value of `concurrency` from `constraints.json`. Each object has fields no other than below:
   - `concurrency`: the concurrency value for this result
   - `context_length`: the largest context verified for the final service at
-    this concurrency, as described in `## Benchmark`
+    this concurrency, as described in `## Benchmark`. `null` only when the benchmark couldn't be done at this concurrency.
   - `benchmark`: the final service benchmark at this concurrency, as
-    described in `## Benchmark`
+    described in `## Benchmark`. `null` only when the benchmark couldn't be done at this
+    concurrency.
 
 Set `final_report.json.base` as follows:
 

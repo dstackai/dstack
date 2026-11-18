@@ -9,7 +9,7 @@ from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import Resources
 from dstack._internal.core.models.presets import (
     PRESET_EXCLUDED_FIELDS,
-    PresetBenchmark,
+    PresetResult,
     PresetVerificationReplicaGroup,
 )
 from dstack._internal.core.models.resources import (
@@ -31,8 +31,7 @@ def build_preset(
     verification_replica_groups: list[PresetVerificationReplicaGroup],
     base_model: str,
     repo: str,
-    context_length: int,
-    benchmark: PresetBenchmark,
+    result: list[PresetResult],
     configuration: PresetConfiguration,
     best_trial: int,
     preset_id: str,
@@ -48,12 +47,11 @@ def build_preset(
         base=base_model,
         id=preset_id,
         repo=repo,
-        context_length=context_length,
         best_trial=best_trial,
         configuration=configuration,
         created_at=created_at,
         service=service,
-        benchmark=benchmark,
+        result=result,
         verified_on=verification_replica_groups,
     )
 

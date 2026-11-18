@@ -4,9 +4,14 @@ from typing import List, Literal, Optional, Union
 from pydantic import Field, PositiveInt
 from typing_extensions import Annotated
 
+from dstack._internal.cli.models.preset_agent import (
+    PresetSessionState,
+    PresetSessionStatus,
+    PresetTrial,
+)
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import PresetConfiguration
-from dstack._internal.core.models.presets import PortablePreset
+from dstack._internal.core.models.presets import AnyPresetConstraints, PortablePreset
 
 
 class BasePreset(CoreModel):
@@ -45,3 +50,33 @@ AnyStoredPreset = Annotated[Union[VerifiedPreset, PulledPreset], Field(discrimin
 
 class PresetListOutput(CoreModel):
     presets: List[AnyStoredPreset]
+
+
+class PresetTrialsSummary(CoreModel):
+    """What the session row of `dstack preset list` shows about a session's
+    completed trials."""
+
+    count: int
+    # The trial with the highest tok/s that met the constraints.
+    best: Optional[PresetTrial] = None
+    # The trial with the highest tok/s but broke the constraints.
+    best_failed: Optional[PresetTrial] = None
+    # One value per trial in order, for the sparkline; None for a trial that
+    # produced no benchmark.
+    series: list[Optional[float]]
+    # Parallel to `series`: True where the trial broke the constraints.
+    failed: list[bool]
+    # The hardware of the shown trial, `best` or else `best_failed`; when neither
+    # exists, of the last trial that recorded it, so the session still shows what
+    # it ran on.
+    gpu: Optional[str] = None
+
+
+class PresetSessionEntry(CoreModel):
+    id: str
+    state: PresetSessionState
+    name: Optional[str]
+    status: PresetSessionStatus
+    trials: PresetTrialsSummary
+    verification: Optional[str]
+    constraints: Optional[AnyPresetConstraints]
