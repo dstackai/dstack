@@ -165,11 +165,27 @@ def _check_result_answers_request(
 ) -> None:
     if all(r.benchmark is None for r in result):
         raise CLIError("The agent's final report has no completed benchmark")
+    concurrencies = [r.concurrency for r in result]
+    if len(set(concurrencies)) != len(concurrencies):
+        raise CLIError("The agent's final report has more than one entry for the same concurrency")
     for r in result:
-        # A `null` benchmark is an entry the agent could not measure; a partial
-        # sweep is allowed, so there is nothing to compare for it.
+        if (
+            configuration.concurrency is not None
+            and r.concurrency not in configuration.concurrency
+        ):
+            raise CLIError(
+                f"The agent's final benchmark concurrency of {r.concurrency} does not match the"
+                f" requested concurrency of {configuration.concurrency}"
+            )
+        # The agent could not measure this concurrency. That is allowed, so
+        # there is nothing more to check for it.
         if r.benchmark is None:
             continue
+        if r.context_length is None:
+            raise CLIError(
+                f"The agent's final report has a benchmark at concurrency {r.concurrency}"
+                " but no context length"
+            )
         if r.benchmark.workload.concurrency != r.concurrency:
             raise CLIError(
                 f"The agent's final benchmark concurrency {r.concurrency} does not"
@@ -201,14 +217,6 @@ def _check_workload_answers_request(
                 f"The agent's final benchmark shared prefix of {workload.shared_prefix_tokens}"
                 f" tokens does not match the requested {shared_prefix_tokens}"
             )
-    if (
-        configuration.concurrency is not None
-        and workload.concurrency not in configuration.concurrency
-    ):
-        raise CLIError(
-            f"The agent's final benchmark concurrency of {workload.concurrency} does not match the"
-            f" requested concurrency of {configuration.concurrency}"
-        )
 
 
 def _normalized_benchmark(

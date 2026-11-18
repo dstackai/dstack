@@ -274,6 +274,62 @@ class TestBuildVerifiedPreset:
                 created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
             )
 
+    def test_rejects_a_sweep_with_two_entries_at_the_same_concurrency(self, tmp_path):
+        run = get_running_service_run()
+        report = _sweep_report(run, measured=(48,))
+        report = report.model_copy(update={"result": [report.result[0], *report.result]})
+
+        with pytest.raises(CLIError, match="more than one entry for the same concurrency"):
+            build_verified_preset(
+                run=run,
+                preset_configuration=_sweep_configuration(),
+                report=report,
+                workspace_path=tmp_path,
+                session_path=tmp_path,
+                preset_id="ab12cd34",
+                name=None,
+                created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+            )
+
+    def test_rejects_an_unmeasured_entry_at_an_unrequested_concurrency(self, tmp_path):
+        run = get_running_service_run()
+        report = _sweep_report(run, measured=(48,))
+        unrequested = report.result[2].model_copy(update={"concurrency": 500})
+        report = report.model_copy(update={"result": [*report.result[:2], unrequested]})
+
+        with pytest.raises(
+            CLIError,
+            match=r"concurrency of 500 does not match the requested concurrency of \[48, 96, 192\]",
+        ):
+            build_verified_preset(
+                run=run,
+                preset_configuration=_sweep_configuration(),
+                report=report,
+                workspace_path=tmp_path,
+                session_path=tmp_path,
+                preset_id="ab12cd34",
+                name=None,
+                created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+            )
+
+    def test_rejects_a_measured_entry_without_a_context_length(self, tmp_path):
+        run = get_running_service_run()
+        report = _sweep_report(run, measured=(48,))
+        measured = report.result[0].model_copy(update={"context_length": None})
+        report = report.model_copy(update={"result": [measured, *report.result[1:]]})
+
+        with pytest.raises(CLIError, match="benchmark at concurrency 48 but no context length"):
+            build_verified_preset(
+                run=run,
+                preset_configuration=_sweep_configuration(),
+                report=report,
+                workspace_path=tmp_path,
+                session_path=tmp_path,
+                preset_id="ab12cd34",
+                name=None,
+                created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+            )
+
     def test_verifies_a_benchmark_on_the_requested_dataset(self, tmp_path):
         run = get_running_service_run()
         report = _dataset_report(run, dataset="spec_bench")

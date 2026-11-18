@@ -316,35 +316,35 @@ def _format_creation_objective(
     return f"[secondary]{' '.join(parts)}[/]"
 
 
-def _breaches_constraints(preset: AnyStoredPreset) -> bool:
+def _passing_result(preset: AnyStoredPreset) -> list[PresetResult]:
+    """The measured entries that met the requested constraints."""
+    measured = [r for r in preset.result if r.benchmark is not None]
     if not isinstance(preset, VerifiedPreset):
         # A pulled preset carries no requested constraints to breach.
-        return False
-    configuration = preset.configuration
-    # One breaching benchmark is enough: a service that misses its target at any
-    # measured concurrency is flagged. Entries without a benchmark are skipped.
-    for r in preset.result:
-        if r.benchmark is None:
-            continue
-        if (
-            configuration.max_ttft is not None
-            and r.benchmark.metrics.ttft_ms.p50 > configuration.max_ttft
-        ):
-            return True
-        if (
-            configuration.min_context_length is not None
-            and r.context_length is not None
-            and r.context_length < configuration.min_context_length
-        ):
-            return True
-    return False
+        return measured
+    return [r for r in measured if not _breaches_constraints(r, preset.configuration)]
+
+
+def _breaches_constraints(r: PresetResult, configuration: PresetConfiguration) -> bool:
+    assert r.benchmark is not None
+    if (
+        configuration.max_ttft is not None
+        and r.benchmark.metrics.ttft_ms.p50 > configuration.max_ttft
+    ):
+        return True
+    return (
+        configuration.min_context_length is not None
+        and r.context_length is not None
+        and r.context_length < configuration.min_context_length
+    )
 
 
 def format_preset_benchmark(preset: AnyStoredPreset, *, verbose: bool = False) -> str:
+    passing = _passing_result(preset)
+    if passing:
+        return _format_result_benchmark(passing, verbose=verbose)
     text = _format_result_benchmark(preset.result, verbose=verbose)
-    if _breaches_constraints(preset):
-        return f"[secondary]*{text}[/]"
-    return text
+    return f"[secondary]*{text}[/]"
 
 
 # Entries of a stored preset and of a session's trial share the fields read here.

@@ -1677,6 +1677,47 @@ class TestSummarizeSessionTrials:
 
         assert summary.count == 0
 
+    def test_an_old_failed_trial_without_a_benchmark_is_counted(self, tmp_path):
+        # Before concurrency sweeps, a failed trial was written with no
+        # `benchmark` key and no `result` list.
+        trials_dir = _write_trials(tmp_path, [])
+        (trials_dir / "1").mkdir(parents=True)
+        (trials_dir / "1" / "trial.json").write_text(
+            json.dumps(
+                {
+                    "resources": {"gpu": {"name": "A40", "memory": "48GB", "count": 1}},
+                    "failed": True,
+                }
+            )
+        )
+
+        summary = _summarize_session_trials(trials_dir)
+
+        assert summary.count == 1
+        assert summary.series == [None]
+        assert summary.failed == [True]
+        assert summary.gpu == "A40:48GB:1"
+
+    def test_a_broken_entry_does_not_drop_the_other_entries(self, tmp_path):
+        trial = PresetTrial(
+            result=[
+                get_trial_result(tok_s=100.0, concurrency=48),
+                get_trial_result(tok_s=180.0, concurrency=96),
+            ]
+        )
+        record = json.loads(trial.model_dump_json())
+        record["result"].append({"concurrency": 192, "benchmark": {"metrics": {}}})
+        trials_dir = _write_trials(tmp_path, [])
+        (trials_dir / "1").mkdir(parents=True)
+        (trials_dir / "1" / "trial.json").write_text(json.dumps(record))
+
+        summary = _summarize_session_trials(trials_dir)
+
+        assert summary.count == 1
+        assert summary.series == [180.0]
+        assert summary.failed == [False]
+        assert [r.failed for r in get_or_error(summary.best).result] == [False, False]
+
 
 class TestReadLastSessionVerification:
     def test_newest_attempt_wins_and_a_missing_directory_is_not_verifying(self, tmp_path):

@@ -90,6 +90,23 @@ class PresetTrialResult(CoreModel):
     benchmark: Optional[PresetTrialBenchmark] = None
     failed: bool = False
 
+    @model_validator(mode="after")
+    def fail_without_benchmark(self) -> Self:
+        """An entry without a benchmark is one the agent could not measure, which
+        the prompt defines as failed; the flag is set in case the agent left it out."""
+        if self.benchmark is None:
+            self.failed = True
+        return self
+
+
+def _entry_or_failed(value: Any, handler: ValidatorFunctionWrapHandler) -> Any:
+    try:
+        return handler(value)
+    except ValidationError:
+        # A broken entry counts as a failed one, so the other entries of the
+        # trial are still listed.
+        return PresetTrialResult(failed=True)
+
 
 class PresetTrial(CoreModel):
     """The `trials/<n>/trial.json` record as defined in the system_prompt.md.
@@ -100,12 +117,18 @@ class PresetTrial(CoreModel):
     groups: Optional[list[list[dict[str, Any]]]] = None
     # Required and non-empty: `system_prompt.md` states that `trial.json` has
     # one `result` entry per concurrency value.
-    result: Annotated[list[PresetTrialResult], Field(min_length=1)]
+    result: Annotated[
+        list[Annotated[PresetTrialResult, WrapValidator(_entry_or_failed)]],
+        Field(min_length=1),
+    ]
 
     @model_validator(mode="before")
     @classmethod
     def convert_to_result_list(cls, data: Any) -> Any:
-        if isinstance(data, dict) and "result" not in data and "benchmark" in data:
+        # An old `trial.json` has no `result` list. Its `benchmark`,
+        # `context_length` and `failed` are at the top level, and a failed one
+        # may have no `benchmark` at all.
+        if isinstance(data, dict) and "result" not in data:
             data = dict(data)
             data["result"] = [
                 {

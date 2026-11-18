@@ -610,7 +610,7 @@ def _summarize_session_trials(path: Path) -> PresetTrialsSummary:
         count=len(trials),
         best=best,
         best_failed=best_failed,
-        series=[_max_tok_s(trial) for trial in trials],
+        series=[_max_tok_s(_scored_trial(trial)) for trial in trials],
         failed=[_trial_failed(trial) for trial in trials],
         gpu=gpu,
     )
@@ -646,8 +646,8 @@ def _passing_trial_results(trial: PresetTrial) -> list[PresetTrialResult]:
 
 
 def _max_tok_s(trial: PresetTrial) -> Optional[float]:
-    """The trial's score for selection and its sparkline bar: the highest tok/s
-    over its entries that have a benchmark; None when no entry has one."""
+    """The highest tok/s over the trial's entries that have a benchmark; None
+    when no entry has one."""
     values = [
         entry.benchmark.effective_output_tok_per_s
         for entry in trial.result
@@ -656,6 +656,13 @@ def _max_tok_s(trial: PresetTrial) -> Optional[float]:
     if not values:
         return None
     return max(values)
+
+
+def _scored_trial(trial: PresetTrial) -> PresetTrial:
+    """Returns trial with only the entries that met the constraints, or the original trial if none did."""
+    if _trial_failed(trial):
+        return trial
+    return trial.model_copy(update={"result": _passing_trial_results(trial)})
 
 
 def _select_best_and_best_failed(
@@ -668,10 +675,7 @@ def _select_best_and_best_failed(
     best_failed: Optional[PresetTrial] = None
     best_failed_tok_s = 0.0
     for trial in trials:
-        if _trial_failed(trial):
-            kept = trial
-        else:
-            kept = trial.model_copy(update={"result": _passing_trial_results(trial)})
+        kept = _scored_trial(trial)
         tok_s = _max_tok_s(kept)
         if tok_s is None:
             continue
