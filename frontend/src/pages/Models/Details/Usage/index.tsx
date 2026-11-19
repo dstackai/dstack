@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { TableProps } from 'components';
-import { Alert, Box, DateRangePicker, Header, ListEmptyMessage, PropertyFilter, SegmentedControl, Table } from 'components';
+import { Alert, DateRangePicker, Header, ListEmptyMessage, PropertyFilter, SegmentedControl, Table } from 'components';
 
 import { useCollection } from 'hooks';
 import { getServerError } from 'libs';
@@ -52,13 +52,7 @@ export const ModelUsage: React.FC<{ model: IModelExtended }> = ({ model }) => {
 
     // The total row's cells look like the column headers
     const renderCell = (item: IMeteringRow, content: string) =>
-        item === total ? (
-            <Box fontWeight="bold" color="text-body-secondary">
-                {content}
-            </Box>
-        ) : (
-            content
-        );
+        item === total ? <span className={styles.total}>{content}</span> : content;
 
     const columns: TableProps.ColumnDefinition<IMeteringRow>[] = [
         {
