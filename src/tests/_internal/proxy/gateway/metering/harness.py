@@ -71,6 +71,10 @@ class TestNginx(Nginx):
     def write_global_conf(self):
         pass
 
+    async def drain(self) -> bool:
+        # This harness forwards directly to its fixture backend and owns no Nginx workers.
+        return True
+
 
 async def _noop(*args, **kwargs):
     pass

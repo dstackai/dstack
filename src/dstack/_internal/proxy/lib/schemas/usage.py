@@ -85,6 +85,16 @@ class _UsageCheckpoint(UsageModel):
 
 class UsageCheckpoint(_UsageCheckpoint):
     schema_version: Literal[2] = 2
+    drain_state: Literal["ingress", "ingress_stopped", "waiting", "sealed"] | None = Field(
+        default=None, exclude_if=lambda state: state is None
+    )
+    """ingress_stopped records a clean collector stop while old Nginx workers can still deliver."""
+
+    @model_validator(mode="after")
+    def check_sealed(self) -> Self:
+        if self.drain_state == "sealed" and self.active_batch.entries:
+            raise ValueError("A sealed checkpoint cannot have unclosed entries")
+        return self
 
 
 class LegacyUsageCheckpoint(_UsageCheckpoint):
@@ -122,3 +132,14 @@ class UsageAckRequest(UsageModel):
 
 class UsageAckResponse(UsageModel):
     acknowledged_batch_ids: list[Identifier]
+
+
+class UsageDrainResponse(UsageModel):
+    sealed: Annotated[bool, Field(strict=True)]
+    empty: Annotated[bool, Field(strict=True)]
+
+    @model_validator(mode="after")
+    def check_empty(self) -> Self:
+        if self.empty and not self.sealed:
+            raise ValueError("An unsealed source cannot certify an empty drain")
+        return self

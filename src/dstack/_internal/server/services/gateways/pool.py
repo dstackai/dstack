@@ -1,17 +1,14 @@
 import asyncio
-from typing import Dict, List
+from weakref import WeakValueDictionary
 
-from dstack._internal.server.services.gateways.connection import GatewayConnection
+from dstack._internal.server.services.gateways.connection import GatewayConnection, ssh_key_digest
 from dstack._internal.server.settings import SERVER_PORT
-from dstack._internal.utils.logging import get_logger
-
-logger = get_logger(__name__)
 
 
 class GatewayConnectionsPool:
     def __init__(self) -> None:
-        self._connections: Dict[str, GatewayConnection] = {}
-        self._lock = asyncio.Lock()
+        self._connections: dict[str, tuple[str, GatewayConnection]] = {}
+        self._locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
 
     async def get_or_add(
         self,
@@ -19,40 +16,40 @@ class GatewayConnectionsPool:
         id_rsa: str,
         close_existing_tunnel: bool = False,
     ) -> GatewayConnection:
-        async with self._lock:
-            connection = self._connections.get(hostname)
-            if connection is not None:
-                return connection
-            self._connections[hostname] = GatewayConnection(hostname, id_rsa, SERVER_PORT)
-            open_task = self._connections[hostname].open(
-                close_existing_tunnel=close_existing_tunnel,
-            )
-        try:
-            await open_task
-            return self._connections[hostname]
-        except Exception:
-            async with self._lock:
-                self._connections.pop(hostname, None)
-            raise
+        digest = ssh_key_digest(id_rsa)
+        async with self._locks.setdefault(hostname, asyncio.Lock()):
+            cached = self._connections.get(hostname)
+            if cached is not None:
+                cached_digest, connection = cached
+                if cached_digest == digest:
+                    return connection
+                del self._connections[hostname]
+                await connection.close()
+            connection = GatewayConnection(hostname, id_rsa, SERVER_PORT)
+            try:
+                await connection.open(close_existing_tunnel=close_existing_tunnel)
+            except (Exception, asyncio.CancelledError):
+                await connection.close()
+                raise
+            self._connections[hostname] = (digest, connection)
+            return connection
 
     async def remove(self, hostname: str) -> bool:
-        async with self._lock:
-            if hostname not in self._connections:
+        async with self._locks.setdefault(hostname, asyncio.Lock()):
+            cached = self._connections.pop(hostname, None)
+            if cached is None:
                 return False
-            close_task = self._connections.pop(hostname).close()
-        await close_task
-        return True
+            _, connection = cached
+            await connection.close()
+            return True
 
     async def remove_all(self) -> None:
-        async with self._lock:
-            await asyncio.gather(
-                *(conn.close() for conn in self._connections.values()),
-                return_exceptions=True,
-            )
-            self._connections = {}
+        # Include hosts still opening, before their connections have been published.
+        hosts = set(self._connections).union(self._locks)
+        await asyncio.gather(*(self.remove(host) for host in hosts), return_exceptions=True)
 
-    async def all(self) -> List[GatewayConnection]:
-        return list(self._connections.values())
+    async def all(self) -> list[GatewayConnection]:
+        return [connection for _, connection in self._connections.values()]
 
 
 gateway_connections_pool: GatewayConnectionsPool = GatewayConnectionsPool()

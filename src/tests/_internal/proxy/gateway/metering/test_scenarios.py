@@ -99,6 +99,42 @@ async def test_two_intervals_and_ack(harness):
 
 
 @pytest.mark.asyncio
+async def test_drain_allows_open_stream_to_deliver_its_final_usage(harness):
+    h = harness
+    driver = TrafficDriver(h.gateway_url, artifact_dir=h.state)
+    try:
+        await h.backend_control(hold=["draining-stream"])
+        stream = asyncio.create_task(send(h, driver, "draining-stream", stream=True))
+        try:
+            await h.wait_backend_started("draining-stream")
+            async with httpx.AsyncClient(base_url=h.gateway_url, timeout=10) as control:
+                response = await control.post("/api/usage/drain")
+                assert response.json() == {"sealed": False, "empty": False}
+                with pytest.raises(httpx.HTTPStatusError) as exc:
+                    await driver.send("after-fence")
+                assert exc.value.response.status_code == 503
+        finally:
+            await h.backend_control(release=["draining-stream"])
+            await stream
+        # No clock advance: the final usage-only SSE event must be present immediately.
+        async with httpx.AsyncClient(base_url=h.gateway_url, timeout=10) as control:
+            response = await control.post("/api/usage/drain")
+            assert response.json() == {"sealed": True, "empty": False}
+            (batch,) = (await h.batches())["batches"]
+            assert totals(batch) == expected("A")
+            ack = await control.post(
+                "/api/usage/batches/ack", json={"batch_ids": [batch["batch_id"]]}
+            )
+            ack.raise_for_status()
+            assert (await control.post("/api/usage/drain")).json() == {
+                "sealed": True,
+                "empty": True,
+            }
+    finally:
+        await driver.close()
+
+
+@pytest.mark.asyncio
 async def test_selective_ack_during_traffic(harness):
     h = harness
     d = TrafficDriver(h.gateway_url, artifact_dir=h.state)

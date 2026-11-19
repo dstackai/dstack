@@ -25,6 +25,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.runs import JobStatus, RunStatus, ServiceSpec
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListReplicaItem
+from dstack._internal.proxy.lib.schemas.usage import UsageBatchPage, UsageDrainResponse
 from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks.gateway_replicas import (
     GatewayReplicaFetcher,
@@ -36,6 +37,8 @@ from dstack._internal.server.models import (
     GatewayReplicaModel,
     ServiceRegistrationModel,
     ServiceReplicaRegistrationModel,
+    UsageBatchModel,
+    UsageCounterModel,
 )
 from dstack._internal.server.testing.common import (
     AsyncContextManager,
@@ -58,6 +61,7 @@ from dstack._internal.server.testing.common import (
     mock_lease,
 )
 from dstack._internal.utils.common import get_current_datetime
+from tests._internal.server.services.test_usage import batch
 from tests._internal.utils.test_ssh import PRIVATE_KEY, PUBLIC_KEY
 
 
@@ -670,6 +674,31 @@ class TestGatewayReplicaWorkerSubmitted:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestGatewayReplicaWorkerRunning:
+    async def test_collects_minute_batch_for_claimed_replica(
+        self, test_db, session, worker, mock_gateway_connection
+    ):
+        project = await create_project(session)
+        backend = await create_backend(session, project.id)
+        gateway = await create_gateway(
+            session, project.id, backend.id, status=GatewayStatus.RUNNING
+        )
+        replica = await create_gateway_replica(session, backend, gateway_id=gateway.id)
+        _lock_replica(replica)
+        await session.commit()
+        mock_gateway_connection.return_value.ip_address = replica.ip_address
+        client = _get_client_mock(mock_gateway_connection)
+        client.fetch_usage_batches.return_value = UsageBatchPage(batches=[batch()])
+        client.list_services.return_value = []
+
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        receipt = (await session.scalars(select(UsageBatchModel))).one_or_none()
+        assert receipt is not None
+        assert (receipt.gateway_replica_id, receipt.gateway_id) == (replica.id, gateway.id)
+        counter = (await session.scalars(select(UsageCounterModel))).one()
+        assert counter.usage_baches_id == receipt.id and counter.total_tokens == 23
+        client.acknowledge_usage.assert_awaited_once_with(["batch-1"])
+
     @pytest.mark.parametrize(
         "gateway_status,to_be_deleted",
         [
@@ -684,6 +713,7 @@ class TestGatewayReplicaWorkerRunning:
         test_db,
         session: AsyncSession,
         worker: GatewayReplicaWorker,
+        mock_gateway_connection,
         gateway_status: GatewayStatus,
         to_be_deleted: bool,
         legacy_replica: bool,
@@ -726,8 +756,14 @@ class TestGatewayReplicaWorkerRunning:
         assert replica.status == GatewayReplicaStatus.TERMINATING
         assert replica.active is False
 
+    @pytest.mark.parametrize("waiting", ["inflight", "ack_failed", "unreachable", "drained"])
     async def test_running_to_terminating_when_scaled_in(
-        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        mock_gateway_connection,
+        waiting,
     ):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
@@ -747,13 +783,26 @@ class TestGatewayReplicaWorkerRunning:
         replica.scale_in = True
         _lock_replica(replica)
         await session.commit()
+        client = _get_client_mock(mock_gateway_connection)
+        client.drain_usage.return_value = UsageDrainResponse(
+            sealed=waiting != "inflight", empty=waiting == "drained"
+        )
+        if waiting == "ack_failed":
+            client.fetch_usage_batches.return_value = UsageBatchPage(batches=[batch()])
+            client.acknowledge_usage.side_effect = TimeoutError("ACK timed out")
+        elif waiting == "unreachable":
+            client.drain_usage.side_effect = TimeoutError("Gateway is unavailable")
 
         await worker.process(_replica_to_pipeline_item(replica))
 
         await session.refresh(replica)
-        assert replica.status == GatewayReplicaStatus.TERMINATING
-        assert replica.active is False
-        assert replica.status_message == "Scaled in"
+        if waiting == "drained":
+            assert replica.status == GatewayReplicaStatus.TERMINATING
+            assert not replica.active and replica.status_message == "Scaled in"
+        else:
+            assert replica.status == GatewayReplicaStatus.RUNNING
+            assert replica.active and replica.scale_in
+        assert replica.lock_token is None
 
 
 def _get_client_mock(mock_gateway_connection: AsyncMock) -> AsyncMock:
@@ -1414,12 +1463,14 @@ class TestGatewayReplicaWorkerRunningStateSync:
             "Service replica unregistered",
         }
 
-    async def test_no_gateway_calls_when_state_already_in_sync(
+    @pytest.mark.parametrize("usage_unavailable", [False, True])
+    async def test_reconciles_in_sync_registrations_without_gateway_writes(
         self,
         test_db,
         session: AsyncSession,
         worker: GatewayReplicaWorker,
         mock_gateway_connection: AsyncMock,
+        usage_unavailable: bool,
     ):
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -1444,6 +1495,8 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
+        if usage_unavailable:
+            client_mock.fetch_usage_batches.side_effect = TimeoutError("Gateway usage timed out")
         client_mock.list_services.return_value = [
             ServiceListItem(
                 id=run.id.hex,
@@ -1463,7 +1516,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
         client_mock.submit_gateway_config.assert_not_called()
 
         # Registration records are still (re)created to reflect the confirmed state,
-        # even though no gateway calls were needed this tick.
+        # even when the usage endpoint is unavailable.
         service_registration = (
             await session.execute(
                 select(ServiceRegistrationModel).where(

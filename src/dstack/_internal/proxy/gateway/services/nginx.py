@@ -1,16 +1,21 @@
+import asyncio
 import importlib.resources
+import os
 import subprocess
 import tempfile
 from asyncio import Lock
 from pathlib import Path
 from typing import Literal, Optional
 
+import httpx
 import jinja2
+import psutil
 from pydantic import BaseModel
 
 from dstack._internal.proxy.gateway.const import PROXY_PORT_ON_GATEWAY
 from dstack._internal.proxy.gateway.models import ACMESettings
 from dstack._internal.proxy.lib import models
+from dstack._internal.proxy.lib.cancellation import await_completion
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
@@ -18,6 +23,8 @@ from dstack._internal.utils.logging import get_logger
 CERTBOT_TIMEOUT = 40
 CERTBOT_2ND_TIMEOUT = 5
 NGINX_DIR = Path("/etc/nginx")
+NGINX_PID_FILE = Path("/run/nginx.pid")
+NGINX_DRAIN_SOCKET = Path("/run/dstack-nginx-drain.sock")
 logger = get_logger(__name__)
 
 
@@ -84,6 +91,7 @@ class Nginx:
         self._nginx_dir = nginx_dir
         self._sites_enabled_dir = nginx_dir / "sites-enabled"
         self._nginx_conf_path = nginx_dir / "nginx.conf"
+        self._drain_marker = nginx_dir / ".dstack-draining"
         self._lock: Lock = Lock()
 
     async def register(self, conf: SiteConfig, acme: ACMESettings) -> None:
@@ -181,9 +189,60 @@ class Nginx:
     def write_global_conf(self) -> None:
         log_format_conf = read_package_resource("00-log-format.conf")
         self.write_conf(log_format_conf, self._sites_enabled_dir / "00-log-format.conf")
+        self.write_conf(self._global_conf(), self._nginx_conf_path)
 
-        nginx_conf = read_package_resource("nginx.conf")
-        self.write_conf(nginx_conf, self._nginx_conf_path)
+    def _global_conf(self) -> str:
+        template = jinja2.Template(
+            read_package_resource("nginx.conf"),
+            trim_blocks=True,
+            lstrip_blocks=True,
+            keep_trailing_newline=True,
+        )
+        return template.render(
+            draining=self._drain_marker.exists(), drain_socket=NGINX_DRAIN_SOCKET
+        )
+
+    async def drain(self) -> bool:
+        """Fence public routes and poll until all pre-drain workers finish naturally."""
+        async with self._lock:
+            return await await_completion(asyncio.create_task(run_async(self._drain)))
+
+    def _drain(self) -> bool:
+        if not self._drain_marker.exists():
+            sudo_write(self._drain_marker, "")
+        config = self._global_conf()
+        if not self._nginx_conf_path.exists() or self._nginx_conf_path.read_text() != config:
+            # Keep the fence on disk if reload fails. Nginx may restart before the next poll.
+            sudo_write(self._nginx_conf_path, config)
+            self.reload()
+            return False
+
+        # A successful HUP only acknowledges the signal. Probe the running generation
+        # through its private listener, then check that every older worker has exited.
+        try:
+            with httpx.Client(transport=httpx.HTTPTransport(uds=str(NGINX_DRAIN_SOCKET))) as http:
+                response = http.get("http://localhost/", timeout=1)
+                response.raise_for_status()
+                worker_pid = int(response.text)
+        except (httpx.HTTPError, ValueError):
+            # A crash can leave the correct file on disk before the reload signal.
+            self.reload()
+            return False
+        try:
+            master = psutil.Process(int(NGINX_PID_FILE.read_text()))
+            if [child.pid for child in master.children()] != [worker_pid]:
+                return False
+        except (OSError, ValueError, psutil.Error):
+            return False
+        # Either process may restart first. Persist both the Nginx boot config and the
+        # Gateway's mode marker, including their directory entries, before certifying.
+        for path in (self._nginx_conf_path, self._drain_marker, self._nginx_dir):
+            fd = os.open(path, os.O_RDONLY)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+        return True
 
 
 def read_package_resource(file: str) -> str:

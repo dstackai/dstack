@@ -6,6 +6,32 @@ from dstack._internal.server.services.gateways.client import AsyncClientWrapper,
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "status,payload,error",
+    [
+        (200, {"sealed": True, "empty": True}, None),
+        (404, {}, httpx.HTTPStatusError),
+        (200, {"sealed": False, "empty": True}, ValidationError),
+        (200, {"sealed": "true", "empty": True}, ValidationError),
+    ],
+)
+async def test_drain_requires_explicit_confirmation(status, payload, error):
+    def response(request):
+        assert request.method == "POST" and request.url.path == "/api/usage/drain"
+        return httpx.Response(status, json=payload)
+
+    client = GatewayClient(port=1)
+    await client._client.aclose()
+    async with AsyncClientWrapper(transport=httpx.MockTransport(response)) as http:
+        client._client = http
+        if error:
+            with pytest.raises(error):
+                await client.drain_usage()
+        else:
+            assert (await client.drain_usage()).empty
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("version", [1, 2])
 async def test_usage_client_contract(version):
     seen = []

@@ -19,7 +19,6 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.common import ApplyAction, validate_json_extra_ignore
-from dstack._internal.core.models.gateways import GatewayReplicaStatus
 from dstack._internal.core.models.profiles import (
     RetryEvent,
 )
@@ -57,7 +56,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import events, services
 from dstack._internal.server.services import projects as projects_services
 from dstack._internal.server.services import repos as repos_services
-from dstack._internal.server.services.gateways import get_gateway_replica_models
+from dstack._internal.server.services.gateways import get_serving_gateway_replica_models
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
     get_job_configured_volumes,
@@ -159,15 +158,13 @@ def get_run_spec(run_model: RunModel) -> RunSpec:
 def gateway_registration_failed(run_model: RunModel) -> bool:
     if run_model.gateway is None:
         return False
-    running_gateway_replica_ids = {
-        replica.id
-        for replica in get_gateway_replica_models(run_model.gateway)
-        if replica.status == GatewayReplicaStatus.RUNNING
+    serving_gateway_replica_ids = {
+        replica.id for replica in get_serving_gateway_replica_models(run_model.gateway)
     }
-    if not running_gateway_replica_ids:
+    if not serving_gateway_replica_ids:
         return False
     registration_by_replica_id = {r.gateway_replica_id: r for r in run_model.service_registrations}
-    for replica_id in running_gateway_replica_ids:
+    for replica_id in serving_gateway_replica_ids:
         registration = registration_by_replica_id.get(replica_id)
         if (
             registration is None

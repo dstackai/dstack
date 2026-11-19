@@ -364,9 +364,18 @@ class TestRunActiveWorker:
         assert run.termination_reason is None
         assert run.lock_token is None
 
-    async def test_terminates_run_ignoring_registration_on_non_running_replica(
-        self, test_db, session: AsyncSession, worker: RunWorker
+    @pytest.mark.parametrize(
+        "retiring_status", [GatewayReplicaStatus.TERMINATING, GatewayReplicaStatus.RUNNING]
+    )
+    async def test_terminates_run_ignoring_registration_on_retiring_replica(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: RunWorker,
+        mock_gateway_connection,
+        retiring_status: GatewayReplicaStatus,
     ) -> None:
+        mock_gateway_connection.return_value.get_stats.return_value = None
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
@@ -380,15 +389,14 @@ class TestRunActiveWorker:
         gateway_replica_running = await create_gateway_replica(
             session=session, gateway_id=gateway.id, backend=backend, replica_num=0
         )
-        # Terminated replica successfully registered before going away — should be ignored,
-        # since only currently running replicas count towards the predicate.
         gateway_replica_terminating = await create_gateway_replica(
             session=session,
             gateway_id=gateway.id,
             backend=backend,
             replica_num=1,
-            status=GatewayReplicaStatus.TERMINATING,
+            status=retiring_status,
         )
+        gateway_replica_terminating.scale_in = retiring_status == GatewayReplicaStatus.RUNNING
         run = await create_run(
             session=session,
             project=project,
@@ -1545,10 +1553,20 @@ class TestRunActiveWorker:
         assert old_job.status == JobStatus.TERMINATING
         assert old_job.termination_reason == JobTerminationReason.SCALED_DOWN
 
-    @pytest.mark.parametrize("failed_registration", [False, True])
-    async def test_service_rolling_deployment_keeps_old_replica_until_new_replica_registered_with_gateway(
-        self, test_db, session: AsyncSession, worker: RunWorker, failed_registration: bool
+    @pytest.mark.parametrize(
+        ("failed_registration", "scale_in"),
+        [(False, False), (True, False), (False, True)],
+    )
+    async def test_service_rolling_deployment_waits_for_registrations_on_serving_gateway_replicas(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: RunWorker,
+        mock_gateway_connection,
+        failed_registration: bool,
+        scale_in: bool,
     ) -> None:
+        mock_gateway_connection.return_value.get_stats.return_value = None
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
@@ -1565,6 +1583,7 @@ class TestRunActiveWorker:
         gateway_replica_2 = await create_gateway_replica(
             session=session, gateway_id=gateway.id, backend=backend, replica_num=1
         )
+        gateway_replica_2.scale_in = scale_in
         run_spec = get_run_spec(
             repo_id=repo.name,
             run_name="service-run",
@@ -1653,7 +1672,7 @@ class TestRunActiveWorker:
 
         await session.refresh(old_job)
         await session.refresh(new_job)
-        assert old_job.status == JobStatus.RUNNING
+        assert old_job.status == (JobStatus.TERMINATING if scale_in else JobStatus.RUNNING)
         assert new_job.status == JobStatus.RUNNING
 
     async def test_service_rolling_deployment_scales_down_old_replica_once_new_replica_registered_with_gateway(

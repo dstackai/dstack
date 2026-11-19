@@ -22,6 +22,7 @@ from dstack._internal.proxy.lib.schemas.usage import (
     UsageAckRequest,
     UsageAckResponse,
     UsageBatchPage,
+    UsageDrainResponse,
 )
 from dstack._internal.server import settings
 
@@ -273,6 +274,11 @@ class GatewayClient:
         if set(result.acknowledged_batch_ids) != set(batch_ids):
             raise ValueError("Gateway acknowledged unexpected usage batch IDs")
         return result
+
+    async def drain_usage(self) -> UsageDrainResponse:
+        response = await self._client.post(self._url("/api/usage/drain"), timeout=10)
+        response.raise_for_status()
+        return UsageDrainResponse.model_validate(response.json())
 
     def _url(self, path: str) -> str:
         return f"{self.base_url}/{path.lstrip('/')}"

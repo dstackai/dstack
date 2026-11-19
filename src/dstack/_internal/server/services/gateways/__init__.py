@@ -682,13 +682,13 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
 
 
 async def get_or_add_gateway_connections(
-    gateway_replicas: Sequence[GatewayReplicaModel],
+    gateway: GatewayModel,
 ) -> List[GatewayConnection]:
-    running_replicas = [r for r in gateway_replicas if r.status == GatewayReplicaStatus.RUNNING]
-    if not running_replicas:
+    serving_replicas = get_serving_gateway_replica_models(gateway)
+    if not serving_replicas:
         raise GatewayError("Gateway replica not found")
     connections: List[GatewayConnection] = []
-    for replica in running_replicas:
+    for replica in serving_replicas:
         if replica.ip_address is None:
             logger.warning("Gateway replica %s has no ip_address", replica.id)
             raise GatewayError("Failed to connect to gateway replica")
@@ -705,7 +705,7 @@ async def get_or_add_gateway_connections(
 
 
 async def get_combined_gateway_stats(
-    gateway_replicas: Sequence[GatewayReplicaModel],
+    gateway: GatewayModel,
     project_name: str,
     run_name: str,
 ) -> Optional[PerWindowStats]:
@@ -715,7 +715,7 @@ async def get_combined_gateway_stats(
     try:
         # FIXME: once a gateway replica is scaled in, its connection is no longer available and its
         # stats are lost, potentially resulting in incorrect service scaling decisions.
-        connections = await get_or_add_gateway_connections(gateway_replicas)
+        connections = await get_or_add_gateway_connections(gateway)
     except GatewayError:
         return None
     per_replica: list[PerWindowStats] = []
@@ -884,6 +884,17 @@ def get_gateway_replica_models(gateway_model: GatewayModel) -> List[GatewayRepli
     if gateway_model.gateway_replica is not None:  # pre-0.20.25 gateway
         replicas.append(gateway_model.gateway_replica)
     return replicas
+
+
+def get_serving_gateway_replica_models(gateway: GatewayModel) -> list[GatewayReplicaModel]:
+    # Draining replicas remain RUNNING for final usage collection and skip registration.
+    if gateway.to_be_deleted or gateway.status == GatewayStatus.FAILED:
+        return []
+    return [
+        replica
+        for replica in get_gateway_replica_models(gateway)
+        if replica.status == GatewayReplicaStatus.RUNNING and not replica.scale_in
+    ]
 
 
 async def skip_gateway_replicas_min_processing_interval(

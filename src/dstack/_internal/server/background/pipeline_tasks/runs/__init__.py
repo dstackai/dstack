@@ -48,7 +48,6 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import events
 from dstack._internal.server.services.gateways import (
     get_combined_gateway_stats,
-    get_gateway_replica_models,
 )
 from dstack._internal.server.services.jobs import emit_job_status_change_event
 from dstack._internal.server.services.locking import get_locker
@@ -537,7 +536,7 @@ async def _load_gateway_stats(run_model: RunModel, run_spec: RunSpec) -> Optiona
     if run_spec.configuration.type != "service" or run_model.gateway is None:
         return None
     return await get_combined_gateway_stats(
-        get_gateway_replica_models(run_model.gateway),
+        run_model.gateway,
         run_model.project.name,
         run_model.run_name,
     )

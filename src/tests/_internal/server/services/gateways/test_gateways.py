@@ -6,8 +6,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal import settings as core_settings
 from dstack._internal.core.backends.base.compute import get_dstack_gateway_install_command
+from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
 from dstack._internal.proxy.gateway.const import SERVICE_SCALING_WINDOWS
 from dstack._internal.proxy.gateway.schemas.stats import Stat
+from dstack._internal.server.background.pipeline_tasks.runs import _load_gateway_stats
+from dstack._internal.server.models import (
+    GatewayModel,
+    GatewayReplicaModel,
+    ProjectModel,
+    RunModel,
+)
 from dstack._internal.server.services import gateways
 from dstack._internal.server.services.gateways import (
     _merge_per_window_stats,
@@ -18,7 +27,48 @@ from dstack._internal.server.testing.common import (
     create_gateway,
     create_gateway_replica,
     create_project,
+    get_run_spec,
 )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("deleting", [False, True])
+async def test_autoscaling_uses_only_serving_gateway_stats(monkeypatch, deleting):
+    healthy = GatewayReplicaModel(
+        ip_address="1.1.1.1",
+        ssh_private_key="key",
+        status=GatewayReplicaStatus.RUNNING,
+        scale_in=False,
+    )
+    retiring = GatewayReplicaModel(
+        ip_address="2.2.2.2",
+        ssh_private_key="key",
+        status=GatewayReplicaStatus.RUNNING,
+        scale_in=True,
+    )
+    gateway = GatewayModel(
+        status=GatewayStatus.RUNNING,
+        to_be_deleted=deleting,
+        gateway_replicas=[retiring],
+        gateway_replica=healthy,
+    )
+    run = RunModel(gateway=gateway, project=ProjectModel(name="project"), run_name="service")
+    spec = get_run_spec(
+        repo_id="repo", configuration=ServiceConfiguration(port=80, image="ubuntu")
+    )
+    stats = {w: Stat(requests=12, request_time=0.5) for w in SERVICE_SCALING_WINDOWS}
+
+    async def get_connection(hostname, id_rsa):
+        conn = AsyncMock()
+        conn.get_stats.return_value = (
+            stats
+            if hostname == healthy.ip_address
+            else {w: Stat(requests=99, request_time=5.0) for w in SERVICE_SCALING_WINDOWS}
+        )
+        return conn
+
+    monkeypatch.setattr(gateways.gateway_connections_pool, "get_or_add", get_connection)
+    assert await _load_gateway_stats(run, spec) == (None if deleting else stats)
 
 
 class TestMergePerWindowStats:

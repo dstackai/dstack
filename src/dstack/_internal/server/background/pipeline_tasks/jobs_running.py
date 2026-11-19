@@ -21,7 +21,6 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
 )
 from dstack._internal.core.models.files import FileArchiveMapping
-from dstack._internal.core.models.gateways import GatewayReplicaStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.metrics import Metric
 from dstack._internal.core.models.profiles import StartupOrder
@@ -82,7 +81,7 @@ from dstack._internal.server.services.backends.provisioning import (
     resolve_provisioning_image,
 )
 from dstack._internal.server.services.gateways import (
-    get_gateway_replica_models,
+    get_serving_gateway_replica_models,
     skip_gateway_replicas_min_processing_interval,
 )
 from dstack._internal.server.services.instances import (
@@ -543,11 +542,15 @@ async def _fetch_run_model(
         query = query.options(
             joinedload(RunModel.gateway)
             .selectinload(GatewayModel.gateway_replicas)
-            .load_only(GatewayReplicaModel.id, GatewayReplicaModel.status),
+            .load_only(
+                GatewayReplicaModel.id, GatewayReplicaModel.status, GatewayReplicaModel.scale_in
+            ),
         ).options(
             joinedload(RunModel.gateway)
             .joinedload(GatewayModel.gateway_replica)
-            .load_only(GatewayReplicaModel.id, GatewayReplicaModel.status),
+            .load_only(
+                GatewayReplicaModel.id, GatewayReplicaModel.status, GatewayReplicaModel.scale_in
+            ),
         )
     if replica_num is not None:
         assert run_spec is not None, "run_spec must be provided when replica_num is set"
@@ -1165,17 +1168,15 @@ async def _check_gpu_utilization(
 def _job_gateway_registration_failed(gateway: GatewayModel | None, job_model: JobModel) -> bool:
     if gateway is None:
         return False
-    running_gateway_replica_ids = {
-        replica.id
-        for replica in get_gateway_replica_models(gateway)
-        if replica.status == GatewayReplicaStatus.RUNNING
+    serving_gateway_replica_ids = {
+        replica.id for replica in get_serving_gateway_replica_models(gateway)
     }
-    if not running_gateway_replica_ids:
+    if not serving_gateway_replica_ids:
         return False
     registration_by_replica_id = {
         r.gateway_replica_id: r for r in job_model.service_replica_registrations
     }
-    for replica_id in running_gateway_replica_ids:
+    for replica_id in serving_gateway_replica_ids:
         registration = registration_by_replica_id.get(replica_id)
         if (
             registration is None

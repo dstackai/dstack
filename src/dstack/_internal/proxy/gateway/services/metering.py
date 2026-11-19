@@ -4,7 +4,7 @@ import asyncio
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Literal
 
 from dstack._internal.proxy.gateway.services.metering_store import MeteringStore
 from dstack._internal.proxy.lib.cancellation import await_completion
@@ -15,6 +15,7 @@ from dstack._internal.proxy.lib.schemas.usage import (
     UsageBatch,
     UsageBatchPage,
     UsageCheckpoint,
+    UsageDrainResponse,
     UsageEntry,
     UsageKey,
 )
@@ -59,6 +60,8 @@ class MeteringCollector(UsageObserver):
         self._closed = False
         self._pending_bytes = 0
         self._reconfiguring = False
+        self._interrupted_drain = False
+        self._saved_drain_state: str | None = None
 
     async def start(self) -> None:
         async with self._lock:
@@ -66,17 +69,24 @@ class MeteringCollector(UsageObserver):
                 return
             if not self.profiles and not self.store.exists():
                 return
-            saved = await asyncio.to_thread(self.store.load)
-            now = self.clock.utc_now()
-            self._state = saved or UsageCheckpoint(active_batch=self._new_batch(now))
-            self._entries = {entry.key: entry for entry in self._state.active_batch.entries}
-            self._published = {batch.batch_id for batch in self._state.pending_batches}
-            self._pending_bytes = sum(
-                len(b.model_dump_json().encode()) for b in self._state.pending_batches
-            )
-            self._last_time = self._state.active_batch.interval_start
-            await self._rotate(now)
+            await self._load()
+            await self._rotate(self.clock.utc_now())
             await self._save(self._snapshot())
+
+    async def _load(self) -> None:
+        saved = await asyncio.to_thread(self.store.load)
+        self._state = saved or UsageCheckpoint(active_batch=self._new_batch(self.clock.utc_now()))
+        self._entries = {entry.key: entry for entry in self._state.active_batch.entries}
+        self._published = {batch.batch_id for batch in self._state.pending_batches}
+        self._pending_bytes = sum(
+            len(b.model_dump_json().encode()) for b in self._state.pending_batches
+        )
+        self._last_time = self._state.active_batch.interval_start
+        self._saved_drain_state = self._state.drain_state
+        self._interrupted_drain = self._state.drain_state in ("ingress", "waiting")
+        if self._state.drain_state == "ingress_stopped":
+            # start() checkpoints this before admitting traffic from the old Nginx generation.
+            self._state = self._state.model_copy(update={"drain_state": "ingress"})
 
     async def configure_profiles(
         self, profiles: Mapping[str, str], persist: Callable[[], Awaitable[None]] | None = None
@@ -113,6 +123,8 @@ class MeteringCollector(UsageObserver):
             self._closed
             or self._reconfiguring
             or self._state is None
+            or self._interrupted_drain
+            or self._state.drain_state in ("waiting", "sealed")
             or self._storage_error
             or self._clock_error
             or self.profile_for(key.service_id) != profile
@@ -142,6 +154,46 @@ class MeteringCollector(UsageObserver):
             if changed or self._storage_error:
                 await self._save(self._snapshot())
 
+    async def drain(self, *, ingress_idle: bool = True) -> UsageDrainResponse:
+        # Finish the checkpoint and publish its result even if the caller disconnects.
+        return await await_completion(asyncio.create_task(self._drain(ingress_idle)))
+
+    async def _drain(self, ingress_idle: bool) -> UsageDrainResponse:
+        async with self._lock:
+            if self._state is None:
+                # An unused replica also needs a durable admission fence.
+                await self._load()
+            assert self._state is not None
+            if self._interrupted_drain:
+                if not ingress_idle:
+                    # Still let the private router fence Nginx ingress after a restart.
+                    return UsageDrainResponse(sealed=False, empty=False)
+                raise ProxyError(
+                    "Gateway restarted with unresolved usage; reconcile the drain", 503
+                )
+            phase: Literal["waiting", "ingress"] = "waiting" if ingress_idle else "ingress"
+            if self._state.drain_state is None or (
+                self._state.drain_state == "ingress" and ingress_idle
+            ):
+                self._state = self._state.model_copy(update={"drain_state": phase})
+                self._seal_if_idle()
+            if self._state.drain_state != self._saved_drain_state or self._storage_error:
+                await self._save(self._snapshot())
+            sealed = ingress_idle and self._state.drain_state == "sealed"
+            return UsageDrainResponse(
+                sealed=sealed, empty=sealed and not self._state.pending_batches
+            )
+
+    def _seal_if_idle(self) -> bool:
+        assert self._state is not None
+        if self._state.drain_state != "waiting" or self._attempts:
+            return False
+        if self._entries:
+            # Close the original UTC minute early. No new attempt can enter it.
+            self._rollover(self._state.active_batch.interval_end)
+        self._state = self._state.model_copy(update={"drain_state": "sealed"})
+        return True
+
     async def get_batches(self, limit: int = 100) -> UsageBatchPage:
         if not 1 <= limit <= 100:
             raise ProxyError("Batch limit must be between 1 and 100")
@@ -155,6 +207,10 @@ class MeteringCollector(UsageObserver):
             ).model_copy(deep=True)
 
     async def acknowledge(self, batch_ids: list[str]) -> UsageAckResponse:
+        # The matching in-memory commit must finish together with its durable write.
+        return await await_completion(asyncio.create_task(self._acknowledge(batch_ids)))
+
+    async def _acknowledge(self, batch_ids: list[str]) -> UsageAckResponse:
         async with self._lock:
             if self._state is None:
                 raise ProxyError("Usage metering is not initialized", 404)
@@ -189,7 +245,15 @@ class MeteringCollector(UsageObserver):
         try:
             for attempt in list(self._attempts):
                 await attempt.finish()
-            await self.checkpoint()
+            async with self._lock:
+                if self._state is not None:
+                    if self._state.drain_state == "ingress" and not self._interrupted_drain:
+                        # An old Nginx worker can still be buffering a model request.
+                        # The next collector must admit it until ingress confirms quiescence.
+                        self._state = self._state.model_copy(
+                            update={"drain_state": "ingress_stopped"}
+                        )
+                    await self._save(self._snapshot())
         finally:
             self.store.close()
 
@@ -200,6 +264,8 @@ class MeteringCollector(UsageObserver):
             if not attempt.dispatched:
                 attempt.finished = True
                 self._attempts.discard(attempt)
+                if self._seal_if_idle():
+                    await self._save(self._snapshot())
                 return
             try:
                 rotated = await self._rotate(self.clock.utc_now())
@@ -222,7 +288,7 @@ class MeteringCollector(UsageObserver):
             )
             attempt.finished = True
             self._attempts.discard(attempt)
-            if rotated:
+            if self._seal_if_idle() or rotated:
                 try:
                     await self._save(self._snapshot())
                 except (OSError, ValueError):
@@ -230,12 +296,19 @@ class MeteringCollector(UsageObserver):
 
     async def _rotate(self, now: datetime) -> bool:
         assert self._state is not None
+        if self._state.drain_state == "sealed":
+            return False
         if self._last_time is not None and now < self._last_time:
             self._clock_error = True
             raise ProxyError("Usage clock moved backwards; reconciliation is required", 503)
         self._last_time = now
         if now < self._state.active_batch.interval_end:
             return False
+        self._rollover(now)
+        return True
+
+    def _rollover(self, next_minute: datetime) -> None:
+        assert self._state is not None
         previous = self._state.active_batch.model_copy(
             update={"entries": list(self._entries.values())}
         )
@@ -244,10 +317,9 @@ class MeteringCollector(UsageObserver):
             pending.append(previous)
             self._pending_bytes += len(previous.model_dump_json().encode())
         self._state = self._state.model_copy(
-            update={"active_batch": self._new_batch(now), "pending_batches": pending}
+            update={"active_batch": self._new_batch(next_minute), "pending_batches": pending}
         )
         self._entries = {}
-        return True
 
     def _snapshot(self) -> UsageCheckpoint:
         assert self._state is not None
@@ -267,6 +339,7 @@ class MeteringCollector(UsageObserver):
             self._storage_error = exc
             raise
         self._published = {batch.batch_id for batch in state.pending_batches}
+        self._saved_drain_state = state.drain_state
         self._storage_error = None
 
     @staticmethod

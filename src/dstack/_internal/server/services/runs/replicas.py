@@ -2,10 +2,9 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from dstack._internal.core.models.configurations import ReplicaGroup
-from dstack._internal.core.models.gateways import GatewayReplicaStatus
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
 from dstack._internal.server.models import JobModel, RunModel
-from dstack._internal.server.services.gateways import get_gateway_replica_models
+from dstack._internal.server.services.gateways import get_serving_gateway_replica_models
 from dstack._internal.server.services.jobs import (
     get_job_spec,
     group_jobs_by_replica_latest,
@@ -140,17 +139,15 @@ def is_replica_receiving_traffic(run_model: RunModel, jobs: list[JobModel]) -> b
     if run_model.gateway is None:
         # served by the in-server proxy
         return True
-    running_gateway_replica_ids = {
-        replica.id
-        for replica in get_gateway_replica_models(run_model.gateway)
-        if replica.status == GatewayReplicaStatus.RUNNING
+    serving_gateway_replica_ids = {
+        replica.id for replica in get_serving_gateway_replica_models(run_model.gateway)
     }
-    if not running_gateway_replica_ids:
+    if not serving_gateway_replica_ids:
         return False
     registration_by_replica_id = {
         r.gateway_replica_id: r for r in job.service_replica_registrations
     }
-    for replica_id in running_gateway_replica_ids:
+    for replica_id in serving_gateway_replica_ids:
         registration = registration_by_replica_id.get(replica_id)
         if registration is None or not registration.is_registered:
             return False

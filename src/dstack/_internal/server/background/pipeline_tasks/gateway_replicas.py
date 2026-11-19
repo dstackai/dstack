@@ -64,6 +64,10 @@ from dstack._internal.server.services.gateways import (
 from dstack._internal.server.services.gateways.client import GatewayClient
 from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
+from dstack._internal.server.services.gateways.usage import (
+    collect_gateway_usage,
+    drain_gateway_usage,
+)
 from dstack._internal.server.services.instances import get_instance_remote_connection_info
 from dstack._internal.server.services.jobs import job_model_to_job_submission
 from dstack._internal.server.services.locking import get_locker
@@ -655,12 +659,6 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
     if replica_model is None:
         return
     gateway_model = _get_loaded_gateway_model(replica_model)
-    if gateway_model is None:
-        await _commit_update(item, replica_model, update_map={})
-        return
-    if update_map := _mark_terminating_if_needed(gateway_model, replica_model):
-        await _commit_update(item, replica_model, update_map=update_map)
-        return
     try:
         connection = await gateway_connections_pool.get_or_add(
             hostname=get_or_error(replica_model.ip_address),
@@ -668,6 +666,18 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
         )
     except Exception as e:
         logger.warning("%s: failed to connect to gateway: %s", fmt(replica_model), e)
+        await _commit_update(item, replica_model, update_map={})
+        return
+    if gateway_model is not None and (
+        update_map := _mark_terminating_if_needed(gateway_model, replica_model)
+    ):
+        # Keep the replica active and its management tunnel usable until the final ACK.
+        # The token-guarded transition records permission for the terminating worker.
+        drained = await drain_gateway_usage(connection, item.id, gateway_model.id, item.lock_token)
+        await _commit_update(item, replica_model, update_map=update_map if drained else {})
+        return
+    await collect_gateway_usage(connection, item.id, item.lock_token)
+    if gateway_model is None:
         await _commit_update(item, replica_model, update_map={})
         return
     async with connection.client() as client:

@@ -50,6 +50,168 @@ async def record(collector, user="u", service="s", usage=None):
 
 @pytest.mark.asyncio
 class TestMeteringCollector:
+    async def test_drain_finishes_admitted_attempts_and_replays_final_minute(self, tmp_path):
+        path = tmp_path / "usage.json"
+        clock = FakeClock()
+        store = MeteringStore(path)
+        c = MeteringCollector(store, clock=clock, profiles={"s": VLLM_PROFILE})
+        await c.start()
+        try:
+            await record(c)
+            clock.advance()
+            await c.rotate_if_due()
+            (previous,) = (await c.get_batches()).batches
+            saved = store.load()
+            assert saved is not None
+            final_minute = saved.active_batch
+            key = UsageKey(consumer_subject_id="u", service_id="s")
+            attempt = c.start_attempt(key, VLLM_PROFILE)
+            attempt.mark_dispatched()
+            assert (await c.drain()).model_dump() == {"sealed": False, "empty": False}
+            with pytest.raises(ProxyError) as exc:
+                c.start_attempt(key, VLLM_PROFILE)
+            assert exc.value.status_code == 503
+            await c.acknowledge([previous.batch_id])
+            assert not (await c.drain()).empty
+            attempt.observe_usage(dict(prompt_tokens=20, completion_tokens=3, total_tokens=23))
+            await attempt.finish()
+            assert (await c.drain()).model_dump() == {"sealed": True, "empty": False}
+            (batch,) = (await c.get_batches()).batches
+            assert (batch.batch_id, batch.interval_start, batch.interval_end) == (
+                final_minute.batch_id,
+                final_minute.interval_start,
+                final_minute.interval_end,
+            )
+            assert batch.entries[0].total_tokens == 23
+        finally:
+            await c.close()
+
+        # Restart within the sealed UTC minute. Old ACKs cannot remove the final batch.
+        c = MeteringCollector(MeteringStore(path), clock=clock, profiles={"s": VLLM_PROFILE})
+        await c.start()
+        try:
+            await c.rotate_if_due()
+            await c.acknowledge([previous.batch_id])
+            assert (await c.get_batches()).batches == [batch]
+            with pytest.raises(ProxyError):
+                c.start_attempt(key, VLLM_PROFILE)
+            await c.acknowledge([batch.batch_id])
+            assert (await c.drain()).model_dump() == {"sealed": True, "empty": True}
+        finally:
+            await c.close()
+
+    async def test_drain_fails_closed_across_disk_failure_and_ack_retry(self, tmp_path):
+        path = tmp_path / "usage.json"
+        store = FailingStore(path)
+        c = MeteringCollector(store, clock=FakeClock(), profiles={"s": VLLM_PROFILE})
+        await c.start()
+        try:
+            await record(c)
+            store.fail = True
+            with pytest.raises(OSError):
+                await c.drain()
+            with pytest.raises(ProxyError):
+                await record(c)
+            assert not (await c.get_batches()).batches
+            store.fail = False
+            assert (await c.drain()).model_dump() == {"sealed": True, "empty": False}
+            (batch,) = (await c.get_batches()).batches
+            store.fail = True
+            with pytest.raises(OSError):
+                await c.acknowledge([batch.batch_id])
+            store.fail = False
+            assert not (await c.drain()).empty
+            assert (await c.get_batches()).batches == [batch]
+            await c.acknowledge([batch.batch_id])
+            assert (await c.drain()).empty
+        finally:
+            store.fail = False
+            await c.close()
+
+    async def test_restart_with_unresolved_drain_keeps_admission_and_deletion_fenced(
+        self, tmp_path
+    ):
+        path = tmp_path / "usage.json"
+        clock = FakeClock()
+        store = MeteringStore(path)
+        c = MeteringCollector(store, clock=clock, profiles={"s": VLLM_PROFILE})
+        await c.start()
+        key = UsageKey(consumer_subject_id="u", service_id="s")
+        c.start_attempt(key, VLLM_PROFILE).mark_dispatched()
+        assert not (await c.drain()).sealed
+        # Abrupt loss of the process, without graceful request finalization.
+        store.close()
+        for _ in range(2):
+            c = MeteringCollector(MeteringStore(path), clock=clock, profiles={"s": VLLM_PROFILE})
+            await c.start()
+            try:
+                with pytest.raises(ProxyError) as exc:
+                    await c.drain()
+                assert exc.value.status_code == 503
+                with pytest.raises(ProxyError):
+                    c.start_attempt(key, VLLM_PROFILE)
+            finally:
+                await c.close()
+
+    async def test_cancelled_drain_persists_final_batch_before_unlock(self, tmp_path, monkeypatch):
+        clock = FakeClock()
+        store = MeteringStore(tmp_path / "usage.json")
+        c = MeteringCollector(store, clock=clock, profiles={"s": VLLM_PROFILE})
+        await c.start()
+        await record(c)
+        writing, release = asyncio.Event(), asyncio.Event()
+        save = store.save
+
+        async def delay_save(state):
+            writing.set()
+            await release.wait()
+            await save(state)
+
+        monkeypatch.setattr(store, "save", delay_save)
+        drain = asyncio.create_task(c.drain())
+        await writing.wait()
+        drain.cancel()
+        await asyncio.sleep(0)
+        with pytest.raises(ProxyError):
+            await record(c)
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await drain
+        page = await c.get_batches()
+        assert len(page.batches) == 1
+        # Inspect the result after abrupt process loss without an extra close/checkpoint.
+        store.close()
+        c = MeteringCollector(MeteringStore(store.path), clock=clock)
+        await c.start()
+        try:
+            assert await c.get_batches() == page
+            assert (await c.drain()).model_dump() == {"sealed": True, "empty": False}
+        finally:
+            await c.close()
+
+    async def test_interrupted_checkpoint_cannot_certify_a_seal(self, tmp_path, monkeypatch):
+        store = MeteringStore(tmp_path / "usage.json")
+        c = MeteringCollector(store, clock=FakeClock(), profiles={"s": VLLM_PROFILE})
+        await c.start()
+        try:
+            await record(c)
+            with monkeypatch.context() as injection:
+
+                async def stop_writer(state):
+                    raise asyncio.CancelledError
+
+                injection.setattr(store, "save", stop_writer)
+                with pytest.raises(asyncio.CancelledError):
+                    await c.drain()
+                with pytest.raises(asyncio.CancelledError):
+                    await c.drain()
+                assert not (await c.get_batches()).batches
+            assert (await c.drain()).model_dump() == {"sealed": True, "empty": False}
+            (batch,) = (await c.get_batches()).batches
+            assert batch.entries[0].total_tokens == 23
+        finally:
+            await c.close()
+
     async def test_ack_does_not_clear_active(self, tmp_path):
         clock = FakeClock()
         collector = MeteringCollector(
@@ -71,6 +233,38 @@ class TestMeteringCollector:
         assert b.entries[0].total_tokens == 23
         assert b.batch_id != a.batch_id
         await collector.close()
+
+    async def test_cancelled_ack_cannot_resurrect_a_durably_deleted_final_batch(
+        self, tmp_path, monkeypatch
+    ):
+        store = MeteringStore(tmp_path / "usage.json")
+        c = MeteringCollector(store, clock=FakeClock(), profiles={"s": VLLM_PROFILE})
+        await c.start()
+        try:
+            await record(c)
+            await c.drain()
+            (batch,) = (await c.get_batches()).batches
+            saved, release = asyncio.Event(), asyncio.Event()
+            save = store.save
+
+            async def lose_reply(state):
+                await save(state)
+                saved.set()
+                await release.wait()
+
+            monkeypatch.setattr(store, "save", lose_reply)
+            ack = asyncio.create_task(c.acknowledge([batch.batch_id]))
+            await saved.wait()
+            ack.cancel()
+            release.set()
+            with pytest.raises(asyncio.CancelledError):
+                await ack
+            assert (await c.drain()).empty
+            await c.checkpoint()
+            state = store.load()
+            assert state is not None and state.pending_batches == []
+        finally:
+            await c.close()
 
     async def test_ack_preserves_other_pending(self, tmp_path):
         clock = FakeClock()

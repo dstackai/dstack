@@ -1,4 +1,5 @@
 import contextlib
+import hashlib
 import shutil
 import uuid
 from pathlib import Path
@@ -6,6 +7,7 @@ from typing import AsyncIterator, Optional
 
 import aiorwlock
 
+from dstack._internal.core.errors import SSHError
 from dstack._internal.core.services.ssh.tunnel import (
     SSH_DEFAULT_OPTIONS,
     IPSocket,
@@ -21,13 +23,17 @@ from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
 from dstack._internal.server import settings
 from dstack._internal.server.services.gateways.client import GatewayClient
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.path import FileContent, make_tmp_symlink_to_dir
+from dstack._internal.utils.path import FileContent, FilePath, make_tmp_symlink_to_dir
 
 logger = get_logger(__name__)
 
 
 def _get_connections_dir() -> Path:
     return settings.SERVER_DIR_PATH / "gateway-connections"
+
+
+def ssh_key_digest(id_rsa: str) -> str:
+    return hashlib.sha256(id_rsa.encode()).hexdigest()
 
 
 class GatewayConnection:
@@ -46,7 +52,9 @@ class GatewayConnection:
         self.server_port = server_port
         # a persistent connection_dir is needed to discover and close leftover connections
         # in case of server restarts w/o graceful shutdown
-        self.connection_dir = _get_connections_dir() / ip_address
+        # Different server processes may share this directory while an IP is reassigned.
+        self.connection_dir = _get_connections_dir() / ip_address / ssh_key_digest(id_rsa)
+        self._closed = False
         # connection_dir can have a long path that won't be accepted by the ssh command,
         # so we create a short temporary symlink
         self.temp_dir, self.connection_symlink_dir = make_tmp_symlink_to_dir(
@@ -59,6 +67,7 @@ class GatewayConnection:
             control_sock_path=self.connection_symlink_dir / "control.sock",
             options={
                 **SSH_DEFAULT_OPTIONS,
+                "IdentitiesOnly": "yes",
                 "ConnectTimeout": "1",
                 "ServerAliveInterval": "60",
             },
@@ -75,6 +84,8 @@ class GatewayConnection:
 
     async def check_or_restart(self) -> bool:
         async with self._lock.writer_lock:
+            if self._closed:
+                return False
             if not await self.tunnel.acheck():
                 logger.info("Connection to gateway %s is down, restarting", self.ip_address)
                 await self._open_tunnel()
@@ -83,11 +94,29 @@ class GatewayConnection:
 
     async def open(self, close_existing_tunnel: bool = False) -> None:
         async with self._lock.writer_lock:
+            if self._closed:
+                raise SSHError("Gateway connection is closed")
             if close_existing_tunnel:
                 # Close remaining tunnel if previous server process died w/o graceful shutdown
+                await self._close_legacy_tunnel()
                 if await self.tunnel.acheck():
                     await self.tunnel.aclose()
             await self._open_tunnel()
+
+    async def _close_legacy_tunnel(self) -> None:
+        # Older servers placed control.sock directly under the address. Only use it
+        # for startup cleanup; management HTTP always uses the key-specific tunnel.
+        address_dir = self.connection_dir.parent
+        if not (address_dir / "control.sock").exists():
+            return
+        temp_dir, short_path = make_tmp_symlink_to_dir(address_dir, "legacy")
+        with temp_dir:
+            legacy = SSHTunnel(
+                destination=self.tunnel.destination,
+                identity=FilePath(self.tunnel.identity_path),
+                control_sock_path=short_path / "control.sock",
+            )
+            await legacy.aclose()
 
     async def _open_tunnel(self) -> None:
         self.connection_dir.mkdir(parents=True, exist_ok=True)
@@ -110,8 +139,14 @@ class GatewayConnection:
 
     async def close(self) -> None:
         async with self._lock.writer_lock:
+            if self._closed:
+                return
             await self.tunnel.aclose()
+            self._closed = True
+            self.temp_dir.cleanup()
             shutil.rmtree(self.connection_dir, ignore_errors=True)
+            with contextlib.suppress(OSError):
+                self.connection_dir.parent.rmdir()
 
     async def try_collect_stats(self) -> None:
         if not self._client.is_server_ready:
@@ -133,4 +168,6 @@ class GatewayConnection:
     @contextlib.asynccontextmanager
     async def client(self) -> AsyncIterator[GatewayClient]:
         async with self._lock.reader_lock:
+            if self._closed:
+                raise SSHError("Gateway connection is closed")
             yield self._client

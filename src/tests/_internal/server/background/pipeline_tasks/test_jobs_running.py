@@ -2475,11 +2475,15 @@ class TestJobRunningWorker:
         assert job.status == JobStatus.RUNNING
         assert job.termination_reason is None
 
-    async def test_terminates_job_ignoring_registration_on_non_running_replica(
+    @pytest.mark.parametrize(
+        "retiring_status", [GatewayReplicaStatus.TERMINATING, GatewayReplicaStatus.RUNNING]
+    )
+    async def test_terminates_job_ignoring_registration_on_retiring_replica(
         self,
         test_db,
         session: AsyncSession,
         worker: JobRunningWorker,
+        retiring_status: GatewayReplicaStatus,
     ) -> None:
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -2494,15 +2498,14 @@ class TestJobRunningWorker:
         gateway_replica_running = await create_gateway_replica(
             session=session, gateway_id=gateway.id, backend=backend, replica_num=0
         )
-        # Terminated replica successfully registered before going away — should be ignored,
-        # since only currently running replicas count towards the predicate.
         gateway_replica_terminating = await create_gateway_replica(
             session=session,
             gateway_id=gateway.id,
             backend=backend,
             replica_num=1,
-            status=GatewayReplicaStatus.TERMINATING,
+            status=retiring_status,
         )
+        gateway_replica_terminating.scale_in = retiring_status == GatewayReplicaStatus.RUNNING
         run = await create_run(
             session=session,
             project=project,

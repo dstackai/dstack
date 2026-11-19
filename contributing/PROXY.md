@@ -187,9 +187,21 @@ observations since the last successful checkpoint can be lost on forced terminat
 The `.lock` sidecar enforces one process, and `.initialized` detects missing established state.
 Never delete/reset these files as a routine repair: reconcile identity/history first.
 
-Server polls `/api/usage/batches` over the existing private SSH management connection,
-commits idempotent receipts/entries, then POSTs `/api/usage/batches/ack`. No network
-work happens inside its database transaction. Old Gateways lacking this API are skipped.
+The `GatewayReplicaPipeline` worker holding the running replica's lease polls
+`/api/usage/batches` over its private SSH management connection. It verifies the
+source and lease token, commits the page's receipts and counters, then POSTs
+`/api/usage/batches/ack` outside the transaction. If the server exits between
+commit and ACK, another server can claim the replica after lease expiry and ACK
+the replayed page. Old Gateways lacking the usage API still get normal state sync.
+
+On planned removal of a serving Gateway replica, the worker calls the private
+`POST /api/usage/drain`. Nginx fences new public requests and lets open HTTP
+streams and WebSockets finish. The collector then seals the final active minute.
+The worker keeps delivering closed batches during the wait. Only a sealed, empty
+queue permits the worker to mark the VM for termination. An open stream can
+therefore delay scale-in. Update the Gateway and all server workers before
+relying on this protocol. If a Gateway lacks the drain API or crashes with
+unresolved requests, its VM stays in place pending upgrade or reconciliation.
 
 Public project model endpoints traverse metering; direct service hostnames still bypass it.
 Resolve that routing policy before paid use. Token quotas are outside DS-002. Local

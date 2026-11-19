@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,14 +7,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.duration import Duration
+from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
 from dstack._internal.core.models.profiles import Profile, ProfileRetry, RetryEvent
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.core.models.volumes import Volume
-from dstack._internal.server.models import UserModel
+from dstack._internal.server.models import (
+    GatewayModel,
+    GatewayReplicaModel,
+    JobModel,
+    RunModel,
+    ServiceReplicaRegistrationModel,
+    UserModel,
+)
 from dstack._internal.server.services import runs as runs_services
 from dstack._internal.server.services.jobs import check_can_attach_job_volumes
 from dstack._internal.server.services.projects import add_project_member
+from dstack._internal.server.services.runs.replicas import is_replica_receiving_traffic
 from dstack._internal.server.testing.common import (
     create_job,
     create_project,
@@ -23,6 +34,27 @@ from dstack._internal.server.testing.common import (
     get_volume,
     get_volume_configuration,
 )
+
+
+@pytest.mark.parametrize("reason", ["scale_in", "deleting", "failed"])
+def test_registered_job_has_no_route_via_retiring_legacy_gateway(reason):
+    replica = GatewayReplicaModel(
+        id=uuid4(), status=GatewayReplicaStatus.RUNNING, scale_in=reason == "scale_in"
+    )
+    gateway = GatewayModel(
+        status=GatewayStatus.FAILED if reason == "failed" else GatewayStatus.RUNNING,
+        to_be_deleted=reason == "deleting",
+        gateway_replica=replica,
+    )
+    job = JobModel(
+        ready=True,
+        registered=True,
+        status=JobStatus.RUNNING,
+        service_replica_registrations=[
+            ServiceReplicaRegistrationModel(gateway_replica_id=replica.id, is_registered=True)
+        ],
+    )
+    assert not is_replica_receiving_traffic(RunModel(gateway=gateway), [job])
 
 
 class TestListUserRuns:
