@@ -122,11 +122,13 @@ async def unregister_service(
 
         logger.debug("Unregistering service %s", service.fmt())
 
+        await nginx.unregister(service)
+        # Only after the reload, so that Nginx stops routing requests to the replicas
         await stop_replica_connections(
             ids=(r.id for r in service.replicas),
             service_conn_pool=service_conn_pool,
+            drain=True,
         )
-        await nginx.unregister(service)
         await repo.delete_models_by_run(project_name, run_name)
         await repo.delete_service(project_name, run_name)
         await service_conn_pool.remove_service_client(project_name, run_name)
@@ -345,18 +347,16 @@ async def apply_service(
     nginx: Nginx,
     service_conn_pool: ServiceConnectionPool,
 ) -> dict[models.Replica, BaseException]:
+    removed_replica_ids = []
     if old_service is not None:
         if service.domain != old_service.domain:
             raise UnexpectedProxyError(
                 f"Did not expect service {service.fmt()}"
                 f" domain name to change ({old_service.domain} -> {service.domain})"
             )
-        await stop_replica_connections(
-            ids=(
-                replica.id for replica in old_service.replicas if replica not in service.replicas
-            ),
-            service_conn_pool=service_conn_pool,
-        )
+        removed_replica_ids = [
+            replica.id for replica in old_service.replicas if replica not in service.replicas
+        ]
     replica_conns, replica_failures = await get_or_add_replica_connections(
         service, repo, service_conn_pool
     )
@@ -371,6 +371,10 @@ async def apply_service(
     ]
     service_config = await get_nginx_service_config(service, replica_configs)
     await nginx.register(service_config, (await repo.get_config()).acme_settings)
+    # Only after the reload, so that Nginx stops routing requests to the removed replicas
+    await stop_replica_connections(
+        ids=removed_replica_ids, service_conn_pool=service_conn_pool, drain=True
+    )
     return replica_failures
 
 
@@ -403,10 +407,17 @@ async def get_or_add_replica_connections(
 
 
 async def stop_replica_connections(
-    ids: Iterable[str], service_conn_pool: ServiceConnectionPool
+    ids: Iterable[str], service_conn_pool: ServiceConnectionPool, drain: bool = False
 ) -> None:
-    tasks = map(service_conn_pool.remove, ids)
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    """
+    With `drain`, return right away and close each connection once requests already sent
+    through it finish. See `ServiceConnectionPool.remove`.
+    """
+    ids = list(ids)
+    results = await asyncio.gather(
+        *(service_conn_pool.remove(replica_id, drain=drain) for replica_id in ids),
+        return_exceptions=True,
+    )
     for replica_id, exc in zip(ids, results):
         if isinstance(exc, Exception):
             logger.error("Error stopping connection to replica %s: %s", replica_id, exc)

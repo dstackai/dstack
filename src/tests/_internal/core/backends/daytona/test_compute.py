@@ -137,6 +137,7 @@ def _run_job(compute, offer=None, instance_name="dstack-test-unique", **override
         "run": SimpleNamespace(),
         "job": SimpleNamespace(job_spec=job_spec),
         "instance_offer": offer or _offers(compute, _item())[0],
+        "project_name": "main",
         "project_ssh_public_key": PUBLIC_KEY,
         "project_ssh_private_key": "private-key",
         "volumes": [],

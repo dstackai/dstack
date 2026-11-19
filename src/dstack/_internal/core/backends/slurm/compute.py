@@ -136,6 +136,7 @@ class SlurmCompute(
         run: Run,
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
+        project_name: str,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: list[Volume],
@@ -149,6 +150,7 @@ class SlurmCompute(
             run=run,
             job=job,
             instance_offer=instance_offer,
+            project_name=project_name,
             project_ssh_public_key=project_ssh_public_key,
             extra_authorized_keys=extra_authorized_keys,
             requirements=requirements,
@@ -161,6 +163,7 @@ class SlurmCompute(
         run: Run,
         job_configurations: list[JobConfiguration],
         instance_offer: InstanceOfferWithAvailability,
+        project_name: str,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         placement_group: Optional[PlacementGroup],
@@ -172,6 +175,7 @@ class SlurmCompute(
             run=run,
             job=master_job,
             instance_offer=instance_offer,
+            project_name=project_name,
             project_ssh_public_key=project_ssh_public_key,
             extra_authorized_keys=extra_authorized_keys,
             requirements=requirements,
@@ -196,6 +200,7 @@ class SlurmCompute(
         run: Run,
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
+        project_name: str,
         project_ssh_public_key: str,
         extra_authorized_keys: list[str],
         requirements: Requirements,
@@ -216,7 +221,7 @@ class SlurmCompute(
             assert run.run_spec.run_name is not None
             slurm_job_name = generate_unique_backend_name(
                 resource_name=run.run_spec.run_name,
-                project_name=run.project_name,
+                project_name=project_name,
                 max_length=SLURM_JOB_NAME_MAX_LENGTH,
             )
 

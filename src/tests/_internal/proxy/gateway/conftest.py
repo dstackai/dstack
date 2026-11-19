@@ -16,11 +16,15 @@ def system_mocks() -> Generator[Mocks, None, None]:
         patch(f"{nginx}.Nginx.run_certbot") as run_certbot,
         patch(f"{connection}.ServiceConnection.open") as open_conn,
         patch(f"{connection}.ServiceConnection.close") as close_conn,
+        patch(f"{connection}._wait_until_idle") as wait_until_idle,
     ):
         sudo.return_value = []
+        # Drains finish right away unless a test holds them
+        wait_until_idle.return_value = True
         yield Mocks(
             reload_nginx=reload_nginx,
             run_certbot=run_certbot,
             open_conn=open_conn,
             close_conn=close_conn,
+            wait_until_idle=wait_until_idle,
         )

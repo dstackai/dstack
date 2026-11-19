@@ -910,7 +910,7 @@ def create_instance_model(
         instance_id = uuid.uuid4()
     provider_ref = issue_provider_ref(
         session=session,
-        project=project,
+        project_id=project.id,
         owner_type=OwnerType.INSTANCE,
         owner_id=instance_id,
         owner_name=instance_name,
