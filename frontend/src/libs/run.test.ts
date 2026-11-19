@@ -17,12 +17,9 @@ const makeRun = (status: IRun['status']) =>
     }) as IRun;
 
 describe('Model of a run', () => {
-    test.each([
-        ['running', BASE_URL],
-        ['terminated', null],
-    ] as const)('the model of a %s run has the URL %s', (status, baseUrl) => {
+    test.each(['running', 'terminated'] as const)('the model of a %s run has the URL of the run', (status) => {
         const model = getExtendedModelFromRun(makeRun(status));
 
-        expect(model?.endpoints).toEqual([{ project_name: 'exporter-proj', base_url: baseUrl }]);
+        expect(model?.endpoints).toEqual([{ project_name: 'exporter-proj', base_url: BASE_URL }]);
     });
 });

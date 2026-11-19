@@ -14,22 +14,11 @@
     flex-grow: 1;
     min-height: 300px;
     display: grid;
-    grid-template-columns: 300px 1fr;
+    grid-template-columns: 1fr;
     grid-template-rows: 60px 1fr auto;
-    grid-template-areas: "sidebar buttons"
-                          "sidebar chat"
-                          "sidebar form";
-}
-
-.side {
-    grid-area: sidebar;
-    border-right: 1px solid #b6bec9;
-    padding-right: 20px;
-    padding-top: 20px;
-
-    textarea {
-        resize: none !important;
-    }
+    grid-template-areas: "buttons"
+                          "chat"
+                          "form";
 }
 
 .buttons {

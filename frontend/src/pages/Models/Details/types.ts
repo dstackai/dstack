@@ -1,5 +1,4 @@
 export interface FormValues {
-    instructions?: string;
     message: string;
 }
 

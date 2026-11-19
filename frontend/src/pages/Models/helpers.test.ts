@@ -1,4 +1,4 @@
-import { getImportedModelStatus, mergeModels } from './helpers';
+import { getImportedModelStatus, isModelServed, mergeModels } from './helpers';
 
 import { IModelExtended } from './List/types';
 
@@ -26,7 +26,9 @@ const makeModel = (projectName: string): IModelExtended => ({
 
 const makeProjectImports = (projectName: string, baseUrl: string | null = getUrl(projectName)): TProjectImports => ({
     project_name: projectName,
-    imports: [{ export: { project_name: 'exporter-proj', exported_models: [{ name: QWEN, base_url: baseUrl }] } }],
+    imports: [
+        { export: { name: 'models', project_name: 'exporter-proj', exported_models: [{ name: QWEN, base_url: baseUrl }] } },
+    ],
 });
 
 describe('Models helpers', () => {
@@ -64,7 +66,6 @@ describe('Models helpers', () => {
 
         const makeFinishedModel = (runId: string): IModelExtended => ({
             ...running,
-            endpoints: [{ project_name: 'exporter-proj', base_url: null }],
             run: running.run && { ...running.run, id: runId, status: 'terminated' },
         });
 
@@ -73,6 +74,23 @@ describe('Models helpers', () => {
 
         expect(mergeModels([later, running], [])).toEqual([running]);
         expect(mergeModels([later, earlier], [])).toEqual([later]);
+    });
+
+    test("a project's own model is served until its run is finished, and keeps its URL afterwards", () => {
+        const running = makeModel('exporter-proj');
+        const stopped: IModelExtended = { ...running, run: running.run && { ...running.run, status: 'terminated' } };
+
+        expect(isModelServed(running)).toBe(true);
+        expect(isModelServed(stopped)).toBe(false);
+        expect(stopped.endpoints[0].base_url).toBe(getUrl('exporter-proj'));
+    });
+
+    test('an imported model is served while its import list gives it a URL', () => {
+        const [running] = mergeModels([], [makeProjectImports('importer-proj')]);
+        const [stopped] = mergeModels([], [makeProjectImports('importer-proj', null)]);
+
+        expect(isModelServed(running)).toBe(true);
+        expect(isModelServed(stopped)).toBe(false);
     });
 
     test('an imported model is running with a URL and stopped without one', () => {

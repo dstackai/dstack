@@ -43,5 +43,8 @@ export const useModel = (projectName: IProject['project_name'], modelName: IMode
         // Not while a request runs, and not when one has failed
         isNotFound: !isLoading && !error && !model,
         hasUsage: !!model && hasModelUsage(model, imports.projects, userData),
+        // The user's projects and their import lists, for the Exports tab
+        projects: imports.projects,
+        projectsImports: imports.projectsImports,
     } as const;
 };

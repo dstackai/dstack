@@ -6,6 +6,7 @@ import notificationsReducer from 'components/Notifications/slice';
 import { artifactApi } from 'services/artifact';
 import { authApi } from 'services/auth';
 import { eventApi } from 'services/events';
+import { exportApi } from 'services/export';
 import { fleetApi } from 'services/fleet';
 import { gatewayApi } from 'services/gateway';
 import { importApi } from 'services/import';
@@ -51,6 +52,7 @@ export const store = configureStore({
         [eventApi.reducerPath]: eventApi.reducer,
         [templateApi.reducerPath]: templateApi.reducer,
         [importApi.reducerPath]: importApi.reducer,
+        [exportApi.reducerPath]: exportApi.reducer,
         [meteringApi.reducerPath]: meteringApi.reducer,
     },
 
@@ -76,6 +78,7 @@ export const store = configureStore({
             .concat(repoApi.middleware)
             .concat(templateApi.middleware)
             .concat(importApi.middleware)
+            .concat(exportApi.middleware)
             .concat(meteringApi.middleware)
             .concat(mainApi.middleware),
 });

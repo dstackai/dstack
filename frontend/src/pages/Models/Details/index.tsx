@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, Outlet, useMatch, useParams } from 'react-router-dom';
+import { Navigate, useParams, useSearchParams } from 'react-router-dom';
+import { product } from 'product';
 
 import {
     Alert,
@@ -12,6 +13,7 @@ import {
     DetailsHeader,
     Loader,
     Modal,
+    SelectCSD,
     SpaceBetween,
     Tabs,
     TokenVisibilityButton,
@@ -23,14 +25,18 @@ import { ROUTES } from 'routes';
 
 import { selectAuthToken } from 'App/slice';
 
+import { ModelExports } from './Exports';
 import { getCurlModelCode, getModelUrl, getPythonModelCode } from './helpers';
 import { useModel } from './hooks';
+import { ModelDetails } from './ModelDetails';
+import { ModelUsage } from './Usage';
 
 import styles from './styles.module.scss';
 
 enum ModelTab {
     Details = 'details',
-    Usage = 'usage',
+    Exports = 'exports',
+    Metering = 'metering',
 }
 
 enum CodeTab {
@@ -44,12 +50,19 @@ export const ModelDetailsPage: React.FC = () => {
     const [viewCodeVisible, setViewCodeVisible] = useState<boolean>(false);
     const [codeTab, setCodeTab] = useState<CodeTab>(CodeTab.Python);
     const [isTokenVisible, setIsTokenVisible] = useState<boolean>(false);
+    const [codeProjectName, setCodeProjectName] = useState<IProject['project_name']>();
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
-    const paramModelName = params.modelName ?? '';
-    const matchUsage = useMatch(ROUTES.MODELS.DETAILS.USAGE.TEMPLATE);
+    const paramModelName = params['*'] ?? '';
+    const [searchParams] = useSearchParams();
+    const isMeteringTab = searchParams.get('tab') === ROUTES.MODELS.DETAILS.METERING.TAB;
+    // Exports exist only where the server enables them
+    const isExportsTab = product.hasExports && searchParams.get('tab') === ROUTES.MODELS.DETAILS.EXPORTS.TAB;
 
-    const { model, isLoading, error, isNotFound, hasUsage } = useModel(paramProjectName, paramModelName);
+    const { model, isLoading, error, isNotFound, hasUsage, projects, projectsImports } = useModel(
+        paramProjectName,
+        paramModelName,
+    );
 
     useBreadcrumbs([
         {
@@ -83,16 +96,24 @@ export const ModelDetailsPage: React.FC = () => {
 
     const displayedToken = isTokenVisible ? token : TOKEN_MASK;
 
-    const pythonCode = getPythonModelCode({ model, token: displayedToken });
+    // The user's projects through which the model can be accessed now. The code is for the chosen one, else for the first
+    const codeProjectOptions = (model?.endpoints ?? [])
+        .filter(({ base_url }) => base_url)
+        .map(({ project_name }) => ({ label: project_name, value: project_name }));
 
-    const curlCode = getCurlModelCode({ model, token: displayedToken });
+    const codeProjectOption = codeProjectOptions.find(({ value }) => value === codeProjectName) ?? codeProjectOptions[0];
+    const codeParams = { model, projectName: codeProjectOption?.value };
+
+    const pythonCode = getPythonModelCode({ ...codeParams, token: displayedToken });
+
+    const curlCode = getCurlModelCode({ ...codeParams, token: displayedToken });
 
     const onCopyCode = () => {
         switch (codeTab) {
             case CodeTab.Python:
-                return copyToClipboard(getPythonModelCode({ model, token }));
+                return copyToClipboard(getPythonModelCode({ ...codeParams, token }));
             case CodeTab.Curl:
-                return copyToClipboard(getCurlModelCode({ model, token }));
+                return copyToClipboard(getCurlModelCode({ ...codeParams, token }));
         }
     };
 
@@ -102,10 +123,15 @@ export const ModelDetailsPage: React.FC = () => {
             id: ModelTab.Details,
             href: ROUTES.MODELS.DETAILS.FORMAT(paramProjectName, paramModelName),
         },
+        product.hasExports && {
+            label: t('models.exports.title'),
+            id: ModelTab.Exports,
+            href: ROUTES.MODELS.DETAILS.EXPORTS.FORMAT(paramProjectName, paramModelName),
+        },
         hasUsage && {
-            label: t('models.usage.title'),
-            id: ModelTab.Usage,
-            href: ROUTES.MODELS.DETAILS.USAGE.FORMAT(paramProjectName, paramModelName),
+            label: t('models.metering'),
+            id: ModelTab.Metering,
+            href: ROUTES.MODELS.DETAILS.METERING.FORMAT(paramProjectName, paramModelName),
         },
     ].filter(Boolean) as {
         label: string;
@@ -113,8 +139,11 @@ export const ModelDetailsPage: React.FC = () => {
         href: string;
     }[];
 
-    // A user who doesn't get the Usage tab doesn't get its page either
-    if (model && matchUsage && !hasUsage) {
+    const activeTabId = isMeteringTab ? ModelTab.Metering : isExportsTab ? ModelTab.Exports : ModelTab.Details;
+    const modelKey = `${paramProjectName}/${paramModelName}`;
+
+    // A user who doesn't get the Metering tab doesn't get its page either
+    if (model && isMeteringTab && !hasUsage) {
         return <Navigate to={ROUTES.MODELS.DETAILS.FORMAT(paramProjectName, paramModelName)} replace />;
     }
 
@@ -126,7 +155,7 @@ export const ModelDetailsPage: React.FC = () => {
                         title={paramModelName}
                         actionButtons={
                             <Button disabled={!getModelUrl(model)} onClick={() => setViewCodeVisible(true)}>
-                                {t('models.code')}
+                                {t('models.endpoint')}
                             </Button>
                         }
                     />
@@ -142,17 +171,21 @@ export const ModelDetailsPage: React.FC = () => {
 
                 {model && (
                     <>
-                        <Tabs withNavigation tabs={tabs} activeTabId={matchUsage ? ModelTab.Usage : ModelTab.Details} />
+                        <Tabs withNavigation tabs={tabs} activeTabId={activeTabId} />
 
                         {/* Remount tabs on model change so the chat and the filters of one model don't show for another */}
-                        <Outlet key={`${paramProjectName}/${paramModelName}`} context={model} />
+                        {activeTabId === ModelTab.Details && <ModelDetails key={modelKey} model={model} />}
+                        {activeTabId === ModelTab.Exports && (
+                            <ModelExports key={modelKey} model={model} projects={projects} projectsImports={projectsImports} />
+                        )}
+                        {activeTabId === ModelTab.Metering && <ModelUsage key={modelKey} model={model} />}
                     </>
                 )}
             </ContentLayout>
 
             <Modal
                 visible={viewCodeVisible}
-                header={t('models.details.view_code')}
+                header={t('models.endpoint')}
                 size="large"
                 footer={
                     <Box float="right">
@@ -177,6 +210,18 @@ export const ModelDetailsPage: React.FC = () => {
                         <Tabs
                             onChange={({ detail }) => setCodeTab(detail.activeTabId as CodeTab)}
                             activeTabId={codeTab}
+                            actions={
+                                codeProjectOptions.length > 1 && (
+                                    <div className={styles.codeProject}>
+                                        <SelectCSD
+                                            inlineLabelText={t('models.project')}
+                                            selectedOption={codeProjectOption}
+                                            options={codeProjectOptions}
+                                            onChange={({ detail }) => setCodeProjectName(detail.selectedOption.value)}
+                                        />
+                                    </div>
+                                )
+                            }
                             tabs={[
                                 {
                                     label: 'python',

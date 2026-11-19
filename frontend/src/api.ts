@@ -128,6 +128,8 @@ export const API = {
         TEMPLATES_LIST: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/templates/list`,
         // IMPORTS
         IMPORTS_LIST: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/imports/list`,
+        // EXPORTS
+        EXPORTS_LIST: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/exports/list`,
     },
 
     BACKENDS: {

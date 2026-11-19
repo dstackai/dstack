@@ -14,10 +14,15 @@ import { Message } from './types';
 export const MAX_TOKENS = 4096;
 
 /**
- * The URL through which the user accesses the model, for the page, the chat and the code. It is the URL of the first
- * model endpoint: of the model's own project for its members, else of the first of the user's projects that imports it.
+ * The URL through which the user accesses the model, for the chat and the code: the model endpoint of `projectName`,
+ * else the first one, which is of the model's own project for its members, else of the first of the user's projects
+ * that imports it.
  */
-export const getModelUrl = (model?: IModelExtended) => getModelGateway(model?.endpoints[0]?.base_url);
+export const getModelUrl = (model?: IModelExtended, projectName?: IProject['project_name']) => {
+    const endpoint = model?.endpoints.find(({ project_name }) => project_name === projectName) ?? model?.endpoints[0];
+
+    return getModelGateway(endpoint?.base_url);
+};
 
 type TChatCompletionChunk = OpenAI.Chat.Completions.ChatCompletionChunk;
 
@@ -50,11 +55,18 @@ export const addChunkToMessage = (message: Message, chunk: TChatCompletionChunk)
  */
 const getModelNameLiteral = (model?: IModelExtended) => JSON.stringify(model?.name ?? '');
 
-export const getPythonModelCode = ({ model, token }: { model?: IModelExtended; token?: string }) => {
+type TModelCodeParams = {
+    model?: IModelExtended;
+    // The project whose model endpoint the code uses
+    projectName?: IProject['project_name'];
+    token?: string;
+};
+
+export const getPythonModelCode = ({ model, projectName, token }: TModelCodeParams) => {
     return `from openai import OpenAI
 client = OpenAI(
     api_key="${token}",
-    base_url="${getModelUrl(model)}"
+    base_url="${getModelUrl(model, projectName)}"
 )
 
 response = client.chat.completions.create(
@@ -70,8 +82,8 @@ response = client.chat.completions.create(
 )`;
 };
 
-export const getCurlModelCode = ({ model, token }: { model?: IModelExtended; token?: string }) => {
-    const url = getModelUrl(model).replace(/\/$/, '') + '/chat/completions';
+export const getCurlModelCode = ({ model, projectName, token }: TModelCodeParams) => {
+    const url = getModelUrl(model, projectName).replace(/\/$/, '') + '/chat/completions';
     // The body is in single quotes, which a single quote of the name would end
     const modelName = getModelNameLiteral(model).replace(/'/g, `'\\''`);
 
@@ -92,7 +104,7 @@ export const getCurlModelCode = ({ model, token }: { model?: IModelExtended; tok
 };
 
 /**
- * The Usage tab is for global admins and for the admins of the project that runs the model
+ * The Metering tab, with a model's usage, is for global admins and for the admins of the project that runs the model
  * or of a project that imports it, where the server has the metering API.
  */
 export const hasModelUsage = (model: IModelExtended, projects: IProject[], user: IUser | null): boolean => {
