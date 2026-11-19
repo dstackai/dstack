@@ -30,7 +30,7 @@ export const relativeOptions: DateRangePickerProps.RelativeOption[] = [
 ];
 
 export const useTimeRange = ({ withSearchParams, ascending }: { withSearchParams?: boolean; ascending: boolean }) => {
-    const { t } = useTranslation();
+    const isValidRange = useIsValidRange();
     const [searchParams, setSearchParams] = useSearchParams();
 
     const [timeRange, setTimeRange] = useState<DateRangePickerProps.Value | null>(() =>
@@ -94,7 +94,20 @@ export const useTimeRange = ({ withSearchParams, ascending }: { withSearchParams
         [ascending, start, end],
     );
 
-    const isValidRange: DateRangePickerProps.ValidationFunction = (range) => {
+    return {
+        timeRange,
+        onChangeTimeRange,
+        isValidRange,
+        refreshRelativeTimeRange,
+        requestParams,
+        isPastEnd,
+    } as const;
+};
+
+export const useIsValidRange = (): DateRangePickerProps.ValidationFunction => {
+    const { t } = useTranslation();
+
+    return (range) => {
         if (range?.type === 'absolute') {
             if (!range.startDate || !range.endDate) {
                 return { valid: false, errorMessage: t('events.time_range_incomplete') };
@@ -111,15 +124,6 @@ export const useTimeRange = ({ withSearchParams, ascending }: { withSearchParams
 
         return { valid: true };
     };
-
-    return {
-        timeRange,
-        onChangeTimeRange,
-        isValidRange,
-        refreshRelativeTimeRange,
-        requestParams,
-        isPastEnd,
-    } as const;
 };
 
 const getTimeRangeBounds = (timeRange: DateRangePickerProps.Value | null, now: Date): { start?: Date; end?: Date } => {

@@ -3,10 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 
-import type { PropertyFilterProps } from 'components';
+import type { PropertyFilterProps, ToggleProps } from 'components';
 import { Button, ListEmptyMessage, NavigateLink, TableProps } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
+import { useLocalStorageState } from 'hooks';
 import {
     EMPTY_QUERY,
     getNamePatternFilterRequestParams,
@@ -18,9 +19,9 @@ import { ROUTES } from 'routes';
 import { useLazyGetProjectsQuery } from 'services/project';
 import { useLazyGetUserListQuery } from 'services/user';
 
-import { getModelGateway } from '../helpers';
+import { ModelStatus } from '../components/ModelStatus';
 
-import { IModelExtended } from './types';
+import { IModelExtended, TModelsFilters } from './types';
 
 export const useColumnsDefinitions = () => {
     const { t } = useTranslation();
@@ -31,62 +32,64 @@ export const useColumnsDefinitions = () => {
             header: t('models.model_name'),
             cell: (item) => {
                 return (
-                    <NavigateLink href={ROUTES.MODELS.DETAILS.FORMAT(item.project_name, item.run_name)}>
-                        {item.name}
-                    </NavigateLink>
+                    <NavigateLink href={ROUTES.MODELS.DETAILS.FORMAT(item.project_name, item.name)}>{item.name}</NavigateLink>
                 );
             },
         },
         {
-            id: 'type',
-            header: `${t('models.type')}`,
-            cell: (item) => item.type,
+            id: 'status',
+            header: `${t('models.status')}`,
+            cell: (item) => <ModelStatus model={item} />,
         },
         {
-            id: 'url',
-            header: `${t('models.url')}`,
-            cell: (item) => getModelGateway(item.base_url),
+            id: 'project',
+            header: `${t('models.project')}`,
+            cell: (item) => (
+                <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(item.project_name)}>{item.project_name}</NavigateLink>
+            ),
         },
         {
             id: 'run',
             header: `${t('models.run')}`,
-            cell: (item) => (
-                <NavigateLink
-                    href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(item.project_name, item.run_name ?? 'No run name')}
-                >
-                    {item.run_name}
-                </NavigateLink>
-            ),
+            cell: (item) =>
+                item.run ? (
+                    <NavigateLink href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(item.project_name, item.run.id)}>
+                        {item.run.run_name}
+                    </NavigateLink>
+                ) : (
+                    '-'
+                ),
         },
         {
             id: 'resources',
             header: `${t('models.resources')}`,
-            cell: (item) => item.resources,
+            cell: (item) => item.run?.resources ?? '-',
         },
         {
             id: 'price',
             header: `${t('models.price')}`,
-            cell: (item) => (item.price ? `$${item.price}` : null),
+            cell: (item) => (item.run?.price ? `$${item.run.price}` : '-'),
         },
         {
             id: 'submitted_at',
             header: `${t('models.submitted_at')}`,
-            cell: (item) => format(new Date(item.submitted_at), DATE_TIME_FORMAT),
+            cell: (item) => (item.run ? format(new Date(item.run.submitted_at), DATE_TIME_FORMAT) : '-'),
         },
         {
             id: 'user',
             header: `${t('models.user')}`,
-            cell: (item) => <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.user)}>{item.user}</NavigateLink>,
+            cell: (item) =>
+                item.run ? <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.run.user)}>{item.run.user}</NavigateLink> : '-',
         },
         {
             id: 'repository',
             header: `${t('models.repository')}`,
-            cell: (item) => item.repository,
+            cell: (item) => item.run?.repository ?? '-',
         },
         {
             id: 'backend',
             header: `${t('models.backend')}`,
-            cell: (item) => item.backend,
+            cell: (item) => item.run?.backend ?? '-',
         },
     ];
 
@@ -125,7 +128,7 @@ export const useEmptyMessages = ({
     return { renderEmptyMessage, renderNoMatchMessage } as const;
 };
 
-type RequestParamsKeys = keyof Pick<TRunsRequestParams, 'project_name' | 'username'>;
+type RequestParamsKeys = keyof TModelsFilters;
 
 const filterKeys: Record<string, RequestParamsKeys> = {
     PROJECT_NAME: 'project_name',
@@ -136,7 +139,7 @@ const limit = 100;
 
 export const useFilters = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-
+    const [onlyActive, setOnlyActive] = useLocalStorageState('model-list-filter-only-active', true);
     const [filteringOptions, setFilteringOptions] = useState<PropertyFilterProps.FilteringOption[]>([]);
     const [filteringStatusType, setFilteringStatusType] = useState<PropertyFilterProps.StatusType | undefined>();
     const [getProjects] = useLazyGetProjectsQuery();
@@ -181,10 +184,14 @@ export const useFilters = () => {
         });
     };
 
+    const onChangeOnlyActive: ToggleProps['onChange'] = ({ detail }) => {
+        setOnlyActive(detail.checked);
+    };
+
     const filteringRequestParams = useMemo(() => {
         return tokensToRequestParams<RequestParamsKeys>({
             tokens: propertyFilterQuery.tokens,
-        }) as Partial<TRunsRequestParams>;
+        }) as TModelsFilters;
     }, [propertyFilterQuery]);
 
     const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
@@ -226,6 +233,8 @@ export const useFilters = () => {
         onChangePropertyFilter,
         filteringOptions,
         filteringProperties,
+        onlyActive,
+        onChangeOnlyActive,
         filteringStatusType,
         handleLoadItems,
     } as const;

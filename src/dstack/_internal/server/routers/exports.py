@@ -43,6 +43,7 @@ async def create_export(
         importer_project_names=body.importer_projects,
         exported_fleet_names=body.exported_fleets,
         exported_gateway_names=body.exported_gateways,
+        exported_model_names=body.exported_models,
     )
 
 
@@ -66,6 +67,8 @@ async def update_export(
         remove_exported_fleet_names=body.remove_exported_fleets,
         add_exported_gateway_names=body.add_exported_gateways,
         remove_exported_gateway_names=body.remove_exported_gateways,
+        add_exported_model_names=body.add_exported_models,
+        remove_exported_model_names=body.remove_exported_models,
     )
 
 

@@ -219,6 +219,7 @@ gateway = [
     "uvloop>=0.18.0; sys_platform != 'win32' and platform_python_implementation != 'PyPy'",
     "aiorwlock",
     "aiocache",
+    "anyio",
     "httpx>=0.28.0",
     # Gateway authorization needs the pool cancellation and recovery fixes in httpx2 (#4338).
     "httpx2>=2.13.1",
@@ -230,6 +231,7 @@ server = [
     "uvicorn[standard]",
     "aiorwlock",
     "aiocache",
+    "anyio",
     "httpx>=0.28.0",
     "jinja2",
     "watchfiles",

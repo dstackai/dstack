@@ -11,6 +11,7 @@ import {
     getRunError,
     getRunPriority,
     getRunProbeStatuses,
+    getRunStatus,
     getRunStatusMessage,
     getStatusIconColor,
     getStatusIconType,
@@ -18,7 +19,6 @@ import {
 import { ROUTES } from 'routes';
 import { useGetRunQuery } from 'services/run';
 
-import { finishedRunStatuses } from 'pages/Runs/constants';
 import { runIsStopped } from 'pages/Runs/utils';
 
 import {
@@ -67,13 +67,7 @@ export const RunDetails = () => {
 
     if (!runData) return null;
 
-    const status = finishedRunStatuses.includes(runData.status)
-        ? (runData.latest_job_submission?.status ?? runData.status)
-        : runData.status;
-
-    const terminationReason = finishedRunStatuses.includes(runData.status)
-        ? runData.latest_job_submission?.termination_reason
-        : null;
+    const { status, terminationReason } = getRunStatus(runData);
 
     const finishedAt = getRunListFinishedAt(runData);
 

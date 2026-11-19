@@ -44,6 +44,7 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     RunTerminationReason,
 )
+from dstack._internal.core.models.services import AnyModel, OpenAIChatModel, TGIChatModel
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.core.models.volumes import InstanceMountPoint, MountPoint
 from dstack._internal.server.models import JobModel, RunModel
@@ -65,6 +66,7 @@ from dstack._internal.server.testing.common import (
     create_project,
     create_repo,
     create_run,
+    create_service_run,
     create_user,
     get_auth_headers,
     get_fleet_configuration,
@@ -3785,9 +3787,11 @@ class TestApplyPlanServiceGatewayUpdate:
         user,
         gateway=None,
         gateway_field=None,
+        run_name: str = "test-service",
+        model: Optional[AnyModel] = None,
     ) -> Tuple[RunModel, RunSpec]:
         run_spec = get_run_spec(
-            run_name="test-service",
+            run_name=run_name,
             repo_id=repo.name,
             configuration=ServiceConfiguration(
                 type="service",
@@ -3795,6 +3799,7 @@ class TestApplyPlanServiceGatewayUpdate:
                 port=80,
                 gateway=gateway_field,
                 replicas=Range(min=1, max=1),
+                model=model,
             ),
         )
         validate_run_spec_and_set_defaults(user, run_spec)
@@ -4140,6 +4145,236 @@ class TestApplyPlanServiceGatewayUpdate:
         assert "Service assigned to gateway" not in event_messages
         assert "Service assigned to run without a gateway" not in event_messages
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("new_gateway_field", [False, "project-gateway"])
+    async def test_rejects_update_if_no_service_would_serve_exported_model(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        new_gateway_field: Union[bool, str],
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="my-gateway",
+            wildcard_domain="my-gateway.example",
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
+        project_gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="project-gateway",
+            wildcard_domain="${{ run.project_name }}.project-gateway.example",
+        )
+        await create_gateway_replica(
+            session=session, backend=backend, gateway_id=project_gateway.id
+        )
+        run_model, run_spec = await self._create_service_run(
+            session,
+            project,
+            repo,
+            user,
+            gateway=gateway,
+            gateway_field="my-gateway",
+            model=OpenAIChatModel(name="test-model", format="openai"),
+        )
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[],
+            exported_models=["test-model"],
+            name="models",
+        )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
+        run_spec.configuration.gateway = new_gateway_field
+
+        response = await self._apply(client, project, user, run_model, run_spec)
+        assert response.status_code == 400, response.json()
+        assert response.json()["detail"][0]["msg"] == (
+            "Cannot update 'test-service': 'test-model' is exported by 'models',"
+            " and no other service would serve it to importer projects."
+            " Start another service for the model, or remove it from the export first."
+        )
+        await session.refresh(run_model)
+        assert run_model.gateway_id == gateway.id
+
+    @pytest.mark.asyncio
+    async def test_updates_if_another_service_serves_exported_model(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="my-gateway",
+            wildcard_domain="my-gateway.example",
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
+        model = OpenAIChatModel(name="test-model", format="openai")
+        run_model, run_spec = await self._create_service_run(
+            session, project, repo, user, gateway=gateway, gateway_field="my-gateway", model=model
+        )
+        await create_service_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            gateway=gateway,
+            run_name="other-service",
+            model=model,
+        )
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[],
+            exported_models=["test-model"],
+            name="models",
+        )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
+        run_spec.configuration.gateway = False
+
+        response = await self._apply(client, project, user, run_model, run_spec)
+        assert response.status_code == 200, response.json()
+        await session.refresh(run_model)
+        assert run_model.gateway_id is None
+
+    @pytest.mark.asyncio
+    async def test_updates_if_service_still_serves_exported_model(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="my-gateway",
+            wildcard_domain="my-gateway.example",
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
+        other_gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="other-gateway",
+            wildcard_domain="other-gateway.example",
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=other_gateway.id)
+        run_model, run_spec = await self._create_service_run(
+            session,
+            project,
+            repo,
+            user,
+            gateway=gateway,
+            gateway_field="my-gateway",
+            model=OpenAIChatModel(name="test-model", format="openai"),
+        )
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[],
+            exported_models=["test-model"],
+            name="models",
+        )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
+        run_spec.configuration.gateway = "other-gateway"
+
+        response = await self._apply(client, project, user, run_model, run_spec)
+        assert response.status_code == 200, response.json()
+        await session.refresh(run_model)
+        assert run_model.gateway_id == other_gateway.id
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("model", "gateway_domain"),
+        [
+            pytest.param(
+                TGIChatModel(
+                    name="test-model", format="tgi", chat_template="test", eos_token="</s>"
+                ),
+                "my-gateway.example",
+                id="tgi-format",
+            ),
+            pytest.param(
+                OpenAIChatModel(name="test-model", format="openai"),
+                "${{ run.project_name }}.my-gateway.example",
+                id="project-name-in-gateway-domain",
+            ),
+        ],
+    )
+    async def test_updates_if_service_did_not_serve_exported_model(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        model: AnyModel,
+        gateway_domain: str,
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="my-gateway",
+            wildcard_domain=gateway_domain,
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
+        run_model, run_spec = await self._create_service_run(
+            session, project, repo, user, gateway=gateway, gateway_field="my-gateway", model=model
+        )
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[],
+            exported_models=["test-model"],
+            name="models",
+        )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
+        run_spec.configuration.gateway = False
+
+        response = await self._apply(client, project, user, run_model, run_spec)
+        assert response.status_code == 200, response.json()
+        await session.refresh(run_model)
+        assert run_model.gateway_id is None
+
 
 class TestStopRuns:
     @pytest.mark.asyncio
@@ -4375,7 +4610,7 @@ class TestSubmitService:
                 [("default-gateway", True), ("non-default-gateway", False)],
                 None,
                 "https://test-service.default-gateway.example",
-                "https://test-service.default-gateway.example/v1",
+                "https://gateway.default-gateway.example/test-project",
                 True,
                 "test-model",
                 id="submits-to-default-gateway",
@@ -4384,7 +4619,7 @@ class TestSubmitService:
                 [("default-gateway", True), ("non-default-gateway", False)],
                 True,
                 "https://test-service.default-gateway.example",
-                "https://test-service.default-gateway.example/v1",
+                "https://gateway.default-gateway.example/test-project",
                 True,
                 "test-model",
                 id="submits-to-default-gateway-when-gateway-true",
@@ -4393,7 +4628,7 @@ class TestSubmitService:
                 [("default-gateway", True), ("non-default-gateway", False)],
                 "non-default-gateway",
                 "https://test-service.non-default-gateway.example",
-                "https://test-service.non-default-gateway.example/v1",
+                "https://gateway.non-default-gateway.example/test-project",
                 True,
                 "test-model",
                 id="submits-to-specified-gateway",
@@ -4420,7 +4655,7 @@ class TestSubmitService:
                 [("default-gateway", True)],
                 None,
                 "https://test-service.default-gateway.example",
-                "https://gateway.default-gateway.example",
+                "https://gateway.default-gateway.example/test-project",
                 True,
                 {
                     "type": "chat",
@@ -4847,6 +5082,10 @@ class TestSubmitService:
             response.json()["service"]["url"]
             == "https://test-service.importer-project.example.com"
         )
+        assert (
+            response.json()["service"]["model"]["base_url"]
+            == "https://gateway.importer-project.example.com/importer-project"
+        )
 
     @pytest.mark.asyncio
     async def test_returns_error_if_imported_gateway_domain_has_unknown_variable(
@@ -5003,4 +5242,54 @@ class TestSubmitService:
         assert response.status_code == 400
         assert response.json() == {
             "detail": [{"msg": "Gateway does not accept new services", "code": "error"}]
+        }
+
+    @pytest.mark.asyncio
+    async def test_return_error_if_service_domain_is_taken_by_gateway_model_endpoint(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user, name="test-project")
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            wildcard_domain="example.com",
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
+        project.default_gateway_id = gateway.id
+        await session.commit()
+
+        response = await client.post(
+            f"/api/project/{project.name}/runs/apply",
+            headers=get_auth_headers(user.token),
+            json={
+                "plan": {
+                    "run_spec": get_service_run_spec(repo_id=repo.name, run_name="gateway"),
+                    "current_resource": None,
+                },
+                "force": False,
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": [
+                {
+                    "msg": (
+                        "Domain name 'gateway.example.com' is taken by the gateway's model"
+                        " endpoint. Please use a different run name"
+                    ),
+                    "code": "error",
+                }
+            ]
         }

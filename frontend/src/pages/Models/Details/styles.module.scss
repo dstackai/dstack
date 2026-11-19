@@ -1,79 +1,19 @@
-.modelDetailsLayout {
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - 159px);
-    margin-bottom: -40px;
-}
+.page {
+    height: 100%;
 
-.general {
-    flex-shrink: 0;
-}
-
-.modelForm {
-    position: relative;
-    flex-grow: 1;
-    min-height: 0;
-    display: grid;
-    grid-template-columns: 300px 1fr;
-    grid-template-rows: 60px 1fr auto;
-    grid-template-areas: "sidebar buttons"
-                          "sidebar chat"
-                          "sidebar form";
-}
-
-.side {
-    grid-area: sidebar;
-    border-right: 1px solid #b6bec9;
-    padding-right: 20px;
-    padding-top: 20px;
-
-    textarea {
-        resize: none !important;
+    & [class^="awsui_tabs-content"] {
+        display: none;
     }
-}
 
-.buttons {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 12px;
+    & > [class^="awsui_layout"] {
+        height: 100%;
 
-    & > button {
-        flex-shrink: 0;
-    }
-}
-
-.chat {
-    overflow-y: auto;
-    grid-area: chat;
-    padding: 0 20px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-
-    .message {
-        p {
-            white-space: pre-wrap;
+        & > [class^="awsui_content"] {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
         }
-    }
-}
-
-.messageForm {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    column-gap: 20px;
-    grid-area: form;
-    border-top: 1px solid #b6bec9;
-    margin-right: -20px;
-    padding: 20px;
-
-    textarea {
-        resize: none !important;
-        max-height: calc(100vh - 550px);
-    }
-
-    .buttons {
-        align-self: flex-end;
     }
 }
 

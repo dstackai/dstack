@@ -9,13 +9,12 @@ import {
     getRepoNameFromRun,
     getRunError,
     getRunPriority,
+    getRunStatus,
     getRunStatusMessage,
     getStatusIconColor,
     getStatusIconType,
 } from 'libs/run';
 import { ROUTES } from 'routes';
-
-import { finishedRunStatuses } from 'pages/Runs/constants';
 
 import {
     getRunListFinishedAt,
@@ -78,12 +77,7 @@ export const useColumnsDefinitions = () => {
             id: 'status',
             header: t('projects.run.status'),
             cell: (item: IRun) => {
-                const status = finishedRunStatuses.includes(item.status)
-                    ? (item.latest_job_submission?.status ?? item.status)
-                    : item.status;
-                const terminationReason = finishedRunStatuses.includes(item.status)
-                    ? item.latest_job_submission?.termination_reason
-                    : null;
+                const { status, terminationReason } = getRunStatus(item);
                 const statusMessage = getRunStatusMessage(item);
 
                 return (

@@ -12,9 +12,13 @@ import pytest_asyncio
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel
+from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 from dstack._internal.proxy.lib.services import service_connection
-from dstack._internal.proxy.lib.services.service_connection import ServiceConnectionPool
+from dstack._internal.proxy.lib.services.service_connection import (
+    ServiceConnectionPool,
+    get_service_replica_client,
+)
 from dstack._internal.proxy.lib.testing.common import make_project, make_service
 
 
@@ -446,6 +450,18 @@ class TestServiceConnectionPool:
         await pool.remove_all()
 
         tunnel.aclose.assert_awaited_once()
+
+    async def test_gateway_requests_to_service_share_client_until_it_is_removed(
+        self, service, pool
+    ):
+        repo = GatewayProxyRepo()
+        client = await get_service_replica_client(service, repo, pool)
+        assert await get_service_replica_client(service, repo, pool) is client
+        assert client.headers["Host"] == "service.gateway.test"
+
+        await pool.remove_nginx_client("service.gateway.test")
+        assert client.is_closed
+        assert await get_service_replica_client(service, repo, pool) is not client
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="reads /proc/net/unix")

@@ -7,6 +7,7 @@ class CreateExportRequest(CoreModel):
     importer_projects: list[str] = []
     exported_fleets: list[str] = []
     exported_gateways: list[str] = []
+    exported_models: list[str] = []
 
 
 class UpdateExportRequest(CoreModel):
@@ -19,6 +20,8 @@ class UpdateExportRequest(CoreModel):
     remove_exported_fleets: list[str] = []
     add_exported_gateways: list[str] = []
     remove_exported_gateways: list[str] = []
+    add_exported_models: list[str] = []
+    remove_exported_models: list[str] = []
 
 
 class DeleteExportRequest(CoreModel):

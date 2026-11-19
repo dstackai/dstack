@@ -24,7 +24,9 @@ import { EventsList as InstanceEventsList } from 'pages/Instances/Details/Events
 import { InstanceInspect } from 'pages/Instances/Details/Inspect';
 import { InstanceDetails } from 'pages/Instances/Details/InstanceDetails';
 import { ModelsList } from 'pages/Models';
-import { ModelDetails } from 'pages/Models/Details';
+import { ModelDetailsPage } from 'pages/Models/Details';
+import { ModelDetails } from 'pages/Models/Details/ModelDetails';
+import { ModelUsage } from 'pages/Models/Details/Usage';
 import {
     CreateProjectWizard,
     ProjectAdd,
@@ -242,7 +244,17 @@ export const router = createBrowserRouter([
             },
             {
                 path: ROUTES.MODELS.DETAILS.TEMPLATE,
-                element: <ModelDetails />,
+                element: <ModelDetailsPage />,
+                children: [
+                    {
+                        index: true,
+                        element: <ModelDetails />,
+                    },
+                    product.hasBilling && {
+                        path: ROUTES.MODELS.DETAILS.USAGE.TEMPLATE,
+                        element: <ModelUsage />,
+                    },
+                ].filter(Boolean) as RouteObject[],
             },
 
             // Events, Enterprise and above

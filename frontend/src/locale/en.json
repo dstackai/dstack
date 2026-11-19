@@ -603,9 +603,10 @@
 
     "models": {
         "model_name": "Name",
+        "status": "Status",
+        "project": "Project",
         "url": "URL",
         "gateway": "Gateway",
-        "type": "Type",
         "run": "Run",
         "resources": "Resources",
         "price": "Price",
@@ -614,6 +615,7 @@
         "repository": "Repository",
         "backend": "Backend",
         "code": "Code",
+        "active_only": "Active models",
         "empty_message_title": "No models",
         "empty_message_text": "No models to display.",
         "nomatch_message_title": "No matches",
@@ -621,14 +623,30 @@
         "nomatch_message_button_label": "Clear filter",
 
         "details": {
+            "title": "Details",
             "instructions": "System",
             "instructions_description": "Specify system",
             "message_placeholder": "Enter your question",
             "chat_empty_title": "No messages yet",
             "chat_empty_message": "Please start a chat",
-            "run_name": "Run name",
+            "thinking": "Thinking",
+            "reply_cut": "The reply was cut at the limit of {{limit}} tokens.",
             "view_code": "View code",
             "view_code_description": "You can use the following code to start integrating your current prompt and settings into your application."
+        },
+
+        "usage": {
+            "title": "Usage",
+            "day": "Day",
+            "month": "Month",
+            "day_utc": "Day (UTC)",
+            "month_utc": "Month (UTC)",
+            "total": "Total",
+            "input_tokens": "Input tokens",
+            "cached_input_tokens": "Cached input tokens",
+            "output_tokens": "Output tokens",
+            "empty_message_title": "No usage",
+            "empty_message_text": "No usage to display."
         }
     },
 

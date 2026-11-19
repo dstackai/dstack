@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Literal, Optional, Union
 
+from pydantic import BaseModel, ConfigDict
+
 from dstack._internal.core.models.common import CoreModel
 
 
@@ -25,6 +27,26 @@ class ChatCompletionsRequest(CoreModel):
     tools: List[Any] = []
     tool_choice: Union[Literal["none", "auto"], Dict] = {}
     user: Optional[str] = None
+
+
+class ChatCompletionsStreamOptions(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    include_usage: Optional[bool] = None
+    continuous_usage_stats: Optional[bool] = None
+
+
+class ChatCompletionsPassthroughRequest(BaseModel):
+    """
+    A chat completions request that is forwarded to the model as is.
+    Declares only the fields that dstack-proxy reads or sets.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    model: str
+    stream: Optional[bool] = None
+    stream_options: Optional[ChatCompletionsStreamOptions] = None
 
 
 class ChatCompletionsChoice(CoreModel):
