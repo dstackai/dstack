@@ -22,7 +22,7 @@ The pipeline processes each row at most once per cleanup interval (`DSTACK_SERVE
 
 Processing a row:
 
-- STEP 1: Check whether the backend may have new orphans: it was never cleaned up, the cleanup mode changed, or the project had instance or job activity since the last clean cleanup (`clean_at`). If not, the row is only marked processed. Checking activity here rather than in the fetch query keeps fetching cheap regardless of project sizes, at the cost of a small query and row update per enrolled backend per interval.
+- STEP 1: Check whether the backend may have new orphans: it was never cleaned up, the cleanup mode changed, or the project had instance activity or job activity in its fleets since the last clean cleanup (`clean_at`). If not, the row is only marked processed. Checking activity here rather than in the fetch query keeps fetching cheap regardless of project sizes, at the cost of a small query and row update per enrolled backend per interval.
 - STEP 2: List the backend's resource groups (`list_resource_groups()`). A resource group is one provisioning attempt as found in the provider: the owner resource (`primary_id`, the instance) and internal resources created with it.
 - STEP 3: Load the project's `ProviderRefModel` records and their instances (including soft-deleted ones) by `provider_ref`, in one statement. An instance is committed with its record, so it can't be missed while the record is seen.
 - STEP 4: Classify each group:

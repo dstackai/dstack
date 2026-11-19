@@ -108,6 +108,7 @@ class LiumCompute(ComputeWithFilteredOffersCached, ComputeWithVolumeSupport, Com
         run: Run,
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
+        project_name: str,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
@@ -117,7 +118,7 @@ class LiumCompute(ComputeWithFilteredOffersCached, ComputeWithVolumeSupport, Com
     ) -> JobProvisioningData:
         volume_commands = _get_volume_commands(run, job, volumes)
         instance_name = generate_unique_instance_name_for_job(
-            run, job, max_length=MAX_INSTANCE_NAME_LEN
+            run, job, project_name, max_length=MAX_INSTANCE_NAME_LEN
         )
         authorized_keys = build_authorized_keys(project_ssh_public_key, extra_authorized_keys)
         # CLI keys also need forwarding access through Lium's root SSH service.

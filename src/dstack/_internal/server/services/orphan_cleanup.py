@@ -4,12 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.backends.base.compute import generate_provider_ref
 from dstack._internal.core.models.backends.orphans import OwnerType
-from dstack._internal.server.models import ProjectModel, ProviderRefModel
+from dstack._internal.server.models import ProviderRefModel
 
 
 def issue_provider_ref(
     session: AsyncSession,
-    project: ProjectModel,
+    project_id: uuid.UUID,
     owner_type: OwnerType,
     owner_id: uuid.UUID,
     owner_name: str,
@@ -23,7 +23,7 @@ def issue_provider_ref(
     session.add(
         ProviderRefModel(
             provider_ref=provider_ref,
-            project_id=project.id,
+            project_id=project_id,
             owner_type=owner_type,
             owner_id=owner_id,
             owner_name=owner_name,

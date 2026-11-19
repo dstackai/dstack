@@ -108,6 +108,7 @@ class DaytonaCompute(ComputeWithFilteredOffersCached, ComputeWithVolumeSupport, 
         run: Run,
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
+        project_name: str,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
@@ -120,7 +121,7 @@ class DaytonaCompute(ComputeWithFilteredOffersCached, ComputeWithVolumeSupport, 
         if not image_name or re.search(r"\s", image_name):
             raise ComputeError("Invalid Daytona container image name")
         instance_name = generate_unique_instance_name_for_job(
-            run, job, max_length=MAX_INSTANCE_NAME_LEN
+            run, job, project_name, max_length=MAX_INSTANCE_NAME_LEN
         )
         commands = get_docker_commands(
             build_authorized_keys(project_ssh_public_key, extra_authorized_keys)

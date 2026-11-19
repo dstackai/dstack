@@ -10,6 +10,7 @@ import gpuhunt
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import ComputeWithPlacementGroupSupport
 from dstack._internal.core.backends.features import (
+    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
     BACKENDS_WITH_INSTANCE_VOLUMES_SUPPORT,
     BACKENDS_WITH_MULTINODE_SUPPORT,
     BACKENDS_WITH_PRIVILEGED_SUPPORT,
@@ -44,6 +45,7 @@ async def get_offers_by_requirements(
     volumes: Optional[List[List[Volume]]] = None,
     privileged: bool = False,
     instance_mounts: bool = False,
+    create_instance_support: bool = False,
     placement_group: Optional[PlacementGroup] = None,
     blocks: Union[int, Literal["auto"]] = 1,
     max_offers: Optional[int] = None,
@@ -87,6 +89,11 @@ async def get_offers_by_requirements(
         if backend_types is None:
             backend_types = BACKENDS_WITH_INSTANCE_VOLUMES_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_INSTANCE_VOLUMES_SUPPORT]
+
+    if create_instance_support:
+        if backend_types is None:
+            backend_types = BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
+        backend_types = [b for b in backend_types if b in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT]
 
     if requirements.reservation is not None:
         if backend_types is None:

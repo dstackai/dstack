@@ -39,6 +39,7 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     BackendModel,
+    FleetModel,
     InstanceModel,
     JobModel,
     OrphanCleanupModel,
@@ -363,10 +364,13 @@ async def _has_activity_since(
     # If `run_job()` fails after creating provider resources, the job is terminated and its
     # placeholder instance is deleted, so only the job's activity indicates possible orphans.
     # Finished jobs are no longer processed, so `last_processed_at` is the finish time.
+    # Jobs are matched by fleet, which is set before `run_job()` and belongs to the backend's
+    # project even if the job belongs to another project that imports the fleet.
     has_job_activity = (
         select(JobModel.id)
+        .join(FleetModel, FleetModel.id == JobModel.fleet_id)
         .where(
-            JobModel.project_id == project_id,
+            FleetModel.project_id == project_id,
             JobModel.status.in_(JobStatus.finished_statuses()),
             JobModel.last_processed_at >= since,
         )
