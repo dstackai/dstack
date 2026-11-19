@@ -40,7 +40,6 @@ env:
   - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 replicas:
   - count: 1
-    # For now replica group with router must have count: 1
     commands:
       - pip install smg
       - |

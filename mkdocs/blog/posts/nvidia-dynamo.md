@@ -18,8 +18,8 @@ With the latest update, `dstack` added native support for NVIDIA Dynamo with Pre
 
 <!-- more -->
 
-!!! note "Deprecation notice"
-    The `DSTACK_ROUTER_INTERNAL_IP` environment variable used in this blog post is no longer supported. For the modern approach, see the [NVIDIA Dynamo example](../../docs/examples/inference/dynamo.md).
+!!! note "Update"
+    Since this post was published, `dstack` has removed the `DSTACK_ROUTER_INTERNAL_IP` environment variable used here and lifted most of the limitations listed below: the router replica group can have multiple replicas, and services with a Dynamo router support `retry` and in-place updates. For the current approach, see the [NVIDIA Dynamo example](../../docs/examples/inference/dynamo.md).
 
 ## About NVIDIA Dynamo
 
