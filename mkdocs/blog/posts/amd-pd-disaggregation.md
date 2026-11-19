@@ -198,7 +198,6 @@ $ curl http://localhost:3000/proxy/services/main/amd-sglang-pd-service/v1/chat/c
 Requests are routed to SMG, which selects the prefill and decode workers for each request. The prefill worker processes the prompt, the decode worker continues generation, and Mooncake transfers the KV cache between them over RoCE. `dstack` registers and deregisters workers with SMG as replicas are added or removed, runs the `/health` probe on each replica, and scales each replica group independently.
 
 !!! info "Limitations"
-    - Currently, only one router replica per service is supported.
     - The example uses the SGLang inference backend for prefill and decode workers. vLLM backend support is coming soon.
     - Autoscaling supports the RPS metric. TTFT and ITL-based autoscaling support is coming soon.
 
