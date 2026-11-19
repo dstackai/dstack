@@ -5,6 +5,8 @@ declare interface IImportExportedModel {
 }
 
 declare interface IImportExport {
+    name: string;
+    // The project that exports
     project_name: IProject['project_name'];
     exported_models: IImportExportedModel[];
 }

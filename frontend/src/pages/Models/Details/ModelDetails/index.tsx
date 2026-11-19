@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useOutletContext } from 'react-router-dom';
 import reactStringReplace from 'react-string-replace';
 import OpenAI from 'openai';
 
@@ -20,20 +19,24 @@ import {
     NavigateLink,
     SpaceBetween,
     StatusIndicator,
+    UserAvatar,
 } from 'components';
 
-import { useAppSelector, useNotifications } from 'hooks';
+import { useAppSelector, useLocalStorageState, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
 
-import { selectAuthToken } from 'App/slice';
+import { selectAuthToken, selectUserName } from 'App/slice';
 
 import { ModelStatus } from '../../components/ModelStatus';
+import { isModelServed } from '../../helpers';
 import { addChunkToMessage, getModelUrl, MAX_TOKENS } from '../helpers';
 
 import { IModelExtended } from '../../List/types';
 import { FormValues, Message, Role } from '../types';
 
 import css from './styles.module.scss';
+
+const NO_MESSAGES: Message[] = [];
 
 const MESSAGE_ROLE_MAP: Record<Role, string> = {
     tool: 'Tool',
@@ -69,24 +72,42 @@ const Thinking: React.FC<{ text: string; hasAnswer: boolean }> = ({ text, hasAns
     );
 };
 
-export const ModelDetails: React.FC = () => {
+export const ModelDetails: React.FC<{ model: IModelExtended }> = ({ model }) => {
     const { t } = useTranslation();
     const token = useAppSelector(selectAuthToken);
-    const model = useOutletContext<IModelExtended>();
-    const [messages, setMessages] = useState<Message[]>([]);
+    const userName = useAppSelector(selectUserName);
+
+    // A user's chat with a model is kept in the browser, so that it survives a reload of the page
+    const [messages, storeMessages] = useLocalStorageState<Message[]>(
+        `model-chat/${userName}/${model.project_name}/${model.name}`,
+        NO_MESSAGES,
+    );
+
+    const messagesRef = useRef(messages);
+    messagesRef.current = messages;
+
+    const setMessages = (update: Message[] | ((messages: Message[]) => Message[])) => {
+        messagesRef.current = typeof update === 'function' ? update(messagesRef.current) : update;
+
+        try {
+            storeMessages(messagesRef.current);
+        } catch {
+            // The browser's storage is full: the chat goes on, and a reload loses what didn't fit
+        }
+    };
+
     const [loading, setLoading] = useState<boolean>(false);
     const openai = useRef<OpenAI>();
     const textAreaRef = useRef<HTMLDivElement>(null);
     const chatList = useRef<HTMLElement>();
     const [pushNotification] = useNotifications();
 
-    const messageForShowing = useMemo<Message[]>(() => messages.filter((m) => m.role !== 'system'), [messages]);
-
     // '...' stands for a reply that is on its way, while nothing of it has arrived yet
     const isAwaited = (message: Message, index: number) =>
-        loading && index === messageForShowing.length - 1 && !message.content && !message.thinking;
+        loading && index === messages.length - 1 && !message.content && !message.thinking;
 
-    const modelUrl = getModelUrl(model);
+    // The chat needs a model that a service serves. A stopped model keeps its URL for the Endpoint dialog only
+    const modelUrl = isModelServed(model) ? getModelUrl(model) : '';
 
     const scrollChatToBottom = () => {
         if (!chatList.current) return;
@@ -108,7 +129,7 @@ export const ModelDetails: React.FC = () => {
 
     useEffect(() => {
         scrollChatToBottom();
-    }, [messageForShowing]);
+    }, [messages]);
 
     const { handleSubmit, control, setValue, watch } = useForm<FormValues>();
 
@@ -131,16 +152,7 @@ export const ModelDetails: React.FC = () => {
             return;
         }
 
-        let newMessages: Message[];
-
-        const newMessage: Message = { role: 'user', content: data.message };
-        const messagesWithoutSystemMessage = messages.filter((m) => m.role !== 'system');
-
-        if (data.instructions?.length) {
-            newMessages = [{ role: 'system', content: data.instructions }, ...messagesWithoutSystemMessage, newMessage];
-        } else {
-            newMessages = [...messagesWithoutSystemMessage, newMessage];
-        }
+        const newMessages: Message[] = [...messages, { role: 'user', content: data.message }];
 
         setMessages(newMessages);
         setLoading(true);
@@ -190,7 +202,6 @@ export const ModelDetails: React.FC = () => {
 
     const clearChat = () => {
         setValue('message', '');
-        setValue('instructions', '');
 
         setMessages([]);
         setTimeout(onChangeMessage, 10);
@@ -268,14 +279,6 @@ export const ModelDetails: React.FC = () => {
                         </div>
 
                         <div>
-                            <Box variant="awsui-key-label">{t('models.status')}</Box>
-
-                            <div>
-                                <ModelStatus model={model} />
-                            </div>
-                        </div>
-
-                        <div>
                             <Box variant="awsui-key-label">{t('models.project')}</Box>
 
                             <div>
@@ -283,11 +286,6 @@ export const ModelDetails: React.FC = () => {
                                     {model.project_name}
                                 </NavigateLink>
                             </div>
-                        </div>
-
-                        <div>
-                            <Box variant="awsui-key-label">{t('models.url')}</Box>
-                            <div>{modelUrl || '-'}</div>
                         </div>
 
                         {model.run && (
@@ -303,45 +301,44 @@ export const ModelDetails: React.FC = () => {
                                 </div>
                             </div>
                         )}
+
+                        <div>
+                            <Box variant="awsui-key-label">{t('models.status')}</Box>
+
+                            <div>
+                                <ModelStatus model={model} />
+                            </div>
+                        </div>
                     </ColumnLayout>
                 </Container>
             </div>
 
             <form className={css.modelForm} onSubmit={handleSubmit(onSubmit)}>
                 <div className={css.buttons}>
-                    <Button iconName="remove" disabled={loading || !messages.length} onClick={clearChat} />
+                    <Button formAction="none" disabled={loading || !messages.length} onClick={clearChat}>
+                        {t('common.clear')}
+                    </Button>
                 </div>
 
-                <aside className={css.side}>
-                    <FormTextarea
-                        rows={4}
-                        disabled={loading}
-                        label={t('models.details.instructions')}
-                        constraintText={t('models.details.instructions_description')}
-                        control={control}
-                        name="instructions"
-                    />
-                </aside>
-
                 <div className={css.chat} ref={chatList}>
-                    {!messageForShowing.length && (
+                    {!messages.length && (
                         <ListEmptyMessage
                             title={t('models.details.chat_empty_title')}
                             message={t('models.details.chat_empty_message')}
                         />
                     )}
 
-                    {messageForShowing.map((message, index) => (
+                    {messages.map((message, index) => (
                         <div key={index} className={css.message}>
                             <ChatBubble
                                 ariaLabel=""
                                 type={message.role === 'user' ? 'outgoing' : 'incoming'}
                                 avatar={
-                                    <Avatar
-                                        ariaLabel={MESSAGE_ROLE_MAP[message.role as keyof typeof MESSAGE_ROLE_MAP]}
-                                        color={message.role === 'user' ? 'default' : 'gen-ai'}
-                                        iconName={message.role === 'user' ? 'user-profile' : 'gen-ai'}
-                                    />
+                                    message.role === 'user' ? (
+                                        <UserAvatar userName={userName} size={28} />
+                                    ) : (
+                                        <Avatar ariaLabel={MESSAGE_ROLE_MAP[message.role]} color="gen-ai" iconName="gen-ai" />
+                                    )
                                 }
                             >
                                 <SpaceBetween size="xs">

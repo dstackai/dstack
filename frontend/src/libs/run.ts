@@ -114,10 +114,8 @@ export const getExtendedModelFromRun = (run: IRun): IModelExtended | null => {
     return {
         name: model.name,
         project_name: run.project_name,
-        // A finished run serves no model, so the model has no URL
-        endpoints: [
-            { project_name: run.project_name, base_url: finishedRunStatuses.includes(run.status) ? null : model.base_url },
-        ],
+        // A finished run keeps its URL: the model is back at it when the service is applied again
+        endpoints: [{ project_name: run.project_name, base_url: model.base_url }],
         run: {
             id: run.id,
             run_name: run?.run_spec.run_name ?? 'No run name',

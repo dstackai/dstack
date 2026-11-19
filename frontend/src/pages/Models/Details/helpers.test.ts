@@ -1,5 +1,7 @@
 import type OpenAI from 'openai';
 
+import { ROUTES } from 'routes';
+
 import { addChunkToMessage, getCurlModelCode, getPythonModelCode, hasModelUsage } from './helpers';
 
 import { IModelExtended } from '../List/types';
@@ -42,7 +44,43 @@ beforeEach(() => {
     mockHasBilling = true;
 });
 
+describe('Model address', () => {
+    test('keeps the slashes of the name and encodes the rest', () => {
+        expect(ROUTES.MODELS.DETAILS.FORMAT('exporter-proj', 'Qwen/Qwen3.8-27B-FP8')).toBe(
+            '/projects/exporter-proj/models/Qwen/Qwen3.8-27B-FP8',
+        );
+        expect(ROUTES.MODELS.DETAILS.FORMAT('exporter-proj', 'my model?/v1#x')).toBe(
+            '/projects/exporter-proj/models/my%20model%3F/v1%23x',
+        );
+        expect(ROUTES.MODELS.DETAILS.METERING.FORMAT('exporter-proj', 'Qwen/Qwen3.8-27B-FP8')).toBe(
+            '/projects/exporter-proj/models/Qwen/Qwen3.8-27B-FP8?tab=metering',
+        );
+    });
+
+    test('a name with an empty part between slashes is encoded as a whole', () => {
+        expect(ROUTES.MODELS.DETAILS.FORMAT('exporter-proj', 'a//b')).toBe('/projects/exporter-proj/models/a%2F%2Fb');
+    });
+});
+
 describe('Model code', () => {
+    test('is for the chosen project, else for the first of the projects that have the model', () => {
+        const twoProjects = {
+            ...model,
+            endpoints: [
+                ...model.endpoints,
+                { project_name: 'importer2-proj', base_url: 'https://gateway.example.com/importer2-proj' },
+            ],
+        };
+
+        expect(getPythonModelCode({ model: twoProjects })).toContain('base_url="https://gateway.example.com/importer-proj"');
+        expect(getPythonModelCode({ model: twoProjects, projectName: 'importer2-proj' })).toContain(
+            'base_url="https://gateway.example.com/importer2-proj"',
+        );
+        expect(getCurlModelCode({ model: twoProjects, projectName: 'importer2-proj' })).toContain(
+            'curl https://gateway.example.com/importer2-proj/chat/completions ',
+        );
+    });
+
     test('quotes in the name of a model end neither the Python string nor the curl body', () => {
         const quotedModel = { ...model, name: `it's a "model"` };
 
@@ -102,7 +140,7 @@ describe('Chat reply', () => {
     });
 });
 
-describe('Model usage tab', () => {
+describe('Model metering tab', () => {
     test('a global admin gets it', () => {
         expect(hasModelUsage(model, [], makeUser('admin'))).toBe(true);
     });

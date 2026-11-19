@@ -57,3 +57,10 @@ export const mergeModels = (models: IModelExtended[], projectsImports: TProjectI
  */
 export const getImportedModelStatus = (model: IModelExtended): 'running' | 'stopped' =>
     model.endpoints.some(({ base_url }) => base_url) ? 'running' : 'stopped';
+
+/**
+ * A model answers requests while a service serves it: a project's own model until its run is finished,
+ * an imported one while its import list gives it a URL. A model that isn't served keeps the URL of its last run.
+ */
+export const isModelServed = (model: IModelExtended): boolean =>
+    model.run ? !finishedJobs.includes(model.run.status) : getImportedModelStatus(model) === 'running';

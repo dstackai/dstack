@@ -11,17 +11,19 @@ export type TUsageFilters = Pick<TMeteringListRequestParams, 'project_name' | 'u
 
 const DATE_FORMAT = 'yyyy-MM-dd';
 
+export const DEFAULT_PERIOD: TUsagePeriod = 'day';
+
 export const DEFAULT_TIME_RANGE: DateRangePickerProps.RelativeOption = {
-    key: 'last-3-months',
-    amount: 3,
-    unit: 'month',
+    key: 'last-30-days',
+    amount: 30,
+    unit: 'day',
     type: 'relative',
 };
 
 export const relativeOptions: DateRangePickerProps.RelativeOption[] = [
     { key: 'last-7-days', amount: 7, unit: 'day', type: 'relative' },
-    { key: 'last-30-days', amount: 30, unit: 'day', type: 'relative' },
     DEFAULT_TIME_RANGE,
+    { key: 'last-3-months', amount: 3, unit: 'month', type: 'relative' },
 ];
 
 /**

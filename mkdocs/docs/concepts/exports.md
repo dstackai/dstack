@@ -234,7 +234,7 @@ $ dstack import list -v
 
 </div>
 
-In the UI, imported models show on the `Models` page, next to the project's own models. A model's page shows its URL.
+In the UI, imported models show on the `Models` page, next to the project's own models. On a model's page, the `Endpoint` button shows how to call the model at your project's URL, and the `Exports` tab lists the model's exports and the projects that import it.
 
 The URL is an OpenAI-compatible endpoint with `/models` and `/chat/completions`. Use a `dstack` user token of a member of the importer project as the API key:
 
