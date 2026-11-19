@@ -37,6 +37,7 @@ from dstack._internal.core.models.compute_groups import (
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     DevEnvironmentConfiguration,
+    ServiceConfiguration,
 )
 from dstack._internal.core.models.duration import OptionalIdleDuration
 from dstack._internal.core.models.envs import Env
@@ -96,7 +97,9 @@ from dstack._internal.core.models.runs import (
     RunSpec,
     RunStatus,
     RunTerminationReason,
+    ServiceSpec,
 )
+from dstack._internal.core.models.services import AnyModel
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
     AnyVolumeConfiguration,
@@ -115,6 +118,7 @@ from dstack._internal.server.models import (
     EventModel,
     ExportedFleetModel,
     ExportedGatewayModel,
+    ExportedModelModel,
     ExportModel,
     FileArchiveModel,
     FleetModel,
@@ -145,7 +149,9 @@ from dstack._internal.server.services.permissions import (
     set_default_permissions,
 )
 from dstack._internal.server.services.runner.client import RunnerJobSubmissionMismatchError
+from dstack._internal.server.services.services.options import get_service_options
 from dstack._internal.server.services.users import get_token_hash
+from dstack._internal.utils.common import get_or_error, interpolate_gateway_domain
 
 
 def mock_lease(value: Any) -> Mock:
@@ -442,6 +448,47 @@ async def create_run(
     return run
 
 
+async def create_service_run(
+    session: AsyncSession,
+    project: ProjectModel,
+    repo: RepoModel,
+    user: UserModel,
+    gateway: Optional[GatewayModel] = None,
+    run_name: str = "test-service",
+    model: Optional[AnyModel] = None,
+    status: RunStatus = RunStatus.RUNNING,
+) -> RunModel:
+    """
+    Creates a run of a service that runs on `gateway` or, without it, on the in-server proxy.
+    Fills `service_spec` the way submitting the run does, with the options of `model`.
+    """
+    configuration = ServiceConfiguration(commands=["serve"], port=8000, model=model)
+    run = await create_run(
+        session=session,
+        project=project,
+        repo=repo,
+        user=user,
+        gateway=gateway,
+        run_name=run_name,
+        status=status,
+        run_spec=get_run_spec(run_name=run_name, repo_id=repo.name, configuration=configuration),
+    )
+    if gateway is None:
+        service_url = f"/proxy/services/{project.name}/{run_name}/"
+    else:
+        domain = interpolate_gateway_domain(
+            domain=get_or_error(gateway.wildcard_domain),
+            run_project_name=project.name,
+            exception_type=None,
+        )
+        service_url = f"https://{run_name}.{domain}"
+    run.service_spec = ServiceSpec(
+        url=service_url, options=get_service_options(configuration)
+    ).model_dump_json()
+    await session.commit()
+    return run
+
+
 async def create_job(
     session: AsyncSession,
     run: RunModel,
@@ -640,6 +687,7 @@ async def create_export(
     exported_gateways: Optional[list[GatewayModel]] = None,
     name: str = "test-export",
     is_global: bool = False,
+    exported_models: Optional[list[str]] = None,
 ) -> ExportModel:
     export = ExportModel(
         name=name,
@@ -649,6 +697,9 @@ async def create_export(
         exported_fleets=[ExportedFleetModel(fleet=fleet) for fleet in exported_fleets],
         exported_gateways=[
             ExportedGatewayModel(gateway=gateway) for gateway in (exported_gateways or [])
+        ],
+        exported_models=[
+            ExportedModelModel(name=model_name) for model_name in (exported_models or [])
         ],
     )
     session.add(export)

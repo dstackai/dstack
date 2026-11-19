@@ -148,9 +148,25 @@ test('the token page does not wait for provider discovery', () => {
 });
 
 test('Factory inherits Enterprise features and Sky inherits Factory features', () => {
-    expect(getProductConfig('enterprise')).toMatchObject({ hasEvents: true, hasBilling: false, hasPresets: false });
+    expect(getProductConfig('enterprise')).toMatchObject({
+        hasEvents: true,
+        hasExports: true,
+        hasBilling: false,
+        hasPresets: false,
+    });
     for (const version of ['factory', 'sky']) {
-        expect(getProductConfig(version)).toMatchObject({ hasEvents: true, hasBilling: true, hasPresets: true });
+        expect(getProductConfig(version)).toMatchObject({
+            hasEvents: true,
+            hasExports: true,
+            hasBilling: true,
+            hasPresets: true,
+        });
     }
-    expect(getProductConfig(undefined)).toMatchObject({ id: 'oss', hasEvents: false, hasBilling: false, hasPresets: false });
+    expect(getProductConfig(undefined)).toMatchObject({
+        id: 'oss',
+        hasEvents: false,
+        hasExports: false,
+        hasBilling: false,
+        hasPresets: false,
+    });
 });

@@ -12,6 +12,7 @@ from dstack._internal.core.models.gateways import (
 from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.server.services.services import (
     _should_show_service_https,
+    get_gateway_endpoint_url,
     should_configure_service_https_on_gateway_replica,
 )
 from dstack._internal.server.testing.common import get_run_spec
@@ -114,3 +115,17 @@ class TestShouldShowServiceHttps:
         run_spec = _service_run_spec(https=False)
         gw = _gateway_config(certificate=LetsEncryptGatewayCertificate())
         assert _should_show_service_https(run_spec, gw) is False
+
+
+class TestGetGatewayEndpointUrl:
+    def test_returns_path_of_given_project(self) -> None:
+        url = get_gateway_endpoint_url(
+            "https://test-run.example.com", _gateway_config(), "other-project"
+        )
+        assert url == "https://gateway.example.com/other-project"
+
+    def test_uses_http_when_gateway_has_no_certificate(self) -> None:
+        url = get_gateway_endpoint_url(
+            "http://test-run.example.com", _gateway_config(certificate=None), "test-project"
+        )
+        assert url == "http://gateway.example.com/test-project"

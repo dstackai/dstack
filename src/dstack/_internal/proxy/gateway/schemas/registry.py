@@ -3,6 +3,7 @@ from typing import Annotated, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.proxy.gateway.models import ImportedModel
 from dstack._internal.proxy.lib.const import DEFAULT_SERVICE_READ_TIMEOUT
 from dstack._internal.proxy.lib.models import RateLimit
 
@@ -72,6 +73,22 @@ class RegisterEntrypointRequest(BaseModel):
     domain: str
     https: bool
     read_timeout: int = DEFAULT_SERVICE_READ_TIMEOUT
+
+
+class RegisterImportRequest(BaseModel):
+    export_id: str
+    exporter_project: str
+    name: str
+    """The model's name in the exporter project."""
+
+
+class UnregisterImportRequest(BaseModel):
+    export_id: str
+    name: str
+
+
+class ImportListResponse(BaseModel):
+    imports: list[ImportedModel]
 
 
 class ReplicaProxyJumpKeyUpdate(BaseModel):

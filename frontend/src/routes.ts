@@ -139,10 +139,19 @@ export const ROUTES = {
 
     MODELS: {
         LIST: '/models',
+        // A model's name can have slashes, so it's encoded
         DETAILS: {
-            TEMPLATE: `/projects/:projectName/models/:runName`,
-            FORMAT: (projectName: string, runName: string) =>
-                buildRoute(ROUTES.MODELS.DETAILS.TEMPLATE, { projectName, runName }),
+            TEMPLATE: `/projects/:projectName/models/:modelName`,
+            FORMAT: (projectName: string, modelName: string) =>
+                buildRoute(ROUTES.MODELS.DETAILS.TEMPLATE, { projectName, modelName: encodeURIComponent(modelName) }),
+            USAGE: {
+                TEMPLATE: `/projects/:projectName/models/:modelName/usage`,
+                FORMAT: (projectName: string, modelName: string) =>
+                    buildRoute(ROUTES.MODELS.DETAILS.USAGE.TEMPLATE, {
+                        projectName,
+                        modelName: encodeURIComponent(modelName),
+                    }),
+            },
         },
     },
 

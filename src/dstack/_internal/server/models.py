@@ -1370,6 +1370,10 @@ class ExportModel(BaseModel):
         back_populates="export",
         cascade=CASCADE_DEFAULT_WITH_DELETE_ORPHAN,
     )
+    exported_models: Mapped[List["ExportedModelModel"]] = relationship(
+        back_populates="export",
+        cascade=CASCADE_DEFAULT_WITH_DELETE_ORPHAN,
+    )
 
 
 class ImportModel(BaseModel):
@@ -1434,6 +1438,26 @@ class ExportedGatewayModel(BaseModel):
         ForeignKey("gateways.id", ondelete="CASCADE"), index=True
     )
     gateway: Mapped["GatewayModel"] = relationship()
+
+
+class ExportedModelModel(BaseModel):
+    __tablename__ = "exported_models"
+    __table_args__ = (
+        UniqueConstraint("export_id", "name", name="uq_exported_models_export_id_name"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    export_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("exports.id", ondelete="CASCADE"), index=True
+    )
+    export: Mapped["ExportModel"] = relationship()
+    name: Mapped[str] = mapped_column(Text)
+    """`name` is the name of the model in the export's project. The export holds the model
+    by its name and not by the service that declares it, so the model stays exported
+    when the service is stopped and applied again or replaced by another service.
+    """
 
 
 class UserPublicKeyModel(BaseModel):

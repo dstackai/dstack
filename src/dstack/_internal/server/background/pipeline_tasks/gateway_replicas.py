@@ -2,13 +2,14 @@ import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any, Optional, Sequence
+from typing import Any, Awaitable, Callable, Optional, Sequence
 
 from httpx import HTTPStatusError
 from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     InstrumentedAttribute,
+    aliased,
     joinedload,
     load_only,
     raiseload,
@@ -24,7 +25,8 @@ from dstack._internal.core.errors import BackendError, GatewayError
 from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
 from dstack._internal.core.models.instances import RemoteConnectionInfo
-from dstack._internal.core.models.runs import JobSpec, JobStatus, RunStatus, ServiceSpec
+from dstack._internal.core.models.runs import JobSpec, JobStatus, ServiceSpec
+from dstack._internal.proxy.gateway.models import ImportedModel
 from dstack._internal.proxy.gateway.schemas.registry import ReplicaProxyJumpKeyUpdate
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem
 from dstack._internal.server import settings
@@ -44,8 +46,11 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     BackendModel,
+    ExportedModelModel,
+    ExportModel,
     GatewayModel,
     GatewayReplicaModel,
+    ImportModel,
     InstanceModel,
     JobModel,
     ProjectModel,
@@ -56,6 +61,12 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import events
 from dstack._internal.server.services import gateways as gateways_services
 from dstack._internal.server.services.backends import cache as backends_cache
+from dstack._internal.server.services.exported_models import (
+    can_serve_importer_projects,
+    get_running_service_filters,
+    get_service_model,
+)
+from dstack._internal.server.services.exports import are_exports_enabled
 from dstack._internal.server.services.gateways import (
     get_gateway_configuration,
     get_gateway_lb_configuration,
@@ -686,17 +697,22 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
                 logger.warning("%s: failed to list services: %r", fmt(replica_model), e)
             await _commit_update(item, replica_model, update_map={})
             return
-    run_filters = (
-        RunModel.gateway_id == gateway_model.id,
-        RunModel.deleted == False,
-        RunModel.status.not_in(RunStatus.finished_statuses() + [RunStatus.TERMINATING]),
-    )
+        # Imports are synced only where exports are enabled.
+        currently_registered_imports = None
+        if are_exports_enabled():
+            currently_registered_imports = await _list_imports(client, replica_model)
+    await _run_process_running_gateway_replica_hooks(replica_model, connection)
+    run_filters = (RunModel.gateway_id == gateway_model.id, *get_running_service_filters())
     job_filters = (JobModel.status == JobStatus.RUNNING, JobModel.registered == True)
+    run_fields: list[InstrumentedAttribute[Any]] = [RunModel.id]
+    if currently_registered_imports is not None:
+        # The imports that the replica should have follow from the models of its services.
+        run_fields += [RunModel.project_id, RunModel.service_spec]
     stmt = (
         select(RunModel)
         .where(*run_filters)
         .options(
-            load_only(RunModel.id),
+            load_only(*run_fields),
             joinedload(RunModel.jobs).load_only(JobModel.id, JobModel.instance_id),
             with_loader_criteria(JobModel, and_(*job_filters)),
         )
@@ -717,6 +733,9 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
             )
         )
         instance_connection_info = res.all()
+        expected_imports: set[_ImportRef] = set()
+        if currently_registered_imports is not None:
+            expected_imports = await _get_expected_imports(session, gateway_model, expected_runs)
 
     # Parse keys and compare gateway state without holding a DB connection.
     instance_proxy_jump_public_keys = {}
@@ -735,6 +754,8 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
         currently_registered=currently_registered_services,
         expected=expected_runs,
         instance_proxy_jump_public_keys=instance_proxy_jump_public_keys,
+        currently_registered_imports=currently_registered_imports,
+        expected_imports=expected_imports,
     )
     async with get_session_ctx() as session:
         run_models_by_id, job_models_by_id = await _load_runs_and_jobs_for_state_sync(
@@ -771,6 +792,114 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
             sync_result,
             reconcile_records_result,
         )
+
+
+_PROCESS_RUNNING_GATEWAY_REPLICA_HOOKS: list[
+    Callable[[uuid.UUID, GatewayConnection], Awaitable[None]]
+] = []
+
+
+def register_process_running_gateway_replica_hook(
+    func: Callable[[uuid.UUID, GatewayConnection], Awaitable[None]],
+):
+    """
+    Registers `func` to be called with the ID of a running gateway replica and the connection
+    to it each time `GatewayReplicaPipeline` processes the replica and the replica responds.
+
+    The pipeline keeps the replica locked during the call, so server replicas do not call `func`
+    for the same gateway replica at once, unless the lock expires. `func` should not take long,
+    since the replica's services are synced only after it returns. If `func` raises,
+    the error is logged, and the replica is processed further.
+    """
+    _PROCESS_RUNNING_GATEWAY_REPLICA_HOOKS.append(func)
+
+
+async def _run_process_running_gateway_replica_hooks(
+    replica_model: GatewayReplicaModel, connection: GatewayConnection
+) -> None:
+    for hook in _PROCESS_RUNNING_GATEWAY_REPLICA_HOOKS:
+        try:
+            await hook(replica_model.id, connection)
+        except Exception:
+            logger.exception("%s: process running gateway replica hook failed", fmt(replica_model))
+
+
+async def _list_imports(
+    client: GatewayClient, replica_model: GatewayReplicaModel
+) -> Optional[list[ImportedModel]]:
+    """Returns `None` if the imports cannot be listed. They are not synced then."""
+    try:
+        return await client.list_imports()
+    except Exception as e:
+        if isinstance(e, HTTPStatusError) and e.response.status_code == 404:
+            logger.debug(
+                (
+                    "%s: got error 404 when listing imports, which indicates a gateway"
+                    " that is not updated yet. Skipping imports sync until the gateway is updated"
+                ),
+                fmt(replica_model),
+            )
+        else:
+            logger.warning("%s: failed to list imports: %r", fmt(replica_model), e)
+        return None
+
+
+async def _get_expected_imports(
+    session: AsyncSession, gateway_model: GatewayModel, expected_runs: Sequence[RunModel]
+) -> set["_ImportRef"]:
+    """
+    Returns the imports that the replicas of the gateway should have: for each of the runs
+    that can serve its model to importer projects, one per export of the run's project
+    that holds the model and per importer project of that export.
+
+    If a project imports models with the same name from several exports, only the import
+    from the oldest export is returned, since a gateway keeps one import per project and name.
+    """
+    # (project ID, model name) of the services that can serve their models to importer projects
+    served_models: set[tuple[uuid.UUID, str]] = set()
+    for run_model in expected_runs:
+        model = get_service_model(run_model)
+        if model is not None and can_serve_importer_projects(model, gateway_model):
+            served_models.add((run_model.project_id, model.name))
+    if not served_models:
+        return set()
+    exporter_project_alias = aliased(ProjectModel)
+    importer_project_alias = aliased(ProjectModel)
+    res = await session.execute(
+        select(
+            ExportModel.id,
+            ExportModel.project_id,
+            exporter_project_alias.name,
+            ExportedModelModel.name,
+            importer_project_alias.name,
+        )
+        .join(ExportModel.project.of_type(exporter_project_alias))
+        .join(ExportModel.exported_models)
+        .join(ExportModel.imports)
+        .join(ImportModel.project.of_type(importer_project_alias))
+        .where(
+            ExportModel.project_id.in_({project_id for project_id, _ in served_models}),
+            ExportedModelModel.name.in_({name for _, name in served_models}),
+            importer_project_alias.deleted == False,
+        )
+        .order_by(ExportModel.created_at, ExportModel.id)
+    )
+    rows = res.all()
+    # (importer project, model name) -> import
+    imports: dict[tuple[str, str], _ImportRef] = {}
+    for export_id, project_id, exporter_project_name, model_name, importer_project_name in rows:
+        if (project_id, model_name) not in served_models:
+            continue
+        # The gateway keeps project names in lower case.
+        import_ref = _ImportRef(
+            importer_project=importer_project_name.lower(),
+            export_id=export_id,
+            exporter_project=exporter_project_name.lower(),
+            name=model_name,
+        )
+        # The rows start with the oldest export, whose import is the one to stay.
+        imports.setdefault((import_ref.importer_project, import_ref.name), import_ref)
+    return set(imports.values())
 
 
 async def _perform_state_sync(
@@ -945,6 +1074,37 @@ async def _perform_state_sync(
                 result.failed_replica_registrations[replica_id] = "Unexpected error"
                 continue
             result.registered_replicas.add(replica_id)
+    # Imports are registered before the others are unregistered. When the import of a model
+    # moves to another export, registering replaces it on the gateway, and unregistering
+    # the previous one then changes nothing, so the model stays imported all along.
+    # Failures are only logged: the next sync lists the imports and tries again.
+    for import_ref in plan.register_imports:
+        logger.debug("%s: registering import %s", fmt(replica_model), import_ref)
+        try:
+            async with connection.client() as client:
+                await client.register_import(
+                    importer_project=import_ref.importer_project,
+                    export_id=import_ref.export_id,
+                    exporter_project=import_ref.exporter_project,
+                    name=import_ref.name,
+                )
+        except Exception as e:
+            logger.warning(
+                "%s: failed to register import %s: %r", fmt(replica_model), import_ref, e
+            )
+    for import_ref in plan.unregister_imports:
+        logger.debug("%s: unregistering import %s", fmt(replica_model), import_ref)
+        try:
+            async with connection.client() as client:
+                await client.unregister_import(
+                    importer_project=import_ref.importer_project,
+                    export_id=import_ref.export_id,
+                    name=import_ref.name,
+                )
+        except Exception as e:
+            logger.warning(
+                "%s: failed to unregister import %s: %r", fmt(replica_model), import_ref, e
+            )
     # Send all replacements together. The gateway keeps working tunnels open and
     # saves its state once, rather than rewriting the full state for each replica.
     key_updates = []
@@ -1443,6 +1603,15 @@ class _ServiceRef:
     run_name: str
 
 
+@dataclass(frozen=True)
+class _ImportRef:
+    importer_project: str
+    export_id: uuid.UUID
+    exporter_project: str
+    name: str
+    """The model's name in the exporter project."""
+
+
 @dataclass
 class _StateSyncPlan:
     register_services: set[uuid.UUID] = field(default_factory=set)
@@ -1453,6 +1622,8 @@ class _StateSyncPlan:
     set_run_ids: dict[_ServiceRef, uuid.UUID] = field(default_factory=dict)
     update_replica_proxy_jump_keys: dict[uuid.UUID, set[uuid.UUID]] = field(default_factory=dict)
     """Run IDs mapped to registered job IDs whose saved gateway proxy_jump key needs replacing."""
+    register_imports: set[_ImportRef] = field(default_factory=set)
+    unregister_imports: set[_ImportRef] = field(default_factory=set)
 
 
 @dataclass
@@ -1473,7 +1644,13 @@ def _plan_state_sync(
     currently_registered: list[ServiceListItem],
     expected: Sequence[RunModel],
     instance_proxy_jump_public_keys: dict[uuid.UUID, str],
+    currently_registered_imports: Optional[list[ImportedModel]],
+    expected_imports: set[_ImportRef],
 ) -> _StateSyncPlan:
+    """
+    `currently_registered_imports` is `None` if the gateway replica could not list them.
+    The plan then leaves the imports as they are.
+    """
     plan = _StateSyncPlan()
     expected_run_id_to_run = {run.id: run for run in expected}
     expected_job_id_to_run = {job.id: run for run in expected for job in run.jobs}
@@ -1526,6 +1703,19 @@ def _plan_state_sync(
     for run_id in expected_run_ids - currently_registered_run_ids:
         plan.register_services.add(run_id)
         plan.register_replicas[run_id] = {job.id for job in expected_run_id_to_run[run_id].jobs}
+
+    if currently_registered_imports is not None:
+        currently_registered_import_refs = {
+            _ImportRef(
+                importer_project=imported_model.importer_project,
+                export_id=uuid.UUID(imported_model.export_id),
+                exporter_project=imported_model.exporter_project,
+                name=imported_model.name,
+            )
+            for imported_model in currently_registered_imports
+        }
+        plan.register_imports = expected_imports - currently_registered_import_refs
+        plan.unregister_imports = currently_registered_import_refs - expected_imports
 
     return plan
 

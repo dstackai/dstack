@@ -8,4 +8,5 @@ else
   version="blue"
   echo "$version" > "$root/version"
 fi
-"$root/$version/bin/uvicorn" dstack._internal.proxy.gateway.main:app --loop uvloop
+# Without the timeout, uvicorn waits for all open streams to end before it shuts the app down.
+"$root/$version/bin/uvicorn" dstack._internal.proxy.gateway.main:app --loop uvloop --timeout-graceful-shutdown 10
