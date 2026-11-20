@@ -1,5 +1,5 @@
 import re
-from typing import Annotated, Any, List, Literal, Optional, Self, Sequence
+from typing import Annotated, Any, List, Literal, Optional, Self, Sequence, Union
 
 from pydantic import Field, PositiveFloat, PositiveInt, field_validator, model_validator
 
@@ -127,6 +127,15 @@ class PresetBenchmark(CoreModel):
         return self
 
 
+class PresetResult(CoreModel):
+    concurrency: PositiveInt
+    # The largest context the service was verified to serve at this concurrency.
+    # A preset needs a completed benchmark at only one of the concurrencies from constraints.
+    # This is why context_length and benchmark are optional.
+    context_length: Optional[PositiveInt] = None
+    benchmark: Optional[PresetBenchmark] = None
+
+
 class PresetVerificationReplicaGroup(CoreModel):
     # The service replica group this was measured for.
     name: str
@@ -143,8 +152,6 @@ class PortablePreset(CoreModel):
     # The exact repo/path the service loads, which `base` is a variant of. Not
     # the client-facing API model name — that is `service.model`.
     repo: Annotated[str, Field(min_length=1)]
-    # The largest context the service was verified to serve.
-    context_length: PositiveInt
     # The verified run's spec configuration. The validator below keeps `name`,
     # `gateway`, and profile params unset (the deployer's choices) and requires
     # `model` and resources. Env keys the user declared as passthroughs hold
@@ -152,10 +159,25 @@ class PortablePreset(CoreModel):
     # stored as-is. `files` paths are stored relative to the preset directory,
     # absolute after load.
     service: ServiceConfiguration
-    benchmark: PresetBenchmark
+    result: Annotated[List[PresetResult], Field(min_length=1)]
     # The hardware it was verified on: the actual resources of every running
     # replica, by service replica group.
     verified_on: List[PresetVerificationReplicaGroup]
+
+    @model_validator(mode="before")
+    @classmethod
+    def convert_to_result_list(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "result" not in data and "benchmark" in data:
+            data = dict(data)
+            benchmark = data.pop("benchmark")
+            data["result"] = [
+                {
+                    "concurrency": benchmark["workload"]["concurrency"],
+                    "context_length": data.pop("context_length", None),
+                    "benchmark": benchmark,
+                }
+            ]
+        return data
 
     @model_validator(mode="after")
     def validate_artifact(self) -> Self:
@@ -303,10 +325,19 @@ class PresetConstraints(CoreModel):
     min_context_length: PositiveInt
     max_ttft: PositiveInt
     trials_num: PositiveInt
-    concurrency: PositiveInt
+    concurrency: Annotated[list[PositiveInt], Field(min_length=1)]
     baseline: bool
     fleets: Annotated[list[str], Field(min_length=1)]
     env: list[str]
+
+    @field_validator("concurrency", mode="before")
+    @classmethod
+    def convert_single_concurrency_to_list(cls, value: Any) -> Any:
+        # `constraints.json` of a session created before the concurrency sweep
+        # holds a single value.
+        if isinstance(value, int) and not isinstance(value, bool):
+            return [value]
+        return value
 
 
 class PresetRandomConstraints(PresetConstraints):
@@ -321,6 +352,11 @@ class PresetDatasetConstraints(PresetConstraints):
     """Constraints for a named dataset, which defines its own request shape."""
 
     dataset: str
+
+
+# `constraints.json` is one of the two; each has a required field the other lacks,
+# so a parse picks the right one.
+AnyPresetConstraints = Union[PresetDatasetConstraints, PresetRandomConstraints]
 
 
 def _validate_model(value: Any, *, field: str) -> str:

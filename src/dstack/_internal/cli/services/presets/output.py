@@ -1,13 +1,22 @@
 from collections import defaultdict
-from typing import Any, Optional, Sequence
+from typing import Any, Callable, Iterable, Optional, Sequence, Union
 
 from rich.table import Table
 
-from dstack._internal.cli.models.presets import AnyStoredPreset, VerifiedPreset
+from dstack._internal.cli.models.preset_agent import PresetTrialResult
+from dstack._internal.cli.models.presets import (
+    AnyStoredPreset,
+    PresetSessionEntry,
+    VerifiedPreset,
+)
 from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.core.models.configurations import PresetConfiguration
-from dstack._internal.core.models.presets import PresetWorkload
-from dstack._internal.utils.common import parse_datetime, pretty_date, pretty_resources
+from dstack._internal.core.models.presets import (
+    PresetDatasetConstraints,
+    PresetResult,
+    PresetWorkload,
+)
+from dstack._internal.utils.common import pretty_date, pretty_resources
 
 _STATUS_DISPLAY = {
     "verified": ("verified", "secondary"),
@@ -24,32 +33,27 @@ def _format_status(status: str) -> str:
     return f"[{style}]{text}[/]" if style else text
 
 
-def _verifying(session: dict[str, Any]) -> bool:
-    return isinstance(session.get("verification"), dict)
+def _verifying(session: PresetSessionEntry) -> bool:
+    return session.verification is not None
 
 
 _SPARK_BLOCKS = "▁▂▃▄▅▆▇█"
 
 
-def _format_trial_spark(session: Optional[dict[str, Any]]) -> str:
-    if not isinstance(session, dict):
+def _format_trial_spark(session: PresetSessionEntry) -> str:
+    series = session.trials.series
+    failed = session.trials.failed
+    if not series:
         return ""
-    trials = session.get("trials")
-    series = trials.get("series") if isinstance(trials, dict) else None
-    if not isinstance(series, list) or not series:
-        return ""
-    failed = trials.get("failed")
-    if not isinstance(failed, list) or len(failed) != len(series):
-        failed = [False] * len(series)
-    values = [v for v in series if isinstance(v, (int, float))]
+    values = [v for v in series if v is not None]
     if not values:
         return "·" * len(series)
     high = max(values)
-    passed = [v for v, f in zip(series, failed) if isinstance(v, (int, float)) and not f]
+    passed = [v for v, f in zip(series, failed) if v is not None and not f]
     best = max(passed) if passed else max(values)
     out = []
     for value, is_failed in zip(series, failed):
-        if not isinstance(value, (int, float)):
+        if value is None:
             out.append("[indian_red1]·[/]")
             continue
         glyph = (
@@ -65,25 +69,22 @@ def _format_trial_spark(session: Optional[dict[str, Any]]) -> str:
     return "".join(out)
 
 
-def _format_trial_progress(session: Optional[dict[str, Any]], *, in_flight: bool = False) -> str:
-    if not isinstance(session, dict):
+def _format_trial_progress(session: PresetSessionEntry, *, in_flight: bool = False) -> str:
+    count = session.trials.count
+    trials_num = session.state.trials_num
+    if not count and trials_num is None:
         return ""
-    trials = session.get("trials")
-    trials_num = session.get("trials_num")
-    if not isinstance(trials, dict) or not (trials.get("count") or isinstance(trials_num, int)):
-        return ""
-    count = trials.get("count") or 0
     if in_flight:
-        count = min(count + 1, trials_num) if isinstance(trials_num, int) else count + 1
+        count = min(count + 1, trials_num) if trials_num is not None else count + 1
     progress = str(count)
-    if isinstance(trials_num, int):
+    if trials_num is not None:
         progress += f"/{trials_num}"
     return f" [secondary]({progress})[/]"
 
 
 def print_presets(
     presets: Sequence[AnyStoredPreset],
-    sessions: Optional[list[dict[str, Any]]] = None,
+    sessions: Optional[list[PresetSessionEntry]] = None,
     verbose: bool = False,
     all_presets: bool = False,
     limit: Optional[int] = None,
@@ -98,7 +99,7 @@ def print_presets(
 
 def get_presets_table(
     presets: Sequence[AnyStoredPreset],
-    sessions: Optional[list[dict[str, Any]]] = None,
+    sessions: Optional[list[PresetSessionEntry]] = None,
     verbose: bool = False,
     all_presets: bool = False,
     limit: Optional[int] = None,
@@ -120,16 +121,15 @@ def get_presets_table(
     for preset in presets:
         presets_by_base[preset.base].append(preset)
         repo_to_base[preset.repo] = preset.base
-    sessions_by_model: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    creations_by_id: dict[str, dict[str, Any]] = {}
+    sessions_by_model: dict[str, list[PresetSessionEntry]] = defaultdict(list)
+    creations_by_id: dict[str, PresetSessionEntry] = {}
     for session in sessions or []:
-        session_id = str(session.get("id"))
-        if session_id in preset_ids:
+        if session.id in preset_ids:
             # The stored artifact is the completion record. Cleanup can be
             # interrupted before session.json advances to `success`.
-            creations_by_id[session_id] = session
+            creations_by_id[session.id] = session
             continue
-        model = str(session.get("model") or "unknown")
+        model = session.state.model
         sessions_by_model[repo_to_base.get(model, model)].append(session)
 
     # Same contract as `dstack ps`: one flat list, newest first (base is a column,
@@ -139,12 +139,12 @@ def get_presets_table(
         rows += [(preset.created_at.isoformat(), preset, True) for preset in preset_list]
     for session_list in sessions_by_model.values():
         rows += [
-            (str(session.get("created_at") or ""), session, False) for session in session_list
+            (session.state.created_at.isoformat(), session, False) for session in session_list
         ]
     rows.sort(key=lambda r: r[0], reverse=True)
     only_active = not all_presets and limit is None
     if only_active:
-        active = [r for r in rows if not r[2] and str(r[1].get("status")) == "running"]
+        active = [r for r in rows if not r[2] and r[1].status == "running"]
         rows = active or rows[:1]
 
     for _, item, is_preset in rows[:limit] if limit is not None else rows:
@@ -155,93 +155,62 @@ def get_presets_table(
     return table
 
 
-def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False) -> None:
-    created = ""
-    created_at = session.get("created_at")
-    if isinstance(created_at, str):
-        try:
-            created = pretty_date(parse_datetime(created_at))
-        except ValueError:
-            created = created_at
-    benchmark = ""
-    gpu = ""
-    status_key = str(session.get("status", ""))
+def _add_session(table: Table, session: PresetSessionEntry, *, verbose: bool = False) -> None:
+    status_key = session.status
     if status_key == "running" and _verifying(session):
         status_key = "verifying"
     status = _format_status(status_key) + _format_trial_progress(
         session, in_flight=status_key == "running"
     )
-    trials = session.get("trials")
-    best = trials.get("best") if isinstance(trials, dict) else None
+    trials = session.trials
     # Nothing passed: fall back to the fastest attempt that did not.
-    breached = not isinstance(best, dict)
-    if breached and isinstance(trials, dict):
-        best = trials.get("best_failed")
-    if isinstance(best, dict):
-        gpu = best.get("gpu") or ""
-    if not gpu and isinstance(trials, dict):
-        # Trials can record hardware without ever producing a benchmark.
-        gpu = trials.get("gpu") or ""
-    constraints = session.get("constraints") or {}
-    parts = []
+    breached = trials.best is None
+    best = trials.best or trials.best_failed
+    constraints = session.constraints
     objective = []
-    if dataset := constraints.get("dataset"):
-        objective.append(f"data={dataset}")
-    if constraints.get("input_tokens") and constraints.get("output_tokens"):
+    if isinstance(constraints, PresetDatasetConstraints):
+        objective.append(f"data={constraints.dataset}")
+    elif constraints is not None:
         objective.append(
-            f"io={_format_token_count(constraints['input_tokens'])}"
-            f"/{_format_token_count(constraints['output_tokens'])}"
+            f"io={_format_token_count(constraints.input_tokens)}"
+            f"/{_format_token_count(constraints.output_tokens)}"
         )
-    input_tokens = constraints.get("input_tokens")
-    if input_tokens:
-        shared_prefix_tokens = constraints.get("shared_prefix_tokens") or 0
-        share = round(100 * shared_prefix_tokens / input_tokens)
+        share = round(100 * constraints.shared_prefix_tokens / constraints.input_tokens)
         if share:
             objective.append(f"prefix={share}%")
-    concurrency = (best or {}).get("concurrency") or constraints.get("concurrency")
+    # The shown trial's sweep when it has one, else what was requested.
+    concurrency = _result_concurrencies(best.result) if best is not None else []
+    if not concurrency and constraints is not None:
+        concurrency = constraints.concurrency
     if concurrency:
-        objective.append(f"c={concurrency}")
-    min_context_length = constraints.get("min_context_length")
-    if verbose and isinstance(min_context_length, int):
-        objective.append(f"ctx>={_format_token_count(min_context_length)}")
-    max_ttft = constraints.get("max_ttft")
-    if verbose and isinstance(max_ttft, (int, float)):
-        objective.append(f"ttft<={_format_duration_ms(max_ttft)}")
-    if isinstance(best, dict):
-        tps = _format_number(best["tok_s"])
+        objective.append(f"c={_format_concurrency(concurrency)}")
+    if verbose and constraints is not None:
+        objective.append(f"ctx>={_format_token_count(constraints.min_context_length)}")
+        objective.append(f"ttft<={_format_duration_ms(constraints.max_ttft)}")
+    benchmark = ""
+    if best is not None:
         if objective:
-            # Lead with per-user tps: comparable across rows regardless of concurrency.
-            tpot_ms = best.get("tpot_ms")
-            if isinstance(tpot_ms, (int, float)) and tpot_ms > 0:
-                parts.append(f"tps/user={_format_number(1000 / tpot_ms)}")
-            if verbose:
-                parts.append(f"tps={tps}")
-            ttft_ms = best.get("ttft_ms")
-            if isinstance(ttft_ms, (int, float)):
-                parts.append(f"ttft={_format_duration_ms(ttft_ms)}")
-            context_length = best.get("context_length")
-            if isinstance(context_length, int):
-                parts.append(f"ctx={_format_token_count(context_length)}")
-            benchmark = " ".join(parts)
+            benchmark = _format_result_benchmark(best.result, verbose=verbose)
         else:
-            benchmark = f"c={best.get('concurrency')} tps={tps}"
-    benchmark = benchmark.strip()
+            benchmarks = [r.benchmark for r in best.result if r.benchmark is not None]
+            tps = _format_range([b.effective_output_tok_per_s for b in benchmarks], _format_number)
+            benchmark = f"c={_format_concurrency(concurrency)} tps={tps}"
     if benchmark and breached:
         # Marked, not only dimmed: colour alone is not a signal.
         benchmark = f"[secondary]*{benchmark}[/]"
     add_row_from_dict(
         table,
         {
-            "ID": str(session.get("id", "")),
-            "BASE": str(session.get("model") or ""),
-            "NAME": str(session.get("name") or ""),
-            "GPU": gpu,
-            "RESOURCES": gpu,
+            "ID": session.id,
+            "BASE": session.state.model,
+            "NAME": session.name or "",
+            "GPU": trials.gpu or "",
+            "RESOURCES": trials.gpu or "",
             "": _format_trial_spark(session),
             "CONSTRAINTS": f"[secondary]{' '.join(objective)}[/]" if objective else "",
             "BENCHMARK": benchmark,
             "STATUS": status,
-            "SUBMITTED": created,
+            "SUBMITTED": pretty_date(session.state.created_at),
         },
     )
 
@@ -251,7 +220,7 @@ def _add_preset(
     preset: AnyStoredPreset,
     *,
     verbose: bool,
-    creation: Optional[dict[str, Any]] = None,
+    creation: Optional[PresetSessionEntry] = None,
 ) -> None:
     groups = preset.service.replica_groups
     row = {
@@ -259,8 +228,9 @@ def _add_preset(
         "NAME": preset.name or "",
         "RESOURCES": _format_resources(groups[0].resources, verbose=verbose),
         "BASE": preset.base,
-        "STATUS": _format_status(preset.status) + _format_trial_progress(creation),
-        "": _format_trial_spark(creation),
+        "STATUS": _format_status(preset.status)
+        + (_format_trial_progress(creation) if creation is not None else ""),
+        "": _format_trial_spark(creation) if creation is not None else "",
         "CONSTRAINTS": format_preset_objective(
             preset,
             verbose=verbose,
@@ -288,7 +258,7 @@ def format_preset_objective(
     *,
     verbose: bool = False,
 ) -> str:
-    workload = preset.benchmark.workload
+    workload = _measured_workload_from_preset(preset)
     if isinstance(preset, VerifiedPreset):
         return _format_creation_objective(preset.configuration, workload, verbose=verbose)
     # A pulled preset carries no creation context; the measured workload is its
@@ -304,8 +274,23 @@ def format_preset_objective(
         share = round(100 * workload.shared_prefix_tokens / workload.input_tokens)
         if share:
             parts.append(f"prefix={share}%")
-    parts.append(f"c={workload.concurrency}")
+    parts.append(f"c={_format_concurrency([r.concurrency for r in preset.result])}")
     return f"[secondary]{' '.join(parts)}[/]"
+
+
+def _measured_workload_from_preset(preset: AnyStoredPreset) -> PresetWorkload:
+    for r in preset.result:
+        if r.benchmark is not None:
+            return r.benchmark.workload
+    # Unreachable for a stored preset: verification requires at least one
+    # completed benchmark. Kept so the function returns on every path.
+    raise ValueError(f"preset {preset.id} has no measured workload")
+
+
+def _format_concurrency(values: list[int]) -> str:
+    if len(values) == 1:
+        return str(values[0])
+    return f"{min(values)}..{max(values)}"
 
 
 def _format_creation_objective(
@@ -323,7 +308,7 @@ def _format_creation_objective(
         share = round(100 * (configuration.shared_prefix_tokens or 0) / input_tokens)
         if share:
             parts.append(f"prefix={share}%")
-    parts.append(f"c={configuration.concurrency or workload.concurrency}")
+    parts.append(f"c={_format_concurrency(configuration.concurrency or [workload.concurrency])}")
     if verbose and configuration.min_context_length is not None:
         parts.append(f"ctx>={_format_token_count(configuration.min_context_length)}")
     if verbose and configuration.max_ttft is not None:
@@ -331,35 +316,78 @@ def _format_creation_objective(
     return f"[secondary]{' '.join(parts)}[/]"
 
 
-def _breaches_constraints(preset: AnyStoredPreset) -> bool:
+def _passing_result(preset: AnyStoredPreset) -> list[PresetResult]:
+    """The measured entries that met the requested constraints."""
+    measured = [r for r in preset.result if r.benchmark is not None]
     if not isinstance(preset, VerifiedPreset):
         # A pulled preset carries no requested constraints to breach.
-        return False
-    configuration = preset.configuration
-    metrics = preset.benchmark.metrics
-    if configuration.max_ttft is not None and metrics.ttft_ms.p50 > configuration.max_ttft:
+        return measured
+    return [r for r in measured if not _breaches_constraints(r, preset.configuration)]
+
+
+def _breaches_constraints(r: PresetResult, configuration: PresetConfiguration) -> bool:
+    assert r.benchmark is not None
+    if (
+        configuration.max_ttft is not None
+        and r.benchmark.metrics.ttft_ms.p50 > configuration.max_ttft
+    ):
         return True
-    return configuration.min_context_length is not None and (
-        preset.context_length < configuration.min_context_length
+    return (
+        configuration.min_context_length is not None
+        and r.context_length is not None
+        and r.context_length < configuration.min_context_length
     )
 
 
 def format_preset_benchmark(preset: AnyStoredPreset, *, verbose: bool = False) -> str:
-    benchmark = preset.benchmark
-    metrics = benchmark.metrics
+    passing = _passing_result(preset)
+    if passing:
+        return _format_result_benchmark(passing, verbose=verbose)
+    text = _format_result_benchmark(preset.result, verbose=verbose)
+    return f"[secondary]*{text}[/]"
+
+
+# Entries of a stored preset and of a session's trial share the fields read here.
+AnyResult = Union[PresetResult, PresetTrialResult]
+
+
+def _format_result_benchmark(result: Sequence[AnyResult], *, verbose: bool) -> str:
+    """Each metric as its range over the entries that have a benchmark."""
+    benchmarks = [r.benchmark for r in result if r.benchmark is not None]
+    context_lengths = [r.context_length for r in result if r.context_length is not None]
+    # Lead with per-user tps: comparable across rows regardless of concurrency.
     parts = [
-        f"tps/user={_format_number(benchmark.effective_per_user_tok_per_s)}",
+        f"tps/user={_format_range([b.effective_per_user_tok_per_s for b in benchmarks], _format_number)}"
     ]
     if verbose:
-        parts.append(f"tps={_format_number(benchmark.effective_output_tok_per_s)}")
-    parts += [
-        f"ttft={_format_duration_ms(metrics.ttft_ms.p50)}",
-        f"ctx={_format_token_count(preset.context_length)}",
-    ]
-    text = " ".join(parts)
-    if _breaches_constraints(preset):
-        return f"[secondary]*{text}[/]"
-    return text
+        parts.append(
+            f"tps={_format_range([b.effective_output_tok_per_s for b in benchmarks], _format_number)}"
+        )
+    parts.append(
+        f"ttft={_format_range([b.metrics.ttft_ms.p50 for b in benchmarks], _format_duration_ms)}"
+    )
+    if context_lengths:
+        parts.append(f"ctx={_format_range(context_lengths, _format_token_count)}")
+    return " ".join(parts)
+
+
+def _result_concurrencies(result: Sequence[AnyResult]) -> list[int]:
+    """Old `trial.json` entries carry the concurrency only inside the benchmark."""
+    values = []
+    for r in result:
+        if r.concurrency is not None:
+            values.append(r.concurrency)
+        elif r.benchmark is not None:
+            values.append(r.benchmark.workload.concurrency)
+    return values
+
+
+def _format_range(values: Iterable[float], format_value: Callable[[Any], str]) -> str:
+    values = list(values)
+    low, high = min(values), max(values)
+    if low == high:
+        return format_value(low)
+    return f"{format_value(low)}..{format_value(high)}"
 
 
 def _format_duration_ms(value: float) -> str:

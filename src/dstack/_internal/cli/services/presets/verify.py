@@ -29,6 +29,7 @@ from dstack._internal.core.models.configurations import PresetConfiguration, Ser
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.presets import (
     PresetBenchmark,
+    PresetResult,
     PresetVerificationReplicaGroup,
     PresetWorkload,
 )
@@ -113,13 +114,23 @@ def build_verified_preset(
         # prompt has always used; the preset document calls it `repo`, so that
         # it cannot be confused with the service's client-facing model name.
         repo=report.model,
-        context_length=report.context_length,
-        benchmark=_normalized_benchmark(report.benchmark, preset_configuration),
+        result=_normalized_result(report.result, preset_configuration),
         best_trial=report.trial,
         configuration=preset_configuration,
         preset_id=preset_id,
         created_at=created_at,
     )
+
+
+def _normalized_result(
+    result: list[PresetResult], configuration: PresetConfiguration
+) -> list[PresetResult]:
+    return [
+        r.model_copy(update={"benchmark": _normalized_benchmark(r.benchmark, configuration)})
+        if r.benchmark is not None
+        else r
+        for r in result
+    ]
 
 
 def _verified_run_service(run: Run, report: PresetAgentSuccess) -> ServiceConfiguration:
@@ -141,12 +152,46 @@ def _check_report_answers_request(
     """The report must answer what the configuration asked: the same benchmark
     workload, and the requested model — exactly when it was exact, any variant of
     the base otherwise."""
-    _check_workload_answers_request(report.benchmark.workload, configuration)
+    _check_result_answers_request(report.result, configuration)
     if configuration.model.allows_variant_selection:
         if report.base != configuration.model.api_model_name:
             raise CLIError("The agent's final report base does not match the requested model")
     elif report.model != configuration.model.exact_repo:
         raise CLIError("The agent changed an exact model request")
+
+
+def _check_result_answers_request(
+    result: list[PresetResult], configuration: PresetConfiguration
+) -> None:
+    if all(r.benchmark is None for r in result):
+        raise CLIError("The agent's final report has no completed benchmark")
+    concurrencies = [r.concurrency for r in result]
+    if len(set(concurrencies)) != len(concurrencies):
+        raise CLIError("The agent's final report has more than one entry for the same concurrency")
+    for r in result:
+        if (
+            configuration.concurrency is not None
+            and r.concurrency not in configuration.concurrency
+        ):
+            raise CLIError(
+                f"The agent's final benchmark concurrency of {r.concurrency} does not match the"
+                f" requested concurrency of {configuration.concurrency}"
+            )
+        # The agent could not measure this concurrency. That is allowed, so
+        # there is nothing more to check for it.
+        if r.benchmark is None:
+            continue
+        if r.context_length is None:
+            raise CLIError(
+                f"The agent's final report has a benchmark at concurrency {r.concurrency}"
+                " but no context length"
+            )
+        if r.benchmark.workload.concurrency != r.concurrency:
+            raise CLIError(
+                f"The agent's final benchmark concurrency {r.concurrency} does not"
+                f" match the benchmark workload concurrency {r.benchmark.workload.concurrency}"
+            )
+        _check_workload_answers_request(r.benchmark.workload, configuration)
 
 
 def _check_workload_answers_request(
@@ -172,11 +217,6 @@ def _check_workload_answers_request(
                 f"The agent's final benchmark shared prefix of {workload.shared_prefix_tokens}"
                 f" tokens does not match the requested {shared_prefix_tokens}"
             )
-    if configuration.concurrency is not None and workload.concurrency != configuration.concurrency:
-        raise CLIError(
-            f"The agent's final benchmark concurrency of {workload.concurrency} does not match the"
-            f" requested concurrency of {configuration.concurrency}"
-        )
 
 
 def _normalized_benchmark(

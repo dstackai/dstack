@@ -114,14 +114,14 @@ class TestPresetStore:
         path = tmp_path / "presets" / preset.id / "preset.yml"
         data = yaml.safe_load(path.read_text())
         data["configuration"]["dataset"] = "random"
-        data["benchmark"]["workload"]["dataset"] = "random"
-        data["benchmark"]["workload"]["shared_prefix_tokens"] = 0
+        data["result"][0]["benchmark"]["workload"]["dataset"] = "random"
+        data["result"][0]["benchmark"]["workload"]["shared_prefix_tokens"] = 0
         path.write_text(yaml.safe_dump(data, sort_keys=False))
 
         loaded = get_verified_preset(store, preset.id)
 
         assert loaded.configuration.dataset is None
-        assert loaded.benchmark.workload.dataset is None
+        assert get_or_error(loaded.result[0].benchmark).workload.dataset is None
 
     def test_loads_a_preset_that_predates_the_repo_field(self, tmp_path: Path):
         # Presets written before the rename store the served repo as `model`.
@@ -226,7 +226,7 @@ class TestPresetStore:
         store.save(preset)
         path = tmp_path / "presets" / preset.id / "preset.yml"
         data = yaml.safe_load(path.read_text())
-        del data["benchmark"]
+        del data["result"]
         path.write_text(yaml.safe_dump(data, sort_keys=False))
 
         with pytest.raises(CLIError) as excinfo:
@@ -236,7 +236,7 @@ class TestPresetStore:
         # Every reported error is located under the tag the file claims; the
         # untagged union used to add the other arm's errors on top.
         assert "1 validation error for" in message
-        assert "verified.benchmark" in message
+        assert "verified.result" in message
         assert "published." not in message
 
     def test_saving_same_id_overwrites_existing_preset(self, tmp_path: Path):
@@ -244,7 +244,12 @@ class TestPresetStore:
         preset = get_preset()
         store.save(preset)
 
-        updated = preset.model_copy(update={"base": "Qwen/Another-Model", "context_length": 16384})
+        updated = preset.model_copy(
+            update={
+                "base": "Qwen/Another-Model",
+                "result": [preset.result[0].model_copy(update={"context_length": 16384})],
+            }
+        )
         store.save(updated)
 
         assert store.get(preset.id) == updated
@@ -289,7 +294,7 @@ class TestPresetStore:
         store.save(valid)
         path = store.save(get_preset())
         data = yaml.safe_load(path.read_text())
-        data["benchmark"].pop("metrics")
+        data["result"][0]["benchmark"].pop("metrics")
         path.write_text(yaml.safe_dump(data, sort_keys=False))
 
         # One corrupt file must not take down every read; the warning goes to
@@ -383,7 +388,7 @@ class TestPresetStore:
         assert preset.configuration.input_tokens == 10000
         assert preset.configuration.output_tokens == 1500
         assert preset.configuration.shared_prefix_tokens == 0
-        assert preset.configuration.concurrency == 4
+        assert preset.configuration.concurrency == [4]
         # `priority` is not an excluded field, so the regrouping keeps it.
         assert preset.service.priority == 0
         assert [group.name for group in preset.verified_on] == [
@@ -391,7 +396,7 @@ class TestPresetStore:
         ]
         assert get_or_error(preset.verified_on[0].replicas[0].gpu).name == ["MI300X"]
         # The old format never recorded a dataset name for a synthetic workload.
-        assert preset.benchmark.workload.dataset is None
+        assert get_or_error(preset.result[0].benchmark).workload.dataset is None
         assert store.list() == [preset]
 
     def test_upgrade_maps_validation_replicas_to_replica_groups(self, tmp_path: Path):

@@ -14,7 +14,12 @@ import psutil
 import pytest
 import yaml
 
-from dstack._internal.cli.models.preset_agent import PresetAgentInfo, PresetSessionProcess
+from dstack._internal.cli.models.preset_agent import (
+    PresetAgentInfo,
+    PresetSessionProcess,
+    PresetTrial,
+    PresetTrialResult,
+)
 from dstack._internal.cli.services.presets.agent import (
     _prepare_subprocess_command,
     _terminate_process,
@@ -68,6 +73,7 @@ from tests._internal.cli.common import (
     get_fake_api,
     get_session_run,
     get_session_state,
+    get_trial_result,
 )
 
 
@@ -1610,89 +1616,107 @@ class TestLoadResumableSession:
             load_resumable_session(preset_id)
 
 
-def _write_trials(tmp_path, records):
+def _write_trials(tmp_path, trials: list[PresetTrial]):
     trials_dir = tmp_path / "trials"
-    for number, record in enumerate(records, 1):
+    for number, trial in enumerate(trials, 1):
         (trials_dir / str(number)).mkdir(parents=True)
-        (trials_dir / str(number) / "trial.json").write_text(json.dumps(record))
+        (trials_dir / str(number) / "trial.json").write_text(trial.model_dump_json())
     return trials_dir
 
 
 class TestSummarizeSessionTrials:
     def test_counts_records_even_when_trials_share_a_task(self, tmp_path):
-        record = {
-            "resources": {"gpu": {"name": "A40", "memory": "48GB", "count": 1}},
-            "benchmark": {
-                "workload": {"concurrency": 8},
-                "metrics": {"duration_seconds": 10.0, "total_output_tokens": 20000},
-            },
-        }
-        rerun = json.loads(json.dumps(record))
-        rerun["benchmark"]["metrics"]["total_output_tokens"] = 23000
-        nameless = {"benchmark": {"workload": {}, "metrics": {}}}
-        trials_dir = _write_trials(tmp_path, [record, rerun, record, nameless])
+        trial = PresetTrial(
+            resources={"gpu": {"name": "A40", "memory": "48GB", "count": 1}},
+            result=[get_trial_result(tok_s=2000.0, concurrency=8)],
+        )
+        rerun = trial.model_copy(
+            update={"result": [get_trial_result(tok_s=2300.0, concurrency=8)]}
+        )
+        # A trial whose benchmark could not be done, as the agent records it.
+        unmeasured = PresetTrial(result=[PresetTrialResult(concurrency=8, failed=True)])
+        trials_dir = _write_trials(tmp_path, [trial, rerun, trial, unmeasured])
 
         summary = _summarize_session_trials(trials_dir)
-        assert summary is not None
 
         # 4 records = 4 trials: one long-lived task commonly hosts several
         # trials, so identical records must not collapse the count.
-        assert summary["count"] == 4
-        assert summary["best"] == {
-            "tok_s": 2300.0,
-            "tpot_ms": None,
-            "ttft_ms": None,
-            "context_length": None,
-            "concurrency": 8,
-            "gpu": "A40:48GB:1",
-        }
+        assert summary.count == 4
+        assert summary.best == rerun
+        assert summary.gpu == "A40:48GB:1"
 
     def test_trials_are_ordered_numerically_beyond_nine(self, tmp_path):
         # Twelve trials: a string sort would chart 1, 10, 11, 12, 2, ...
-        records = [
-            {
-                "benchmark": {
-                    "metrics": {"total_output_tokens": float(i * 100), "duration_seconds": 1.0},
-                    "workload": {"concurrency": 1},
-                }
-            }
-            for i in range(1, 13)
+        trials = [
+            PresetTrial(result=[get_trial_result(tok_s=float(i * 100))]) for i in range(1, 13)
         ]
-        trials_dir = _write_trials(tmp_path, records)
+        trials_dir = _write_trials(tmp_path, trials)
 
         summary = _summarize_session_trials(trials_dir)
-        assert summary is not None
 
-        assert summary["series"] == [float(i * 100) for i in range(1, 13)]
+        assert summary.series == [float(i * 100) for i in range(1, 13)]
 
     def test_a_trial_still_in_flight_is_not_counted(self, tmp_path):
-        record = {
-            "resources": {},
-            "benchmark": {
-                "workload": {"concurrency": 8},
-                "metrics": {"duration_seconds": 10.0, "total_output_tokens": 20000},
-            },
-        }
-        trials_dir = _write_trials(tmp_path, [record])
+        trial = PresetTrial(resources={}, result=[get_trial_result(tok_s=2000.0, concurrency=8)])
+        trials_dir = _write_trials(tmp_path, [trial])
         # Trial 2 has started but has no result yet.
         (trials_dir / "2").mkdir()
         (trials_dir / "2" / "task.dstack.yml").write_text("type: task\n")
 
         summary = _summarize_session_trials(trials_dir)
-        assert summary is not None
 
-        assert summary["count"] == 1
-        assert summary["series"] == [2000.0]
+        assert summary.count == 1
+        assert summary.series == [2000.0]
 
     def test_a_torn_result_copy_reads_as_still_in_flight(self, tmp_path):
         trials_dir = _write_trials(tmp_path, [])
         (trials_dir / "1").mkdir(parents=True)
-        (trials_dir / "1" / "trial.json").write_text('{"benchmark": {"met')
+        (trials_dir / "1" / "trial.json").write_text('{"result": [{"benchmark": {"met')
 
         summary = _summarize_session_trials(trials_dir)
-        assert summary is not None
 
-        assert summary["count"] == 0
+        assert summary.count == 0
+
+    def test_an_old_failed_trial_without_a_benchmark_is_counted(self, tmp_path):
+        # Before concurrency sweeps, a failed trial was written with no
+        # `benchmark` key and no `result` list.
+        trials_dir = _write_trials(tmp_path, [])
+        (trials_dir / "1").mkdir(parents=True)
+        (trials_dir / "1" / "trial.json").write_text(
+            json.dumps(
+                {
+                    "resources": {"gpu": {"name": "A40", "memory": "48GB", "count": 1}},
+                    "failed": True,
+                }
+            )
+        )
+
+        summary = _summarize_session_trials(trials_dir)
+
+        assert summary.count == 1
+        assert summary.series == [None]
+        assert summary.failed == [True]
+        assert summary.gpu == "A40:48GB:1"
+
+    def test_a_broken_entry_does_not_drop_the_other_entries(self, tmp_path):
+        trial = PresetTrial(
+            result=[
+                get_trial_result(tok_s=100.0, concurrency=48),
+                get_trial_result(tok_s=180.0, concurrency=96),
+            ]
+        )
+        record = json.loads(trial.model_dump_json())
+        record["result"].append({"concurrency": 192, "benchmark": {"metrics": {}}})
+        trials_dir = _write_trials(tmp_path, [])
+        (trials_dir / "1").mkdir(parents=True)
+        (trials_dir / "1" / "trial.json").write_text(json.dumps(record))
+
+        summary = _summarize_session_trials(trials_dir)
+
+        assert summary.count == 1
+        assert summary.series == [180.0]
+        assert summary.failed == [False]
+        assert [r.failed for r in get_or_error(summary.best).result] == [False, False]
 
 
 class TestReadLastSessionVerification:
@@ -1710,7 +1734,7 @@ class TestReadLastSessionVerification:
         (service_dir / "2" / "service.dstack.yml").write_text("type: service\n")
 
         # Attempt 2 has no result yet, so it is the one in flight.
-        assert _read_last_session_verification(service_dir) == {"status": "verifying"}
+        assert _read_last_session_verification(service_dir) == "verifying"
 
     def test_the_newest_result_is_returned(self, tmp_path):
         # Attempts 9 and 10: a string sort would pick "9" as the newest.
@@ -1721,11 +1745,7 @@ class TestReadLastSessionVerification:
                 json.dumps({"trial": number, "run_name": f"p-{number}", "status": status})
             )
 
-        assert _read_last_session_verification(service_dir) == {
-            "trial": 10,
-            "run_name": "p-10",
-            "status": "verified",
-        }
+        assert _read_last_session_verification(service_dir) == "verified"
 
     def test_a_torn_result_copy_reads_as_verifying(self, tmp_path):
         # The mirror copies whole files, but a reader can still catch one
@@ -1734,7 +1754,7 @@ class TestReadLastSessionVerification:
         (service_dir / "1").mkdir(parents=True)
         (service_dir / "1" / "verification.json").write_text('{"trial": 1, "run_na')
 
-        assert _read_last_session_verification(service_dir) == {"status": "verifying"}
+        assert _read_last_session_verification(service_dir) == "verifying"
 
 
 class TestFileLineReader:

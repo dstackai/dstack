@@ -1,15 +1,23 @@
-import json
 from datetime import datetime, timedelta, timezone
 from io import StringIO
 
 import pytest
 from rich.table import Table
 
-from dstack._internal.cli.models.presets import PulledPreset
+from dstack._internal.cli.models.preset_agent import PresetTrial, PresetTrialResult
+from dstack._internal.cli.models.presets import PresetSessionEntry, PulledPreset
 from dstack._internal.cli.services.presets import output as output_module
 from dstack._internal.cli.services.presets.output import _add_session, _format_number
 from dstack._internal.core.models.presets import PortablePreset, PresetWorkload
-from tests._internal.cli.common import get_preset, plain_console
+from dstack._internal.utils.common import get_or_error
+from tests._internal.cli.common import (
+    get_preset,
+    get_preset_constraints,
+    get_session_entry,
+    get_trial_result,
+    get_trials_summary,
+    plain_console,
+)
 
 pytestmark = pytest.mark.windows
 
@@ -28,7 +36,7 @@ class TestFormatNumber:
 class TestFormatPresetBenchmark:
     def test_formats_second_scale_ttft_without_scientific_notation(self):
         preset = get_preset()
-        ttft = preset.benchmark.metrics.ttft_ms
+        ttft = get_or_error(preset.result[0].benchmark).metrics.ttft_ms
         ttft.mean = 8148.3
         ttft.p50 = 8151.4
         ttft.p99 = 8334.2
@@ -71,7 +79,7 @@ class TestFormatPresetObjective:
         # They diverge with a dataset, where the benchmark records measured means.
         preset = get_preset()
         preset.configuration.dataset = "spec_bench"
-        benchmark = preset.benchmark
+        benchmark = get_or_error(preset.result[0].benchmark)
         benchmark.workload = PresetWorkload(
             api=benchmark.workload.api,
             num_requests=benchmark.workload.num_requests,
@@ -140,7 +148,7 @@ class TestPrintPresets:
         assert "2 months ago" in output.getvalue()
 
 
-def _session_row(session: dict) -> dict:
+def _session_row(session: PresetSessionEntry) -> dict:
     table = Table(box=None)
     for column in (
         "BASE",
@@ -163,20 +171,17 @@ def _session_row(session: dict) -> dict:
 class TestSessionRow:
     def test_shows_progress_after_status_and_best_benchmark(self):
         row = _session_row(
-            {
-                "id": "c7e18d52",
-                "status": "running",
-                "trials_num": 3,
-                "trials": {
-                    "count": 2,
-                    "best": {
-                        "tok_s": 2339.0,
-                        "tpot_ms": 3.42,
-                        "concurrency": 8,
-                        "gpu": "A40:48GB:1",
-                    },
-                },
-            }
+            get_session_entry(
+                id="c7e18d52",
+                trials_num=3,
+                trials=get_trials_summary(
+                    2,
+                    best=PresetTrial(
+                        result=[get_trial_result(tok_s=2339.0, tpot_ms=3.42, concurrency=8)]
+                    ),
+                    gpu="A40:48GB:1",
+                ),
+            )
         )
 
         # 2 completed, so the 3rd is the one being trialed.
@@ -188,27 +193,25 @@ class TestSessionRow:
 
     def test_shows_the_shared_prefix_when_the_workload_has_one(self):
         row = _session_row(
-            {
-                "id": "c7e18d52",
-                "status": "running",
-                "constraints": {
-                    "input_tokens": 8192,
-                    "output_tokens": 1024,
-                    "concurrency": 162,
-                    "shared_prefix_tokens": 7373,
-                },
-            }
+            get_session_entry(
+                id="c7e18d52",
+                constraints=get_preset_constraints(
+                    input_tokens=8192,
+                    output_tokens=1024,
+                    concurrency=[162],
+                    shared_prefix_tokens=7373,
+                ),
+            )
         )
 
         assert row["CONSTRAINTS"] == ("[secondary]io=8K/1K prefix=90% c=162[/]")
 
     def test_shows_the_dataset_for_a_session_with_a_custom_dataset(self):
         row = _session_row(
-            {
-                "id": "c7e18d52",
-                "status": "running",
-                "constraints": {"dataset": "spec_bench", "concurrency": 4},
-            }
+            get_session_entry(
+                id="c7e18d52",
+                constraints=get_preset_constraints(dataset="spec_bench", concurrency=[4]),
+            )
         )
 
         assert row["CONSTRAINTS"] == ("[secondary]data=spec_bench c=4[/]")
@@ -217,47 +220,38 @@ class TestSessionRow:
         # A zero prefix is the default; only a non-zero share is information.
         # can serve from cache, so a row without it cannot be compared to one with.
         row = _session_row(
-            {
-                "id": "c7e18d52",
-                "status": "running",
-                "constraints": {
-                    "input_tokens": 8192,
-                    "output_tokens": 1024,
-                    "concurrency": 162,
-                    "shared_prefix_tokens": 0,
-                },
-            }
+            get_session_entry(
+                id="c7e18d52",
+                constraints=get_preset_constraints(
+                    input_tokens=8192,
+                    output_tokens=1024,
+                    concurrency=[162],
+                    shared_prefix_tokens=0,
+                ),
+            )
         )
 
         assert "prefix" not in row["CONSTRAINTS"]
 
     def test_shows_zero_progress_without_benchmark(self):
-        row = _session_row(
-            {"id": "ab12cd34", "status": "running", "trials_num": 3, "trials": {"count": 0}}
-        )
+        row = _session_row(get_session_entry(trials_num=3))
 
         assert row["STATUS"] == "[bold sea_green3]trialing[/] [secondary](1/3)[/]"
 
     def test_verifying_keeps_the_completed_count(self):
         row = _session_row(
-            {
-                "id": "ab12cd34",
-                "status": "running",
-                "trials_num": 3,
-                "trials": {"count": 3},
-                "verification": {"status": "verifying"},
-            }
+            get_session_entry(trials_num=3, trials=get_trials_summary(3), verification="verifying")
         )
 
         assert row["STATUS"] == "[bold deep_sky_blue1]verifying[/] [secondary](3/3)[/]"
 
     def test_omits_progress_without_trials_data(self):
-        row = _session_row({"id": "ab12cd34", "status": "interrupted"})
+        row = _session_row(get_session_entry(status="interrupted"))
 
         assert row["STATUS"] == "[secondary]interrupted[/]"
 
     def test_counts_without_trials_num(self):
-        row = _session_row({"id": "ab12cd34", "status": "interrupted", "trials": {"count": 2}})
+        row = _session_row(get_session_entry(status="interrupted", trials=get_trials_summary(2)))
 
         assert row["STATUS"] == "[secondary]interrupted[/] [secondary](2)[/]"
 
@@ -271,18 +265,18 @@ class TestOrdering:
             update={"id": "11aa22bb", "created_at": old.created_at + timedelta(days=2)}
         )
         sessions = [
-            {
-                "id": "aaaaaaaa",
-                "status": "interrupted",
-                "model": old.base,
-                "created_at": "2026-07-01T00:00:00Z",
-            },
-            {
-                "id": "bbbbbbbb",
-                "status": "interrupted",
-                "model": old.base,
-                "created_at": "2026-07-02T00:00:00Z",
-            },
+            get_session_entry(
+                id="aaaaaaaa",
+                status="interrupted",
+                model=old.base,
+                created_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
+            ),
+            get_session_entry(
+                id="bbbbbbbb",
+                status="interrupted",
+                model=old.base,
+                created_at=datetime(2026, 7, 2, tzinfo=timezone.utc),
+            ),
         ]
 
         output_module.print_presets([old, new], sessions=sessions)
@@ -311,13 +305,13 @@ class TestDoneProgress:
         monkeypatch.setattr(output_module, "console", plain_console(buffer, width=200))
         preset = get_preset()
         sessions = [
-            {
-                "id": preset.id,
-                "status": session_status,
-                "model": preset.base,
-                "trials_num": 4,
-                "trials": {"count": 3},
-            }
+            get_session_entry(
+                id=preset.id,
+                status=session_status,
+                model=preset.base,
+                trials_num=4,
+                trials=get_trials_summary(3),
+            )
         ]
 
         output_module.print_presets([preset], sessions=sessions)
@@ -331,13 +325,9 @@ class TestDoneProgress:
 class TestVerifyingStatus:
     def test_running_session_with_a_verification_record_shows_verifying(self):
         row = _session_row(
-            {
-                "id": "ab12cd34",
-                "status": "running",
-                "trials_num": 10,
-                "trials": {"count": 6},
-                "verification": {"trial": 3, "run_name": "p-2", "status": "verifying"},
-            }
+            get_session_entry(
+                trials_num=10, trials=get_trials_summary(6), verification="verifying"
+            )
         )
 
         # The trial budget is not spent, which the old inference required.
@@ -345,30 +335,22 @@ class TestVerifyingStatus:
 
     def test_a_failed_attempt_still_counts_as_verifying(self):
         row = _session_row(
-            {
-                "id": "ab12cd34",
-                "status": "running",
-                "trials_num": 2,
-                "trials": {"count": 2},
-                "verification": {"trial": 3, "status": "failed", "reason": "probe never passed"},
-            }
+            get_session_entry(trials_num=2, trials=get_trials_summary(2), verification="failed")
         )
 
         assert row["STATUS"].startswith("[bold deep_sky_blue1]verifying[/]")
 
     def test_a_spent_trial_budget_alone_stays_trialing(self):
-        row = _session_row(
-            {"id": "ab12cd34", "status": "running", "trials_num": 2, "trials": {"count": 2}}
-        )
+        row = _session_row(get_session_entry(trials_num=2, trials=get_trials_summary(2)))
 
         assert row["STATUS"].startswith("[bold sea_green3]trialing[/]")
 
 
-def _write_trials(tmp_path, records):
+def _write_trials(tmp_path, trials: list[PresetTrial]):
     trials_dir = tmp_path / "trials"
-    for number, record in enumerate(records, 1):
+    for number, trial in enumerate(trials, 1):
         (trials_dir / str(number)).mkdir(parents=True)
-        (trials_dir / str(number) / "trial.json").write_text(json.dumps(record))
+        (trials_dir / str(number) / "trial.json").write_text(trial.model_dump_json())
     return trials_dir
 
 
@@ -378,28 +360,19 @@ class TestFailedTrials:
 
         # The failed trial is the fastest. It broke `max_ttft`, so promoting it
         # would put a non-compliant configuration at the top of the listing.
-        trials_dir = _write_trials(
-            tmp_path,
-            [
-                {
-                    "benchmark": {
-                        "metrics": {"total_output_tokens": tokens, "duration_seconds": 1.0},
-                        "workload": {"concurrency": 8},
-                    },
-                    **({"failed": True} if failed else {}),
-                }
-                for tokens, failed in ((100.0, False), (900.0, True), (300.0, False))
-            ],
-        )
+        trials = [
+            PresetTrial(result=[get_trial_result(tok_s=tokens, concurrency=8, failed=failed)])
+            for tokens, failed in ((100.0, False), (900.0, True), (300.0, False))
+        ]
+        trials_dir = _write_trials(tmp_path, trials)
 
         summary = _summarize_session_trials(trials_dir)
-        assert summary is not None
 
-        assert summary["count"] == 3
+        assert summary.count == 3
         # Still charted: the trial happened and its number is real.
-        assert summary["series"] == [100.0, 900.0, 300.0]
-        assert summary["best"]["tok_s"] == 300.0
-        assert summary["best_failed"]["tok_s"] == 900.0
+        assert summary.series == [100.0, 900.0, 300.0]
+        assert summary.best == trials[2]
+        assert summary.best_failed == trials[1]
 
     def test_reports_the_gpu_when_no_trial_produced_a_benchmark(self, tmp_path):
         from dstack._internal.cli.services.presets.session import _summarize_session_trials
@@ -408,28 +381,36 @@ class TestFailedTrials:
         # the only thing left that knows what the run was on.
         trials_dir = _write_trials(
             tmp_path,
-            [{"resources": {"gpu": {"name": "MI300X", "memory": "192GB", "count": 1}}}],
+            [
+                PresetTrial(
+                    resources={"gpu": {"name": "MI300X", "memory": "192GB", "count": 1}},
+                    result=[PresetTrialResult(concurrency=4, failed=True)],
+                )
+            ],
         )
 
         summary = _summarize_session_trials(trials_dir)
-        assert summary is not None
 
-        assert summary["best"] is None
-        assert summary["best_failed"] is None
-        assert summary["gpu"] == "MI300X:192GB:1"
+        assert summary.best is None
+        assert summary.best_failed is None
+        assert summary.gpu == "MI300X:192GB:1"
 
     def test_reports_the_gpu_of_a_single_node_group(self, tmp_path):
         from dstack._internal.cli.services.presets.session import _summarize_session_trials
 
         trials_dir = _write_trials(
             tmp_path,
-            [{"groups": [[{"gpu": {"name": "MI300X", "memory": "192GB", "count": 1}}]]}],
+            [
+                PresetTrial(
+                    groups=[[{"gpu": {"name": "MI300X", "memory": "192GB", "count": 1}}]],
+                    result=[get_trial_result()],
+                )
+            ],
         )
 
         summary = _summarize_session_trials(trials_dir)
-        assert summary is not None
 
-        assert summary["gpu"] == "MI300X:192GB:1"
+        assert summary.gpu == "MI300X:192GB:1"
 
     def test_counts_the_worker_nodes_of_a_disaggregated_trial(self, tmp_path):
         from dstack._internal.cli.services.presets.session import _summarize_session_trials
@@ -438,13 +419,17 @@ class TestFailedTrials:
         h200 = {"gpu": {"name": "H200", "memory": "141GB", "count": 8}}
         trials_dir = _write_trials(
             tmp_path,
-            [{"groups": [[{"cpu": "16"}], [h200], [h200, h200]]}],
+            [
+                PresetTrial(
+                    groups=[[{"cpu": "16"}], [h200], [h200, h200]],
+                    result=[get_trial_result()],
+                )
+            ],
         )
 
         summary = _summarize_session_trials(trials_dir)
-        assert summary is not None
 
-        assert summary["gpu"] == "H200:141GB:8 x3"
+        assert summary.gpu == "H200:141GB:8 x3"
 
     def test_shows_the_split_when_roles_ran_different_gpus(self, tmp_path):
         from dstack._internal.cli.services.presets.session import _summarize_session_trials
@@ -453,72 +438,64 @@ class TestFailedTrials:
         trials_dir = _write_trials(
             tmp_path,
             [
-                {
-                    "groups": [
+                PresetTrial(
+                    groups=[
                         [{"gpu": {"name": "H200", "memory": "141GB", "count": 8}}],
                         [h100, h100],
-                    ]
-                }
+                    ],
+                    result=[get_trial_result()],
+                )
             ],
         )
 
         summary = _summarize_session_trials(trials_dir)
-        assert summary is not None
 
         # Group order, not sorted: the roles read in the order they ran.
-        assert summary["gpu"] == "H200:141GB:8 + H100:80GB:8 x2"
+        assert summary.gpu == "H200:141GB:8 + H100:80GB:8 x2"
 
     def test_the_fastest_failed_trial_is_kept_when_nothing_passed(self, tmp_path):
         from dstack._internal.cli.services.presets.session import _summarize_session_trials
 
-        trials_dir = _write_trials(
-            tmp_path,
-            [
-                {
-                    "benchmark": {
-                        "metrics": {
-                            "total_output_tokens": tokens,
-                            "duration_seconds": 1.0,
-                            "tpot_ms": {"mean": 41.7, "p50": 34.4},
-                            "ttft_ms": {"p50": 4300.0},
-                        },
-                        "workload": {"concurrency": 4},
-                    },
-                    "failed": True,
-                }
-                for tokens in (100.0, 300.0, 200.0)
-            ],
-        )
+        trials = [
+            PresetTrial(
+                result=[
+                    get_trial_result(
+                        tok_s=tokens, tpot_ms=41.7, ttft_ms=4300.0, concurrency=4, failed=True
+                    )
+                ]
+            )
+            for tokens in (100.0, 300.0, 200.0)
+        ]
+        trials_dir = _write_trials(tmp_path, trials)
 
         summary = _summarize_session_trials(trials_dir)
-        assert summary is not None
 
-        assert summary["best"] is None
-        assert summary["best_failed"]["tok_s"] == 300.0
-        # Mean, not p50: MTP skews TPOT right, and mean is the delivered rate.
-        assert summary["best_failed"]["tpot_ms"] == 41.7
+        assert summary.best is None
+        assert summary.best_failed == trials[1]
 
     def test_a_run_that_met_nothing_still_shows_what_it_measured(self):
         row = _session_row(
-            {
-                "id": "ab12cd34",
-                "status": "running",
-                "constraints": {"input_tokens": 10000, "output_tokens": 1500},
-                "trials": {
-                    "count": 1,
-                    "series": [100.0],
-                    "failed": [True],
-                    "best": None,
-                    "best_failed": {
-                        "tok_s": 100.0,
-                        "tpot_ms": 34.4,
-                        "ttft_ms": 4300.0,
-                        "context_length": 1048576,
-                        "concurrency": 4,
-                        "gpu": "MI300X:192GB:1",
-                    },
-                },
-            }
+            get_session_entry(
+                constraints=get_preset_constraints(input_tokens=10000, output_tokens=1500),
+                trials=get_trials_summary(
+                    1,
+                    series=[100.0],
+                    failed=[True],
+                    best_failed=PresetTrial(
+                        result=[
+                            get_trial_result(
+                                tok_s=100.0,
+                                tpot_ms=34.4,
+                                ttft_ms=4300.0,
+                                concurrency=4,
+                                context_length=1048576,
+                                failed=True,
+                            )
+                        ]
+                    ),
+                    gpu="MI300X:192GB:1",
+                ),
+            )
         )
 
         assert "ttft=4.3s" in row["BENCHMARK"]
@@ -528,19 +505,90 @@ class TestFailedTrials:
         assert "*tps/user" in row["BENCHMARK"]
 
 
+class TestSweepRow:
+    def test_shows_the_passing_sweep_of_the_best_trial_as_ranges(self, tmp_path):
+        from dstack._internal.cli.services.presets.session import _summarize_session_trials
+
+        # The trial broke `max_ttft` at 192 only, so the row ranges over 48 and 96.
+        trial = PresetTrial(
+            result=[
+                get_trial_result(
+                    tok_s=100, tpot_ms=10.0, ttft_ms=400.0, concurrency=48, context_length=32768
+                ),
+                get_trial_result(
+                    tok_s=180, tpot_ms=20.0, ttft_ms=800.0, concurrency=96, context_length=32768
+                ),
+                get_trial_result(
+                    tok_s=200,
+                    tpot_ms=40.0,
+                    ttft_ms=6000.0,
+                    concurrency=192,
+                    context_length=32768,
+                    failed=True,
+                ),
+            ]
+        )
+        summary = _summarize_session_trials(_write_trials(tmp_path, [trial]))
+
+        row = _session_row(
+            get_session_entry(
+                trials=summary, constraints=get_preset_constraints(concurrency=[48, 96, 192])
+            )
+        )
+
+        assert row["CONSTRAINTS"] == "[secondary]io=1K/1K c=48..96[/]"
+        assert row["BENCHMARK"] == "tps/user=50..100 ttft=400ms..800ms ctx=32K"
+
+    def test_falls_back_to_the_whole_failed_sweep_when_nothing_passed(self, tmp_path):
+        from dstack._internal.cli.services.presets.session import _summarize_session_trials
+
+        trial = PresetTrial(
+            result=[
+                get_trial_result(
+                    tok_s=100,
+                    tpot_ms=10.0,
+                    ttft_ms=400.0,
+                    concurrency=48,
+                    context_length=32768,
+                    failed=True,
+                ),
+                get_trial_result(
+                    tok_s=180,
+                    tpot_ms=20.0,
+                    ttft_ms=800.0,
+                    concurrency=96,
+                    context_length=32768,
+                    failed=True,
+                ),
+                get_trial_result(
+                    tok_s=200,
+                    tpot_ms=40.0,
+                    ttft_ms=6000.0,
+                    concurrency=192,
+                    context_length=32768,
+                    failed=True,
+                ),
+            ]
+        )
+        summary = _summarize_session_trials(_write_trials(tmp_path, [trial]))
+
+        row = _session_row(
+            get_session_entry(
+                trials=summary, constraints=get_preset_constraints(concurrency=[48, 96, 192])
+            )
+        )
+
+        assert row["CONSTRAINTS"] == "[secondary]io=1K/1K c=48..192[/]"
+        assert row["BENCHMARK"] == "[secondary]*tps/user=25..100 ttft=400ms..6s ctx=32K[/]"
+
+
 class TestFailedTrialSpark:
     def test_a_trial_that_broke_a_constraint_is_charted_but_not_the_best(self):
         # Its number is real, so it earns a bar rather than a `·`, and green goes
         # to the best trial that meets the constraints even on a lower number.
-        session = {
-            "id": "ab12cd34",
-            "status": "running",
-            "trials": {
-                "count": 3,
-                "series": [100.0, 900.0, 300.0],
-                "failed": [False, True, False],
-            },
-        }
+        session = get_session_entry(
+            trials=get_trials_summary(3, series=[100.0, 900.0, 300.0], failed=[False, True, False])
+        )
 
         spark = output_module._format_trial_spark(session)
 
@@ -552,15 +600,9 @@ class TestFailedTrialSpark:
     def test_the_best_failed_trial_is_gold_while_none_passes(self):
         # With nothing meeting the constraints, the best result so far is still
         # what the run has to show; the rest are context.
-        session = {
-            "id": "ab12cd34",
-            "status": "running",
-            "trials": {
-                "count": 3,
-                "series": [100.0, 900.0, 300.0],
-                "failed": [True, True, True],
-            },
-        }
+        session = get_session_entry(
+            trials=get_trials_summary(3, series=[100.0, 900.0, 300.0], failed=[True, True, True])
+        )
 
         spark = output_module._format_trial_spark(session)
 

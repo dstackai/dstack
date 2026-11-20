@@ -368,8 +368,8 @@ class TestPresetLocalCommands:
         data = json.loads(capsys.readouterr().out)
         assert data["id"] == preset.id
         assert data["created_at"] == render_datetime_as_api(preset.created_at)
-        assert data["context_length"] == 32768
-        assert data["benchmark"]["metrics"]["total_output_tokens"] == 2048
+        assert data["result"][0]["context_length"] == 32768
+        assert data["result"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 
     @pytest.mark.parametrize(
         "args",
@@ -389,8 +389,8 @@ class TestPresetLocalCommands:
         data = output["presets"][0]
         assert data["id"] == preset.id
         assert data["created_at"] == render_datetime_as_api(preset.created_at)
-        assert data["context_length"] == 32768
-        assert data["benchmark"]["metrics"]["total_output_tokens"] == 2048
+        assert data["result"][0]["context_length"] == 32768
+        assert data["result"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 
     @pytest.mark.parametrize("flag_attribute", [("--base", "base"), ("--repo", "repo")])
     def test_deletes_all_presets_of_model_keeping_others_without_api_client(
