@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Any, AsyncIterator, Callable, Generator, Optional
 from unittest.mock import patch
 
-import httpx as service_httpx
 import httpx2 as httpx
 import openai
 import pytest
@@ -308,7 +307,7 @@ async def test_unauthorized_http(headers) -> None:
 
 CHAT_COMPLETIONS_URL = "http://test-host/proxy/models/test-proj/chat/completions"
 AUTH_HEADERS = {"Authorization": "Bearer token"}
-ServiceHandler = Callable[[service_httpx.Request], Any]
+ServiceHandler = Callable[[httpx.Request], Any]
 
 
 @pytest.fixture
@@ -316,9 +315,9 @@ def mock_service() -> Generator[Callable[[ServiceHandler], None], None, None]:
     """Routes the requests that the proxy sends to the service to the given handler."""
     handlers: list[ServiceHandler] = []
 
-    async def get_service_replica_client(*args, **kwargs) -> service_httpx.AsyncClient:
-        return service_httpx.AsyncClient(
-            transport=service_httpx.MockTransport(handlers[0]), base_url="http://test-service"
+    async def get_service_replica_client(*args, **kwargs) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            transport=httpx.MockTransport(handlers[0]), base_url="http://test-service"
         )
 
     with patch(
@@ -387,9 +386,9 @@ class TestChatCompletionsPassthrough:
         )
         requests = []
 
-        def handle(request: service_httpx.Request) -> service_httpx.Response:
+        def handle(request: httpx.Request) -> httpx.Response:
             requests.append(request)
-            return service_httpx.Response(
+            return httpx.Response(
                 200, content=response_body, headers={"content-type": "application/json"}
             )
 
@@ -421,9 +420,7 @@ class TestChatCompletionsPassthrough:
     async def test_passes_service_errors_through(self, mock_service) -> None:
         error = b'{"error": {"message": "Too many requests"}}'
         mock_service(
-            lambda request: service_httpx.Response(
-                429, content=error, headers={"Retry-After": "7"}
-            )
+            lambda request: httpx.Response(429, content=error, headers={"Retry-After": "7"})
         )
         auth = ProxyTestAuthProvider({"test-proj": {"token"}})
         meter = ProxyTestMeter()
@@ -440,7 +437,7 @@ class TestChatCompletionsPassthrough:
 
     async def test_does_not_meter_token_counts_that_are_not_real(self, mock_service) -> None:
         response_body = b'{"choices": [], "usage": {"prompt_tokens": 9223372036854775808}}'
-        mock_service(lambda request: service_httpx.Response(200, content=response_body))
+        mock_service(lambda request: httpx.Response(200, content=response_body))
         auth = ProxyTestAuthProvider({"test-proj": {"token"}})
         meter = ProxyTestMeter()
         client = make_http_client(await make_repo(), auth, meter)
@@ -472,9 +469,9 @@ class TestChatCompletionsPassthrough:
     ) -> None:
         requests = []
 
-        def handle(request: service_httpx.Request) -> service_httpx.Response:
+        def handle(request: httpx.Request) -> httpx.Response:
             requests.append(request)
-            return service_httpx.Response(
+            return httpx.Response(
                 200,
                 content=sse(
                     chunk("Hello", usage(9, 1)),
@@ -519,7 +516,7 @@ class TestChatCompletionsPassthrough:
             finally:
                 is_stream_closed.set()
 
-        mock_service(lambda request: service_httpx.Response(200, content=stream()))
+        mock_service(lambda request: httpx.Response(200, content=stream()))
         meter = ProxyTestMeter()
         request = ASGIRequest(
             make_app(await make_repo(), ProxyTestAuthProvider({"test-proj": {"token"}}), meter),
@@ -539,7 +536,7 @@ class TestChatCompletionsPassthrough:
         is_request_received = asyncio.Event()
         is_request_cancelled = asyncio.Event()
 
-        async def handle(request: service_httpx.Request) -> service_httpx.Response:
+        async def handle(request: httpx.Request) -> httpx.Response:
             is_request_received.set()
             try:
                 await asyncio.Event().wait()  # the model is generating
@@ -564,7 +561,7 @@ class TestChatCompletionsPassthrough:
 
 @pytest.mark.asyncio
 async def test_imported_model_is_served_to_importer_project_members_only(mock_service) -> None:
-    mock_service(lambda request: service_httpx.Response(200, json={"usage": usage(9, 2)}))
+    mock_service(lambda request: httpx.Response(200, json={"usage": usage(9, 2)}))
     auth = ProxyTestAuthProvider(
         {"importer-proj": {"importer-token"}, "exporter-proj": {"exporter-token"}}
     )

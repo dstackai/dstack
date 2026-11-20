@@ -1,4 +1,4 @@
-import httpx
+import httpx2 as httpx
 
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 from dstack._internal.proxy.lib.models import ChatModel
