@@ -663,7 +663,16 @@ async def _process_terminating_job(
         result.job_update_map["status"] = _get_job_termination_status(job_model)
         return result
 
-    if job_model.remove_at is None:
+    if _is_aborted(job_model):
+        # An aborted job is not asked to stop, so it keeps running and the runner never runs out
+        # of logs to hand over. Collect what it has buffered so far, but do not wait for more.
+        if _has_logs_to_drain(job_model):
+            await _drain_job_logs(
+                job_model=job_model,
+                instance_model=instance_model,
+                job_update_map=result.job_update_map,
+            )
+    elif job_model.remove_at is None:
         # The first terminating pass. `graceful_termination_attempts` decides whether the runner
         # is asked to stop the job; `remove_at` decides when the container is killed regardless.
         # The two are independent: a job that has already finished on its own is not asked to
@@ -739,6 +748,19 @@ async def _process_terminating_job(
     if detach_result.all_detached:
         result.job_update_map["status"] = _get_job_termination_status(job_model)
     return result
+
+
+def _is_aborted(job_model: JobModel) -> bool:
+    """
+    Whether the job is to be terminated without waiting for it to finish.
+
+    The run's reason is checked too: the run pipeline does not update jobs that are already
+    terminating, so a job of a run aborted after it was stopped keeps its graceful reason.
+    """
+    return (
+        job_model.termination_reason == JobTerminationReason.ABORTED_BY_USER
+        or job_model.run.termination_reason == RunTerminationReason.ABORTED_BY_USER
+    )
 
 
 def _has_logs_to_drain(job_model: JobModel) -> bool:
