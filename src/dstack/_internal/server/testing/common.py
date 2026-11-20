@@ -1317,7 +1317,10 @@ async def create_job_metrics_point(
     memory_working_set_bytes: int = 1024,
     gpus_memory_usage_bytes: Optional[List[int]] = None,
     gpus_util_percent: Optional[List[int]] = None,
+    gpus_power_draw_watts: Optional[List[Optional[float]]] = None,
+    gpus_power_limit_watts: Optional[List[Optional[float]]] = None,
 ) -> JobMetricsPoint:
+    """Unset power lists are stored as NULL, as for a point without power readings."""
     timestamp_micro = int(timestamp.timestamp() * 1_000_000)
     if gpus_memory_usage_bytes is None:
         gpus_memory_usage_bytes = []
@@ -1331,6 +1334,12 @@ async def create_job_metrics_point(
         memory_working_set_bytes=memory_working_set_bytes,
         gpus_memory_usage_bytes=json.dumps(gpus_memory_usage_bytes),
         gpus_util_percent=json.dumps(gpus_util_percent),
+        gpus_power_draw_watts=(
+            json.dumps(gpus_power_draw_watts) if gpus_power_draw_watts is not None else None
+        ),
+        gpus_power_limit_watts=(
+            json.dumps(gpus_power_limit_watts) if gpus_power_limit_watts is not None else None
+        ),
     )
     session.add(jmp)
     await session.commit()

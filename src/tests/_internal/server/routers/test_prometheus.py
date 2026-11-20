@@ -152,6 +152,7 @@ class TestGetPrometheusMetrics:
             memory_usage_bytes=4_294_967_296,
             gpus_util_percent=[80, 90],
             gpus_memory_usage_bytes=[1_073_741_824, 2_147_483_648],
+            gpus_power_draw_watts=[52.5, None],
         )
         # Older, ignored
         await create_job_metrics_point(
@@ -304,6 +305,9 @@ class TestGetPrometheusMetrics:
             # TYPE dstack_job_gpu_memory_usage_bytes gauge
             dstack_job_gpu_memory_usage_bytes{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="0"}} 1073741824.0
             dstack_job_gpu_memory_usage_bytes{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="1"}} 2147483648.0
+            # HELP dstack_job_gpu_power_draw_watts Power draw of the job's GPU, watts (NVIDIA only)
+            # TYPE dstack_job_gpu_power_draw_watts gauge
+            dstack_job_gpu_power_draw_watts{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="0"}} 52.5
             # HELP FIELD_1 Test field 1
             # TYPE FIELD_1 gauge
             FIELD_1{{gpu="0",dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4"}} 350.0
@@ -322,6 +326,33 @@ class TestGetPrometheusMetrics:
             + BASE_CLIENT_METRICS.decode().strip()
         )
         assert response.text.strip() == expected
+
+    async def test_skips_gpu_power_if_point_has_none(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        """Points written before the power columns were added, or by an older server replica,
+        have no power, and the other GPU metrics are still exported."""
+        user = await create_user(session=session, name="test-user", global_role=GlobalRole.USER)
+        project = await _create_project(session, "project-1", user)
+        job = await _create_job(
+            session=session,
+            run_name="run-1",
+            project=project,
+            user=user,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(gpu_count=2),
+        )
+        await create_job_metrics_point(
+            session=session,
+            job_model=job,
+            timestamp=FAKE_NOW - timedelta(seconds=30),
+            gpus_util_percent=[80, 90],
+            gpus_memory_usage_bytes=[1024, 2048],
+        )
+        response = await client.get("/metrics")
+        assert response.status_code == 200
+        assert response.text.count("dstack_job_gpu_usage_ratio{") == 2
+        assert "dstack_job_gpu_power_draw_watts{" not in response.text
 
     @patch("prometheus_client.generate_latest", lambda: BASE_CLIENT_METRICS)
     async def test_returns_empty_response_if_no_runs(self, client: AsyncClient):

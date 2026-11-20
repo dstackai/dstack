@@ -53,6 +53,13 @@ async def get_job_metrics(
     return _calculate_job_metrics(job_model, points)
 
 
+def load_gpus_power(value: Optional[str], gpus_num: int) -> list[Optional[float]]:
+    """Decodes `JobMetricsPoint.gpus_power_draw_watts` or `gpus_power_limit_watts`."""
+    if value is None:
+        return [None] * gpus_num
+    return json.loads(value)
+
+
 def _calculate_job_metrics(job_model: JobModel, points: Sequence[JobMetricsPoint]) -> JobMetrics:
     timestamps: list[datetime] = []
     cpu_usage_points: list[int] = []
@@ -60,6 +67,8 @@ def _calculate_job_metrics(job_model: JobModel, points: Sequence[JobMetricsPoint
     memory_working_set_points: list[int] = []
     gpus_memory_usage_points: defaultdict[int, list[int]] = defaultdict(list)
     gpus_util_points: defaultdict[int, list[int]] = defaultdict(list)
+    gpus_power_draw_points: defaultdict[int, list[tuple[datetime, float]]] = defaultdict(list)
+    gpus_power_limit_points: defaultdict[int, list[tuple[datetime, float]]] = defaultdict(list)
 
     cpus_detected_num: Optional[int] = None
     memory_total: Optional[int] = None
@@ -81,7 +90,8 @@ def _calculate_job_metrics(job_model: JobModel, points: Sequence[JobMetricsPoint
     gpus_detected_num: Optional[int] = None
     gpus_detected_num_mismatch: bool = False
     for point, prev_point in zip(points, points[1:]):
-        timestamps.append(_unix_time_micro_to_datetime(point.timestamp_micro))
+        timestamp = _unix_time_micro_to_datetime(point.timestamp_micro)
+        timestamps.append(timestamp)
         cpu_usage_points.append(_get_cpu_usage(point, prev_point))
         memory_usage_points.append(point.memory_usage_bytes)
         memory_working_set_points.append(point.memory_working_set_bytes)
@@ -92,9 +102,16 @@ def _calculate_job_metrics(job_model: JobModel, points: Sequence[JobMetricsPoint
         if len(gpus_memory_usage) != gpus_detected_num or len(gpus_util) != gpus_detected_num:
             gpus_detected_num_mismatch = True
         if not gpus_detected_num_mismatch:
+            gpus_power_draw = load_gpus_power(point.gpus_power_draw_watts, gpus_detected_num)
+            gpus_power_limit = load_gpus_power(point.gpus_power_limit_watts, gpus_detected_num)
             for i in range(gpus_detected_num):
                 gpus_memory_usage_points[i].append(gpus_memory_usage[i])
                 gpus_util_points[i].append(gpus_util[i])
+                power_draw, power_limit = gpus_power_draw[i], gpus_power_limit[i]
+                if power_draw is not None:
+                    gpus_power_draw_points[i].append((timestamp, power_draw))
+                if power_limit is not None:
+                    gpus_power_limit_points[i].append((timestamp, power_limit))
 
     metrics: list[Metric] = [
         Metric(
@@ -146,6 +163,14 @@ def _calculate_job_metrics(job_model: JobModel, points: Sequence[JobMetricsPoint
                     values=gpu_util_points,
                 )
             )
+        for index, gpu_power_draw_points in gpus_power_draw_points.items():
+            metrics.append(
+                _make_sparse_metric(f"gpu_power_draw_watts_gpu{index}", gpu_power_draw_points)
+            )
+        for index, gpu_power_limit_points in gpus_power_limit_points.items():
+            metrics.append(
+                _make_sparse_metric(f"gpu_power_limit_watts_gpu{index}", gpu_power_limit_points)
+            )
     return JobMetrics(metrics=metrics)
 
 
@@ -154,6 +179,15 @@ def _make_constant_metric(name: str, timestamps: list[datetime], value: float) -
         name=name,
         timestamps=timestamps,
         values=[value] * len(timestamps),
+    )
+
+
+def _make_sparse_metric(name: str, points: list[tuple[datetime, float]]) -> Metric:
+    """A metric with its own timestamps, as it skips points that have no value."""
+    return Metric(
+        name=name,
+        timestamps=[timestamp for timestamp, _ in points],
+        values=[value for _, value in points],
     )
 
 

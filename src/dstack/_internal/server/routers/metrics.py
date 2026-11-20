@@ -58,6 +58,8 @@ async def get_job_metrics(
     * `gpu_memory_total_bytes`
     * `gpu_memory_usage_bytes_gpu{i}`
     * `gpu_util_percent_gpu{i}`
+    * `gpu_power_draw_watts_gpu{i}` (NVIDIA only; may have fewer samples than other metrics)
+    * `gpu_power_limit_watts_gpu{i}` (NVIDIA only; may have fewer samples than other metrics)
     """
     _, project = user_project
 

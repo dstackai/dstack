@@ -1240,6 +1240,13 @@ class JobMetricsPoint(BaseModel):
     """`gpus_memory_usage_bytes` stores a JSON-encoded list of metric values with length `len(gpus)`."""
     gpus_util_percent: Mapped[str] = mapped_column(Text)
     """`gpus_util_percent` stores a JSON-encoded list of metric values with length `len(gpus)`."""
+    gpus_power_draw_watts: Mapped[Optional[str]] = mapped_column(Text)
+    """`gpus_power_draw_watts` stores a JSON-encoded list of metric values with length `len(gpus)`,
+    with `null` for GPUs without a reading. `None` if no GPU reported power, or if the point was
+    written by a server without this column.
+    """
+    gpus_power_limit_watts: Mapped[Optional[str]] = mapped_column(Text)
+    """`gpus_power_limit_watts` has the same format as `gpus_power_draw_watts`."""
 
 
 class JobPrometheusMetrics(BaseModel):

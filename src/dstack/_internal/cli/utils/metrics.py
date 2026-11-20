@@ -28,17 +28,28 @@ AXIS_RULE = "┄"
 NOW = "now"
 
 LIVE_THRESHOLD = timedelta(seconds=3 * WATCH_INTERVAL_SECONDS)
-_FIXED_COLUMNS = 30
+_FIXED_COLUMNS = 32
 """Everything but the sparklines and the job label: the `gpu=N` column, both numbers, and
-the table's padding. Hand-measured against a `589GB/1480GB`-sized number; a wider one
-overflows and Rich ellipsizes the labels rather than shrinking the sparklines."""
+the table's padding. Measured against `100%` and a `9999GB/9999GB`-sized number, which fits
+hosts under 10 TB; a wider one overflows and Rich ellipsizes the labels rather than shrinking
+the sparklines."""
+
+_POWER_FIXED_COLUMNS = 14
+"""What the power column adds besides its sparkline: a `1000W/1000W`-sized number, the space
+before it, and the column's padding."""
 
 _SPARKLINE_COLUMNS = 2
 
 
-def _spark_width(console_width: int, label_width: int = 0) -> int:
-    budget = console_width - _FIXED_COLUMNS - label_width
-    return max(MIN_SPARK_WIDTH, min(MAX_SPARK_WIDTH, budget // _SPARKLINE_COLUMNS))
+def _spark_budget(console_width: int, label_width: int, show_power: bool) -> int:
+    fixed = _FIXED_COLUMNS + (_POWER_FIXED_COLUMNS if show_power else 0)
+    columns = _SPARKLINE_COLUMNS + (1 if show_power else 0)
+    return (console_width - fixed - label_width) // columns
+
+
+def _spark_width(console_width: int, label_width: int = 0, show_power: bool = False) -> int:
+    budget = _spark_budget(console_width, label_width, show_power)
+    return max(MIN_SPARK_WIDTH, min(MAX_SPARK_WIDTH, budget))
 
 
 def get_metrics_table(
@@ -48,7 +59,13 @@ def get_metrics_table(
 ) -> RenderableType:
     labels = job_labels(jobs)
     label_width = max((len(label) for label in labels), default=0)
-    width = _spark_width(console_width or console.width, label_width)
+    console_width = console_width or console.width
+    # Older runners and non-NVIDIA GPUs report no power. The column is also left out if three
+    # charts of the minimum width don't fit, as Rich would cut the labels to make room.
+    show_power = any(_reports_power(m) for m in metrics) and (
+        _spark_budget(console_width, label_width, show_power=True) >= MIN_SPARK_WIDTH
+    )
+    width = _spark_width(console_width, label_width, show_power)
     window = _shared_window(metrics)
 
     table = Table(box=None)
@@ -57,18 +74,21 @@ def get_metrics_table(
     table.add_column("", style="secondary", no_wrap=True)
     table.add_column("UTILIZATION", no_wrap=True)
     table.add_column("MEMORY", no_wrap=True)
+    if show_power:
+        table.add_column("POWER", no_wrap=True)
+    empty_row = [""] * len(table.columns)
 
     for index, (job, job_metrics) in enumerate(zip(jobs, metrics)):
         if index:
-            table.add_row("", "", "", "")
-        _add_job(table, job, job_metrics, width, labels[index], window)
+            table.add_row(*empty_row)
+        _add_job(table, job, job_metrics, width, labels[index], window, show_power)
 
     if window is not None:
-        table.add_row("", "", "", "")
+        table.add_row(*empty_row)
         # the axis spans the widest chart drawn: a job with fewer samples than cells draws
         # one cell per sample and cannot fill its share
         axis = _time_axis(max(_cells_drawn(m, window, width) for m in metrics), *window)
-        table.add_row("", "", axis, axis)
+        table.add_row("", "", *[axis] * (len(table.columns) - 2))
     return table
 
 
@@ -100,23 +120,39 @@ def _add_job(
     width: int,
     label: str,
     window: Optional[tuple[datetime, datetime]],
+    show_power: bool,
 ) -> None:
     resources = _get_resources(job)
     blanks = _blank_cells(metrics, window, width)
     cells = width - blanks
-    table.add_row(
+    host_row: List[RenderableType] = [
         label,
         "cpu",
         _pad(_cpu_cell(metrics, resources, cells), blanks),
         _pad(_memory_cell(metrics, resources, cells), blanks),
-    )
+    ]
+    if show_power:
+        host_row.append("")
+    table.add_row(*host_row)
     for index in range(_gpus_num(metrics, resources)):
-        table.add_row(
+        gpu_row: List[RenderableType] = [
             "",
             f"gpu={index}",
             _pad(_gpu_util_cell(metrics, index, cells), blanks),
             _pad(_gpu_memory_cell(metrics, resources, index, cells), blanks),
-        )
+        ]
+        if show_power:
+            power_blanks = max(blanks, _blank_cells(_power_series(metrics, index), window, width))
+            gpu_row.append(
+                _pad(_gpu_power_cell(metrics, index, width - power_blanks), power_blanks)
+            )
+        table.add_row(*gpu_row)
+
+
+def _power_series(job_metrics: JobMetrics, index: int) -> JobMetrics:
+    """Power draw of GPU `index` only. It may start later than the other series."""
+    name = f"gpu_power_draw_watts_gpu{index}"
+    return JobMetrics(metrics=[m for m in job_metrics.metrics if m.name == name])
 
 
 def _shared_window(metrics: Sequence[JobMetrics]) -> Optional[tuple[datetime, datetime]]:
@@ -197,6 +233,20 @@ def _gpu_util_cell(job_metrics: JobMetrics, index: int, width: int) -> Text:
     return Text.assemble(sparkline(values, width, GPU_RAMP), " ", f"{values[-1]:.0f}%")
 
 
+def _gpu_power_cell(job_metrics: JobMetrics, index: int, width: int) -> Text:
+    values = _metric_values(job_metrics, f"gpu_power_draw_watts_gpu{index}")
+    if not values:
+        return no_data()
+    limit = _latest_value(job_metrics, f"gpu_power_limit_watts_gpu{index}")
+    if not limit:
+        # without the limit there is no fixed scale to chart against
+        return Text(f"{values[-1]:.0f}W")
+    percents = [v / limit * 100 for v in values]
+    return Text.assemble(
+        sparkline(percents, width, GPU_RAMP), " ", f"{values[-1]:.0f}W/{limit:.0f}W"
+    )
+
+
 def _capacity_cell(values: List[float], total: Optional[float], width: int, ramp: Ramp) -> Text:
     """A memory chart drawn against capacity, labelled `used/total`."""
     percents = [v / total * 100 for v in values] if total else values
@@ -250,6 +300,10 @@ def _metric_values(job_metrics: JobMetrics, name: str) -> List[Any]:
 def _latest_value(job_metrics: JobMetrics, name: str) -> Optional[Any]:
     values = _metric_values(job_metrics, name)
     return values[-1] if values else None
+
+
+def _reports_power(job_metrics: JobMetrics) -> bool:
+    return any(m.name.startswith("gpu_power_draw_watts_gpu") for m in job_metrics.metrics)
 
 
 def _gpus_num(job_metrics: JobMetrics, resources: Optional[Resources]) -> int:

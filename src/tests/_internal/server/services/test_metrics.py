@@ -165,3 +165,47 @@ class TestGetMetrics:
             Metric(name="gpu_util_percent_gpu0", timestamps=ts, values=gpu0_util),
             Metric(name="gpu_util_percent_gpu1", timestamps=ts, values=gpu1_util),
         ]
+
+    async def test_get_metrics_gpu_power(self, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        jpd = get_job_provisioning_data(gpu_count=2)
+        job = await create_job(session=session, run=run, job_provisioning_data=jpd)
+        # gpu1 never reports power, gpu0 misses one reading, and the two oldest points have no
+        # power columns (the oldest one is only used for the CPU usage of the next one)
+        power = [
+            ([300.5, None], [400.0, None]),
+            ([None, None], [None, None]),
+            ([250.0, None], [400.0, None]),
+            (None, None),
+            (None, None),
+        ]
+        for dt, (draw, limit) in zip(self.ts, power):
+            await create_job_metrics_point(
+                session=session,
+                job_model=job,
+                timestamp=dt,
+                gpus_memory_usage_bytes=[1024, 1024],
+                gpus_util_percent=[50, 0],
+                gpus_power_draw_watts=draw,
+                gpus_power_limit_watts=limit,
+            )
+
+        metrics = await get_job_metrics(session, job)
+
+        assert [m for m in metrics.metrics if m.name.startswith("gpu_power")] == [
+            Metric(
+                name="gpu_power_draw_watts_gpu0",
+                timestamps=[self.ts[0], self.ts[2]],
+                values=[300.5, 250.0],
+            ),
+            Metric(
+                name="gpu_power_limit_watts_gpu0",
+                timestamps=[self.ts[0], self.ts[2]],
+                values=[400.0, 400.0],
+            ),
+        ]
+        util = next(m for m in metrics.metrics if m.name == "gpu_util_percent_gpu0")
+        assert len(util.timestamps) == 4

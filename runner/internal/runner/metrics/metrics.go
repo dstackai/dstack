@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path"
@@ -159,13 +160,13 @@ func (s *MetricsCollector) GetGPUMetrics(ctx context.Context) ([]schemas.GPUMetr
 }
 
 func (s *MetricsCollector) GetNVIDIAGPUMetrics(ctx context.Context) ([]schemas.GPUMetrics, error) {
-	cmd := exec.CommandContext(ctx, "nvidia-smi", "--query-gpu=memory.used,utilization.gpu", "--format=csv,noheader,nounits")
+	cmd := exec.CommandContext(ctx, "nvidia-smi", "--query-gpu=memory.used,utilization.gpu,power.draw,enforced.power.limit", "--format=csv,noheader,nounits")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
 		return []schemas.GPUMetrics{}, fmt.Errorf("failed to execute nvidia-smi: %w", err)
 	}
-	return parseNVIDIASMILikeMetrics(out.String())
+	return parseNVIDIASMILikeMetrics(out.String(), true)
 }
 
 func (s *MetricsCollector) GetAMDGPUMetrics(ctx context.Context) ([]schemas.GPUMetrics, error) {
@@ -241,16 +242,22 @@ func (s *MetricsCollector) GetIntelAcceleratorMetrics(ctx context.Context) ([]sc
 	if err := cmd.Run(); err != nil {
 		return []schemas.GPUMetrics{}, fmt.Errorf("failed to execute hl-smi: %w", err)
 	}
-	return parseNVIDIASMILikeMetrics(out.String())
+	return parseNVIDIASMILikeMetrics(out.String(), false)
 }
 
-func parseNVIDIASMILikeMetrics(output string) ([]schemas.GPUMetrics, error) {
+// parseNVIDIASMILikeMetrics parses memory used and utilization, followed by power draw and
+// limit if withPower is set (nvidia-smi is queried for them, hl-smi is not).
+func parseNVIDIASMILikeMetrics(output string, withPower bool) ([]schemas.GPUMetrics, error) {
 	metrics := []schemas.GPUMetrics{}
+	columns := 2
+	if withPower {
+		columns = 4
+	}
 
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	for _, line := range lines {
 		parts := strings.Split(line, ", ")
-		if len(parts) != 2 {
+		if len(parts) != columns {
 			continue
 		}
 		memUsed, err := strconv.ParseUint(strings.TrimSpace(parts[0]), 10, 64)
@@ -261,11 +268,27 @@ func parseNVIDIASMILikeMetrics(output string) ([]schemas.GPUMetrics, error) {
 		if err != nil {
 			return metrics, fmt.Errorf("failed to parse accelerator utilization: %w", err)
 		}
-		metrics = append(metrics, schemas.GPUMetrics{
+		gpuMetrics := schemas.GPUMetrics{
 			GPUMemoryUsage: memUsed * 1024 * 1024, // Convert MiB to bytes
 			GPUUtil:        utilization,
-		})
+		}
+		if withPower {
+			gpuMetrics.GPUPowerDraw = parseWatts(parts[2])
+			gpuMetrics.GPUPowerLimit = parseWatts(parts[3])
+		}
+		metrics = append(metrics, gpuMetrics)
 	}
 
 	return metrics, nil
+}
+
+// parseWatts returns nil for readings the GPU does not provide, which nvidia-smi prints as
+// [N/A], [Not Supported] or [Unknown Error], so that they do not drop the other metrics.
+// NaN and infinity are dropped too, as they cannot be encoded in the JSON response.
+func parseWatts(value string) *float64 {
+	watts, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if err != nil || math.IsNaN(watts) || math.IsInf(watts, 0) {
+		return nil
+	}
+	return &watts
 }

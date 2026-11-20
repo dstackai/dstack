@@ -152,6 +152,8 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
 
     gpus_memory_usage_bytes = [g.gpu_memory_usage_bytes for g in res.gpus]
     gpus_util_percent = [g.gpu_util_percent for g in res.gpus]
+    gpus_power_draw_watts = [g.gpu_power_draw_watts for g in res.gpus]
+    gpus_power_limit_watts = [g.gpu_power_limit_watts for g in res.gpus]
 
     return JobMetricsPoint(
         job_id=job_model.id,
@@ -161,7 +163,16 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
         memory_working_set_bytes=res.memory_working_set_bytes,
         gpus_memory_usage_bytes=json.dumps(gpus_memory_usage_bytes),
         gpus_util_percent=json.dumps(gpus_util_percent),
+        gpus_power_draw_watts=_dump_gpus_power(gpus_power_draw_watts),
+        gpus_power_limit_watts=_dump_gpus_power(gpus_power_limit_watts),
     )
+
+
+def _dump_gpus_power(values: List[Optional[float]]) -> Optional[str]:
+    # NULL if no GPU has a reading, as with older runners and non-NVIDIA GPUs
+    if all(v is None for v in values):
+        return None
+    return json.dumps(values)
 
 
 @runner_ssh_tunnel

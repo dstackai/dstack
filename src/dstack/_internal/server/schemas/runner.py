@@ -182,6 +182,10 @@ class ComponentInstallRequest(CoreModel):
 class GPUMetrics(CoreModel):
     gpu_memory_usage_bytes: int
     gpu_util_percent: int
+    gpu_power_draw_watts: Optional[float] = None
+    """`gpu_power_draw_watts` is not set by old runners, non-NVIDIA GPUs, and GPUs without power readings."""
+    gpu_power_limit_watts: Optional[float] = None
+    """`gpu_power_limit_watts` is the enforced limit. Set under the same conditions as `gpu_power_draw_watts`."""
 
 
 class MetricsResponse(CoreModel):
