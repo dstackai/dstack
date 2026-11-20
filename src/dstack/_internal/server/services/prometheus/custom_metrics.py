@@ -26,6 +26,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services.instances import get_instance_offer
 from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_runtime_data
+from dstack._internal.server.services.metrics import load_gpus_power
 from dstack._internal.server.services.runs import get_run_spec
 from dstack._internal.utils.common import get_current_datetime
 
@@ -188,10 +189,13 @@ async def get_job_metrics(session: AsyncSession) -> Iterable[Metric]:
             metrics.add_sample(_JOB_MEMORY_WORKING_SET, labels, jmp.memory_working_set_bytes)
             if gpus:
                 gpu_memory_total = gpus[0].memory_mib * 1024 * 1024
-                for gpu_num, (gpu_util, gpu_memory_usage) in enumerate(
+                gpus_util = json.loads(jmp.gpus_util_percent)
+                gpus_power_draw = load_gpus_power(jmp.gpus_power_draw_watts, len(gpus_util))
+                for gpu_num, (gpu_util, gpu_memory_usage, gpu_power_draw) in enumerate(
                     zip(
-                        json.loads(jmp.gpus_util_percent),
+                        gpus_util,
                         json.loads(jmp.gpus_memory_usage_bytes),
+                        gpus_power_draw,
                     )
                 ):
                     gpu_labels = labels.copy()
@@ -199,6 +203,8 @@ async def get_job_metrics(session: AsyncSession) -> Iterable[Metric]:
                     metrics.add_sample(_JOB_GPU_USAGE_RATIO, gpu_labels, gpu_util / 100)
                     metrics.add_sample(_JOB_GPU_MEMORY_TOTAL, gpu_labels, gpu_memory_total)
                     metrics.add_sample(_JOB_GPU_MEMORY_USAGE, gpu_labels, gpu_memory_usage)
+                    if gpu_power_draw is not None:
+                        metrics.add_sample(_JOB_GPU_POWER_DRAW, gpu_labels, gpu_power_draw)
         jpm = job_prometheus_metrics.get(job.id)
         if jpm is not None:
             for metric in text_string_to_metric_families(jpm.text):
@@ -227,6 +233,7 @@ _JOB_MEMORY_WORKING_SET = "dstack_job_memory_working_set_bytes"
 _JOB_GPU_USAGE_RATIO = "dstack_job_gpu_usage_ratio"
 _JOB_GPU_MEMORY_TOTAL = "dstack_job_gpu_memory_total_bytes"
 _JOB_GPU_MEMORY_USAGE = "dstack_job_gpu_memory_usage_bytes"
+_JOB_GPU_POWER_DRAW = "dstack_job_gpu_power_draw_watts"
 
 
 class _Metrics(dict[str, Metric]):
@@ -287,6 +294,7 @@ class _JobMetrics(_Metrics):
         (_JOB_GPU_USAGE_RATIO, _GAUGE, "Job GPU usage, percent (as 0.0-1.0)"),
         (_JOB_GPU_MEMORY_TOTAL, _GAUGE, "Total GPU memory allocated for the job, bytes"),
         (_JOB_GPU_MEMORY_USAGE, _GAUGE, "GPU memory used by the job, bytes"),
+        (_JOB_GPU_POWER_DRAW, _GAUGE, "Power draw of the job's GPU, watts (NVIDIA only)"),
     ]
 
 

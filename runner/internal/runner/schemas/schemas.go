@@ -148,8 +148,10 @@ type HealthcheckResponse struct {
 }
 
 type GPUMetrics struct {
-	GPUMemoryUsage uint64 `json:"gpu_memory_usage_bytes"`
-	GPUUtil        uint64 `json:"gpu_util_percent"`
+	GPUMemoryUsage uint64   `json:"gpu_memory_usage_bytes"`
+	GPUUtil        uint64   `json:"gpu_util_percent"`
+	GPUPowerDraw   *float64 `json:"gpu_power_draw_watts,omitempty"`
+	GPUPowerLimit  *float64 `json:"gpu_power_limit_watts,omitempty"`
 }
 
 type SystemMetrics struct {

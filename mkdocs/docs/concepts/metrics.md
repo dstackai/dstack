@@ -20,6 +20,7 @@ This tab displays key CPU, memory, and GPU metrics collected during the last hou
 
 As an alternative to the UI, you can track essential metrics via the CLI.
 The `dstack metrics` command charts CPU, memory, and GPU utilization over the last hour.
+For jobs on NVIDIA GPUs, it adds a `POWER` column that charts power draw against each GPU's enforced power limit.
 
 <div class="termy">
 
@@ -126,6 +127,7 @@ telemetry, and more.
     | `dstack_job_gpu_usage_ratio`                    | *gauge*   | Job GPU usage, percent (as 0.0-1.0)                                                        | `0.93`         |
     | `dstack_job_gpu_memory_total_bytes`             | *gauge*   | Total GPU memory allocated for the job, bytes                                              | `8589934592.0` |
     | `dstack_job_gpu_memory_usage_bytes`             | *gauge*   | GPU memory used by the job, bytes                                                          | `1048576.0`    |
+    | `dstack_job_gpu_power_draw_watts`               | *gauge*   | Power draw of the job's GPU, watts (NVIDIA only)                                           | `285.43`       |
     | `DCGM_FI_DEV_GPU_UTIL`                          | *gauge*   | GPU utilization (in %)                                                                     |                |
     | `DCGM_FI_DEV_MEM_COPY_UTIL`                     | *gauge*   | Memory utilization (in %)                                                                  |                |
     | `DCGM_FI_DEV_ENC_UTIL`                          | *gauge*   | Encoder utilization (in %)                                                                 |                |

@@ -1,6 +1,6 @@
 import re
 from datetime import datetime, timedelta, timezone
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from unittest.mock import MagicMock
 
 import pytest
@@ -41,6 +41,7 @@ def make_run(
     replica: int = 0,
     job_num: int = 0,
     group: str = "default",
+    memory_gb: int = 32,
 ) -> Tuple[MagicMock, JobMetrics]:
     """A job and its metrics. `state` decides whether the newest sample reads as `now`."""
     newest = datetime.now(timezone.utc)
@@ -62,7 +63,7 @@ def make_run(
         Metric(
             name="memory_working_set_bytes",
             timestamps=timestamps,
-            values=series(lambda t: memory(t) * 32 * GIB),
+            values=series(lambda t: memory(t) * memory_gb * GIB),
         ),
     ]
     for index in range(gpus):
@@ -82,7 +83,7 @@ def make_run(
     job.job_spec.replica_group = group
     submission = MagicMock()
     resources = MagicMock()
-    resources.cpus, resources.memory_mib = cpus, 32 * 1024
+    resources.cpus, resources.memory_mib = cpus, memory_gb * 1024
     resources.gpus = [MagicMock(memory_mib=CAPACITY_GB * 1024) for _ in range(gpus)]
     submission.job_runtime_data.offer.instance.resources = resources
     job.job_submissions = [submission]
@@ -113,9 +114,44 @@ def row(output: str, label: str) -> str:
     return next(line for line in lines(output) if line.strip().startswith(label))
 
 
-def bars(line: str) -> List[int]:
-    """Glyph heights of the first sparkline in `line`, left to right."""
-    return [SPARKS.index(glyph) for glyph in re.findall(rf"[{SPARKS}]+", line)[0]]
+def bars(line: str, chart: int = 0) -> List[int]:
+    """Glyph heights of a sparkline in `line`, the first by default, left to right."""
+    return [SPARKS.index(glyph) for glyph in re.findall(rf"[{SPARKS}]+", line)[chart]]
+
+
+def chart_start(line: str, chart: int = 0) -> int:
+    """The column where a sparkline in `line` begins."""
+    return list(re.finditer(rf"[{SPARKS}]+", line))[chart].start()
+
+
+def fits(output: str, width: int) -> bool:
+    """Nothing wider than the terminal and no label cut short."""
+    return "…" not in output and max(len(line) for line in output.splitlines()) <= width
+
+
+def with_power(
+    metrics: JobMetrics, draw: float, limit: Optional[float] = 700.0, gpus: int = 1
+) -> JobMetrics:
+    """`metrics` plus a steady power draw on each GPU, as an NVIDIA runner reports it."""
+    timestamps = metrics.metrics[0].timestamps
+    power = []
+    for index in range(gpus):
+        power.append(
+            Metric(
+                name=f"gpu_power_draw_watts_gpu{index}",
+                timestamps=timestamps,
+                values=[draw] * len(timestamps),
+            )
+        )
+        if limit is not None:
+            power.append(
+                Metric(
+                    name=f"gpu_power_limit_watts_gpu{index}",
+                    timestamps=timestamps,
+                    values=[limit] * len(timestamps),
+                )
+            )
+    return JobMetrics(metrics=metrics.metrics + power)
 
 
 def colours(output: str, label: str) -> set:
@@ -167,6 +203,16 @@ class TestRendering:
         assert not re.findall(rf"[{SPARKS}]", missing)
         assert sum(1 for line in lines(missing) if "gpu=" in line) == 2
         assert "1%" in render(*make_run("idle", gpus=2))
+
+    def test_labels_fit_on_a_large_host(self):
+        """`100%` next to `1024GB/2048GB` is as wide as the numbers get on a host under 10 TB.
+        Below 57 columns, two charts of the minimum width don't fit anyway."""
+        job, metrics = make_run("ramp", gpus=2, memory_gb=2048)
+        host = row(render(job, metrics), "job=0")
+        assert " 100% " in host and host.endswith(" 1024GB/2048GB")
+        # a step of 5 hits every remainder of the width split between charts
+        for width in range(57, 241, 5):
+            assert fits(render(job, metrics, width=width), width), width
 
 
 class TestWindow:
@@ -243,6 +289,63 @@ class TestJobs:
         }
         assert len(bars(row(output, "replica=0"))) > len(bars(row(output, "replica=1")))
         assert first["replica=1"] > first["replica=0"]  # pushed right by the blank
+
+
+class TestPower:
+    def test_no_column_without_power(self):
+        """Older runners and non-NVIDIA GPUs report no power: the table keeps its two columns
+        rather than gaining one that reads `no data` on every row."""
+        assert "POWER" not in render(*make_run())
+
+    def test_height_is_a_fraction_of_the_limit(self):
+        """As memory against capacity: 350W on a 700W card is a half-height bar."""
+        job, metrics = make_run()
+        gpu = row(render(job, with_power(metrics, 350.0)), "gpu=0")
+        assert gpu.endswith("350W/700W")
+        assert set(bars(gpu, chart=2)) == {(len(SPARKS) - 1) // 2}
+
+    def test_without_the_limit_only_the_number_is_shown(self):
+        """With nothing to scale against, a chart would have to rescale to its own peak."""
+        job, metrics = make_run()
+        gpu = row(render(job, with_power(metrics, 350.0, limit=None)), "gpu=0")
+        assert gpu.endswith("350W")
+        assert len(re.findall(rf"[{SPARKS}]+", gpu)) == 2
+
+    def test_a_job_without_power_reads_no_data(self):
+        nvidia, other = make_run(job_num=0), make_run(job_num=1)
+        output = render([nvidia[0], other[0]], [with_power(nvidia[1], 350.0), other[1]])
+        gpus = [line for line in lines(output) if "gpu=0" in line]
+        assert gpus[0].endswith("350W/700W")
+        assert gpus[1].endswith("no data")
+
+    def test_late_power_starts_where_it_started(self):
+        """Points collected before the server stored power have none, so the power chart
+        starts halfway through the window when only the newest half of the points has it."""
+        job, metrics = make_run(samples=360)
+        metrics = with_power(metrics, 350.0)
+        late_power = JobMetrics(
+            metrics=[
+                Metric(name=m.name, timestamps=m.timestamps[:180], values=m.values[:180])
+                if m.name.startswith("gpu_power")
+                else m
+                for m in metrics.metrics
+            ]
+        )
+        output = render(job, late_power)
+        header, gpu = lines(output)[0], row(output, "gpu=0")
+        width = len(bars(gpu, chart=0))
+        assert chart_start(gpu, chart=0) == header.index("UTILIZATION")
+        assert abs(chart_start(gpu, chart=2) - header.index("POWER") - width / 2) <= 1
+
+    def test_the_column_fits(self):
+        """`1000W/1000W` on a 2 TB host. Where a third chart doesn't fit, the column is left out
+        so that Rich doesn't cut the labels."""
+        job, metrics = make_run("ramp", gpus=2, memory_gb=2048)
+        metrics = with_power(metrics, 1000.0, limit=1000.0, gpus=2)
+        for width in range(57, 241, 5):
+            assert fits(render(job, metrics, width=width), width), width
+        assert row(render(job, metrics, width=120), "gpu=1").endswith("1000W/1000W")
+        assert "POWER" not in render(job, metrics, width=70)
 
 
 @pytest.mark.parametrize(

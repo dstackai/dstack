@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Optional
 from unittest.mock import patch
 
 import pytest
@@ -35,7 +36,40 @@ pytestmark = pytest.mark.usefixtures("image_config_mock")
 class TestCollectMetrics:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_collects_metrics(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize(
+        ["gpus", "power_draw", "power_limit"],
+        [
+            pytest.param(
+                [
+                    GPUMetrics(
+                        gpu_memory_usage_bytes=0,
+                        gpu_util_percent=0,
+                        gpu_power_draw_watts=72.5,
+                        gpu_power_limit_watts=300.0,
+                    ),
+                    # a GPU that prints [N/A] for power
+                    GPUMetrics(gpu_memory_usage_bytes=0, gpu_util_percent=0),
+                ],
+                "[72.5, null]",
+                "[300.0, null]",
+                id="nvidia",
+            ),
+            pytest.param(
+                [GPUMetrics(gpu_memory_usage_bytes=0, gpu_util_percent=0)],
+                None,
+                None,
+                id="no-power-readings",
+            ),
+        ],
+    )
+    async def test_collects_metrics(
+        self,
+        test_db,
+        session: AsyncSession,
+        gpus: list[GPUMetrics],
+        power_draw: Optional[str],
+        power_limit: Optional[str],
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -76,12 +110,7 @@ class TestCollectMetrics:
                 cpu_usage_micro=2,
                 memory_usage_bytes=3,
                 memory_working_set_bytes=4,
-                gpus=[
-                    GPUMetrics(
-                        gpu_memory_usage_bytes=0,
-                        gpu_util_percent=0,
-                    )
-                ],
+                gpus=gpus,
             )
             await collect_metrics()
             SSHTunnelMock.assert_called_once()
@@ -89,6 +118,8 @@ class TestCollectMetrics:
         res = await session.execute(select(JobMetricsPoint))
         metrics_point = res.scalar_one()
         assert metrics_point.job_id == job.id
+        assert metrics_point.gpus_power_draw_watts == power_draw
+        assert metrics_point.gpus_power_limit_watts == power_limit
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
