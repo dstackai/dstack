@@ -9,14 +9,14 @@ import { getServerError } from 'libs';
 import { useGetMeteringQuery } from 'services/metering';
 
 import {
-    compareUsagePeriods,
+    compareMeteringPeriods,
     DEFAULT_PERIOD,
-    formatUsagePeriod,
-    getUsageRequestParams,
-    getUsageTotal,
+    formatMeteringPeriod,
+    getMeteringRequestParams,
+    getMeteringTotal,
     getUserOptionsRequestParams,
     relativeOptions,
-    TUsagePeriod,
+    TMeteringPeriod,
 } from './helpers';
 import { useFilteringOptions, useFilters, useTimeRange, useUserFilteringOptions } from './hooks';
 
@@ -27,16 +27,16 @@ import styles from './styles.module.scss';
 // The token counts of a row and of the total row
 const TOKENS = ['input_tokens', 'cached_input_tokens', 'output_tokens'] as const;
 
-export const ModelUsage: React.FC<{ model: IModelExtended }> = ({ model }) => {
+export const ModelMetering: React.FC<{ model: IModelExtended }> = ({ model }) => {
     const { t } = useTranslation();
-    const [period, setPeriod] = useState<TUsagePeriod>(DEFAULT_PERIOD);
+    const [period, setPeriod] = useState<TMeteringPeriod>(DEFAULT_PERIOD);
     const { timeRange, onChangeTimeRange, isValidRange } = useTimeRange();
     const { filteringRequestParams, propertyFilterQuery, onChangePropertyFilter, filteringProperties } = useFilters();
 
     const [requestParams, userOptionsRequestParams] = useMemo(() => {
         const request = { model, timeRange, period, filters: filteringRequestParams, now: new Date() };
 
-        return [getUsageRequestParams(request), getUserOptionsRequestParams(request)];
+        return [getMeteringRequestParams(request), getUserOptionsRequestParams(request)];
     }, [model, timeRange, period, filteringRequestParams]);
 
     const { currentData, isFetching, error } = useGetMeteringQuery(requestParams);
@@ -45,7 +45,7 @@ export const ModelUsage: React.FC<{ model: IModelExtended }> = ({ model }) => {
     const rows = useMemo(() => (error ? [] : (currentData ?? [])), [currentData, error]);
     // The total of the rows, so it follows the filter, the time range and the period.
     // The API returns every row of a request, so the browser sums them
-    const total = useMemo(() => getUsageTotal(rows), [rows]);
+    const total = useMemo(() => getMeteringTotal(rows), [rows]);
 
     const filteringOptions = useFilteringOptions(currentData);
     const { userFilteringOptions, filteringStatusType, handleLoadItems } = useUserFilteringOptions(userOptionsRequestParams);
@@ -57,9 +57,9 @@ export const ModelUsage: React.FC<{ model: IModelExtended }> = ({ model }) => {
     const columns: TableProps.ColumnDefinition<IMeteringRow>[] = [
         {
             id: 'period',
-            header: t(`models.usage.${period}_utc`),
-            cell: (item) => renderCell(item, item === total ? t('models.usage.total') : formatUsagePeriod(item)),
-            sortingComparator: compareUsagePeriods,
+            header: t(`models.metering.${period}_utc`),
+            cell: (item) => renderCell(item, item === total ? t('models.metering.total') : formatMeteringPeriod(item)),
+            sortingComparator: compareMeteringPeriods,
         },
         {
             id: 'project',
@@ -68,7 +68,7 @@ export const ModelUsage: React.FC<{ model: IModelExtended }> = ({ model }) => {
         },
         ...TOKENS.map((tokens) => ({
             id: tokens,
-            header: t(`models.usage.${tokens}`),
+            header: t(`models.metering.${tokens}`),
             cell: (item: IMeteringRow) => renderCell(item, item[tokens].toLocaleString()),
             sortingField: tokens,
         })),
@@ -80,8 +80,8 @@ export const ModelUsage: React.FC<{ model: IModelExtended }> = ({ model }) => {
                 <Alert type="error">{t('common.server_error', { error: getServerError(error) })}</Alert>
             ) : (
                 <ListEmptyMessage
-                    title={t('models.usage.empty_message_title')}
-                    message={t('models.usage.empty_message_text')}
+                    title={t('models.metering.empty_message_title')}
+                    message={t('models.metering.empty_message_text')}
                 />
             ),
         },
@@ -98,7 +98,7 @@ export const ModelUsage: React.FC<{ model: IModelExtended }> = ({ model }) => {
             items={rows.length ? [...items, total] : items}
             loading={isFetching}
             loadingText={t('common.loading')}
-            header={<Header>{t('models.usage.title')}</Header>}
+            header={<Header>{t('models.metering.tokens')}</Header>}
             filter={
                 <div className={styles.selectFilters}>
                     <div className={styles.propertyFilter}>
@@ -134,10 +134,10 @@ export const ModelUsage: React.FC<{ model: IModelExtended }> = ({ model }) => {
 
                     <SegmentedControl
                         selectedId={period}
-                        onChange={({ detail }) => setPeriod(detail.selectedId as TUsagePeriod)}
+                        onChange={({ detail }) => setPeriod(detail.selectedId as TMeteringPeriod)}
                         options={[
-                            { text: t('models.usage.day'), id: 'day' },
-                            { text: t('models.usage.month'), id: 'month' },
+                            { text: t('models.metering.day'), id: 'day' },
+                            { text: t('models.metering.month'), id: 'month' },
                         ]}
                     />
                 </div>

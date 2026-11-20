@@ -2,8 +2,8 @@ import {
     DEFAULT_PERIOD,
     DEFAULT_TIME_RANGE,
     getFilteringOptions,
-    getUsageRequestParams,
-    getUsageTotal,
+    getMeteringRequestParams,
+    getMeteringTotal,
     getUserOptionsRequestParams,
 } from './helpers';
 
@@ -15,9 +15,9 @@ const model = {
 
 const now = new Date('2026-11-18T23:30:00Z');
 
-describe('Model usage request', () => {
+describe('Model metering request', () => {
     test('asks for the model by day and project in the last 30 days by default', () => {
-        const params = getUsageRequestParams({
+        const params = getMeteringRequestParams({
             model,
             timeRange: DEFAULT_TIME_RANGE,
             period: DEFAULT_PERIOD,
@@ -39,7 +39,7 @@ describe('Model usage request', () => {
         [{ user_name: 'bob' }],
         [{ project_name: 'importer-proj', user_name: 'bob' }],
     ])('the filter %j goes to the request, and the rows stay by project', (filters) => {
-        const params = getUsageRequestParams({ model, timeRange: DEFAULT_TIME_RANGE, period: DEFAULT_PERIOD, filters, now });
+        const params = getMeteringRequestParams({ model, timeRange: DEFAULT_TIME_RANGE, period: DEFAULT_PERIOD, filters, now });
 
         expect(params).toEqual({
             start: '2026-10-19T00:00:00Z',
@@ -57,7 +57,7 @@ describe('Model usage request', () => {
         [{ type: 'absolute', startDate: '2026-11-18', endDate: '2026-11-18' }, '2026-11-18T00:00:00Z', '2026-11-19T00:00:00Z'],
         [{ type: 'absolute', startDate: '2026-10-01', endDate: '2026-10-31' }, '2026-10-01T00:00:00Z', '2026-11-01T00:00:00Z'],
     ] as const)('by day, the time range %j covers whole days', (timeRange, start, end) => {
-        const params = getUsageRequestParams({ model, timeRange, period: 'day', filters: {}, now });
+        const params = getMeteringRequestParams({ model, timeRange, period: 'day', filters: {}, now });
 
         expect(params).toMatchObject({ start, end, group_by: ['day', 'project'] });
     });
@@ -74,7 +74,7 @@ describe('Model usage request', () => {
             '2026-11-01T00:00:00Z',
         ],
     ] as const)('by month, on %s the time range %j covers whole months', (today, timeRange, start, end) => {
-        const params = getUsageRequestParams({
+        const params = getMeteringRequestParams({
             model,
             timeRange,
             period: 'month',
@@ -86,7 +86,7 @@ describe('Model usage request', () => {
     });
 });
 
-describe('Model usage filter', () => {
+describe('Model metering filter', () => {
     test("asks for the users of the filter's project in the same time range, whatever user the filter has", () => {
         const filters = { project_name: 'importer-proj', user_name: 'bob' };
 
@@ -126,7 +126,7 @@ describe('Model usage filter', () => {
     });
 });
 
-describe('Model usage total', () => {
+describe('Model metering total', () => {
     test('sums the rows', () => {
         const rows: IMeteringRow[] = [
             {
@@ -145,6 +145,6 @@ describe('Model usage total', () => {
             },
         ];
 
-        expect(getUsageTotal(rows)).toEqual({ input_tokens: 58918, cached_input_tokens: 49668, output_tokens: 6543 });
+        expect(getMeteringTotal(rows)).toEqual({ input_tokens: 58918, cached_input_tokens: 49668, output_tokens: 6543 });
     });
 });

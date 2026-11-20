@@ -632,8 +632,6 @@
             "view_code_description": "You can use the following code to start integrating your current prompt and settings into your application."
         },
 
-        "metering": "Metering",
-
         "exports": {
             "title": "Exports",
             "name": "Name",
@@ -641,8 +639,9 @@
             "empty_message_text": "No exports to display."
         },
 
-        "usage": {
-            "title": "Tokens",
+        "metering": {
+            "title": "Metering",
+            "tokens": "Tokens",
             "day": "Day",
             "month": "Month",
             "day_utc": "Day (UTC)",

@@ -5,13 +5,13 @@ import type { DateRangePickerProps, PropertyFilterProps } from 'components';
 
 import { IModelExtended } from '../../List/types';
 
-export type TUsagePeriod = Extract<TMeteringGroupBy, 'day' | 'month'>;
+export type TMeteringPeriod = Extract<TMeteringGroupBy, 'day' | 'month'>;
 
-export type TUsageFilters = Pick<TMeteringListRequestParams, 'project_name' | 'user_name'>;
+export type TMeteringFilters = Pick<TMeteringListRequestParams, 'project_name' | 'user_name'>;
 
 const DATE_FORMAT = 'yyyy-MM-dd';
 
-export const DEFAULT_PERIOD: TUsagePeriod = 'day';
+export const DEFAULT_PERIOD: TMeteringPeriod = 'day';
 
 export const DEFAULT_TIME_RANGE: DateRangePickerProps.RelativeOption = {
     key: 'last-30-days',
@@ -33,7 +33,7 @@ export const relativeOptions: DateRangePickerProps.RelativeOption[] = [
  */
 const getTimeRangeBounds = (
     timeRange: DateRangePickerProps.Value,
-    period: TUsagePeriod,
+    period: TMeteringPeriod,
     now: Date,
 ): Pick<TMeteringListRequestParams, 'start' | 'end'> => {
     const today = parseISO(now.toISOString().split('T')[0]);
@@ -54,24 +54,24 @@ const getTimeRangeBounds = (
     };
 };
 
-type TUsageRequest = {
+type TMeteringRequest = {
     model: IModelExtended;
     timeRange: DateRangePickerProps.Value;
-    period: TUsagePeriod;
-    filters: TUsageFilters;
+    period: TMeteringPeriod;
+    filters: TMeteringFilters;
     now: Date;
 };
 
 /**
  * The table's rows: the model's tokens by day or month and by project. A filter by user narrows them to that user's requests.
  */
-export const getUsageRequestParams = ({
+export const getMeteringRequestParams = ({
     model,
     timeRange,
     period,
     filters,
     now,
-}: TUsageRequest): TMeteringListRequestParams => ({
+}: TMeteringRequest): TMeteringListRequestParams => ({
     ...getTimeRangeBounds(timeRange, period, now),
     group_by: [period, 'project'],
     model_project_name: model.project_name,
@@ -83,15 +83,15 @@ export const getUsageRequestParams = ({
  * The rows don't have users, so the users that the filter offers come from a request of their own:
  * the same time range and model by user, in the project of the filter if it has one.
  */
-export const getUserOptionsRequestParams = ({ filters, ...request }: TUsageRequest): TMeteringListRequestParams => ({
-    ...getUsageRequestParams({ ...request, filters: _pick(filters, 'project_name') }),
+export const getUserOptionsRequestParams = ({ filters, ...request }: TMeteringRequest): TMeteringListRequestParams => ({
+    ...getMeteringRequestParams({ ...request, filters: _pick(filters, 'project_name') }),
     group_by: [request.period, 'user'],
 });
 
 /**
  * The API returns every row of a request, so the sum of the rows is the total.
  */
-export const getUsageTotal = (rows: IMeteringRow[]): IMeteringRow => ({
+export const getMeteringTotal = (rows: IMeteringRow[]): IMeteringRow => ({
     input_tokens: _sumBy(rows, 'input_tokens'),
     cached_input_tokens: _sumBy(rows, 'cached_input_tokens'),
     output_tokens: _sumBy(rows, 'output_tokens'),
@@ -115,11 +115,12 @@ export const getFilteringOptions = (
     );
 
 // A row has the day, or the first day of the month, that it sums
-const getUsagePeriod = (row: IMeteringRow) => row.day ?? row.month ?? '';
+const getMeteringPeriod = (row: IMeteringRow) => row.day ?? row.month ?? '';
 
-export const compareUsagePeriods = (a: IMeteringRow, b: IMeteringRow) => getUsagePeriod(a).localeCompare(getUsagePeriod(b));
+export const compareMeteringPeriods = (a: IMeteringRow, b: IMeteringRow) =>
+    getMeteringPeriod(a).localeCompare(getMeteringPeriod(b));
 
-export const formatUsagePeriod = (row: IMeteringRow) => {
+export const formatMeteringPeriod = (row: IMeteringRow) => {
     if (row.day) {
         return format(parseISO(row.day), 'MM/dd/yyyy');
     }
