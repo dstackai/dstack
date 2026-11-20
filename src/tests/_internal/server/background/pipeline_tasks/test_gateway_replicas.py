@@ -27,7 +27,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.runs import JobStatus, RunStatus, ServiceSpec
 from dstack._internal.core.models.services import OpenAIChatModel
-from dstack._internal.proxy.gateway.models import ImportedModel
+from dstack._internal.proxy.gateway.schemas.registry import ImportListItem
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListReplicaItem
 from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks import gateway_replicas
@@ -2427,7 +2427,7 @@ class TestGatewayReplicaWorkerRunningImportsSync:
         client_mock = _get_client_mock(mock_gateway_connection)
         client_mock.list_services.return_value = []
         client_mock.list_imports.return_value = [
-            ImportedModel(
+            ImportListItem(
                 importer_project="importer",
                 export_id=export.id.hex,
                 exporter_project="exporter",
@@ -2502,7 +2502,7 @@ class TestGatewayReplicaWorkerRunningImportsSync:
         # Second tick: the older export is deleted, so the import moves to the newer one.
         client_mock.reset_mock()
         client_mock.list_imports.return_value = [
-            ImportedModel(
+            ImportListItem(
                 importer_project="importer",
                 export_id=older_export_id.hex,
                 exporter_project="exporter",
@@ -2557,7 +2557,7 @@ class TestGatewayReplicaWorkerRunningImportsSync:
         client_mock.list_services.return_value = []
         # Registered while the gateway had a fixed domain.
         client_mock.list_imports.return_value = [
-            ImportedModel(
+            ImportListItem(
                 importer_project="importer",
                 export_id=export.id.hex,
                 exporter_project="exporter",

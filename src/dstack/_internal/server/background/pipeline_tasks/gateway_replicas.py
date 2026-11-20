@@ -26,8 +26,10 @@ from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
 from dstack._internal.core.models.instances import RemoteConnectionInfo
 from dstack._internal.core.models.runs import JobSpec, JobStatus, ServiceSpec
-from dstack._internal.proxy.gateway.models import ImportedModel
-from dstack._internal.proxy.gateway.schemas.registry import ReplicaProxyJumpKeyUpdate
+from dstack._internal.proxy.gateway.schemas.registry import (
+    ImportListItem,
+    ReplicaProxyJumpKeyUpdate,
+)
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem
 from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks.base import (
@@ -826,7 +828,7 @@ async def _run_process_running_gateway_replica_hooks(
 
 async def _list_imports(
     client: GatewayClient, replica_model: GatewayReplicaModel
-) -> Optional[list[ImportedModel]]:
+) -> Optional[list[ImportListItem]]:
     """Returns `None` if the imports cannot be listed. They are not synced then."""
     try:
         return await client.list_imports()
@@ -1644,7 +1646,7 @@ def _plan_state_sync(
     currently_registered: list[ServiceListItem],
     expected: Sequence[RunModel],
     instance_proxy_jump_public_keys: dict[uuid.UUID, str],
-    currently_registered_imports: Optional[list[ImportedModel]],
+    currently_registered_imports: Optional[list[ImportListItem]],
     expected_imports: set[_ImportRef],
 ) -> _StateSyncPlan:
     """

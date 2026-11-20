@@ -7,6 +7,7 @@ from dstack._internal.proxy.gateway.deps import get_gateway_proxy_repo, get_ngin
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.schemas.common import OkResponse
 from dstack._internal.proxy.gateway.schemas.registry import (
+    ImportListItem,
     ImportListResponse,
     RegisterEntrypointRequest,
     RegisterImportRequest,
@@ -169,7 +170,17 @@ async def register_entrypoint(
 async def list_imports(
     repo: Annotated[GatewayProxyRepo, Depends(get_gateway_proxy_repo)],
 ) -> ImportListResponse:
-    return ImportListResponse(imports=await repo.list_imports())
+    return ImportListResponse(
+        imports=[
+            ImportListItem(
+                importer_project=imported_model.importer_project,
+                export_id=imported_model.export_id,
+                exporter_project=imported_model.exporter_project,
+                name=imported_model.name,
+            )
+            for imported_model in await repo.list_imports()
+        ]
+    )
 
 
 @router.post("/{importer_project}/imports/register")
