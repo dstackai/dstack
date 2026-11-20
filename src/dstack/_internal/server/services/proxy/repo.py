@@ -1,6 +1,5 @@
 from typing import List, Optional
 
-import pydantic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, joinedload
@@ -37,8 +36,6 @@ from dstack._internal.server.settings import (
     SERVICE_CLIENT_TIMEOUT,
 )
 from dstack._internal.utils.common import get_or_error
-
-_ANY_MODEL_ADAPTER = pydantic.TypeAdapter(AnyModel)
 
 
 class ServerProxyRepo(BaseProxyRepo):
@@ -160,10 +157,9 @@ class ServerProxyRepo(BaseProxyRepo):
         for run in res.scalars().all():
             service_spec = validate_json_extra_ignore(ServiceSpec, get_or_error(run.service_spec))
             model_spec = service_spec.model
-            model_options_obj = service_spec.options.get("openai", {}).get("model")
-            if model_spec is None or model_options_obj is None:
+            model_options = service_spec.get_model_options()
+            if model_spec is None or model_options is None:
                 continue
-            model_options = _ANY_MODEL_ADAPTER.validate_python(model_options_obj)
             model = ChatModel(
                 project_name=project_name,
                 name=model_spec.name,

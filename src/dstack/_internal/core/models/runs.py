@@ -13,6 +13,7 @@ from dstack._internal.core.models.common import (
     NetworkMode,
     RegistryAuth,
     drop_merged_profile,
+    validate_extra_ignore,
 )
 from dstack._internal.core.models.configurations import (
     DEFAULT_PROBE_METHOD,
@@ -42,6 +43,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import Memory, ResourcesSpec
+from dstack._internal.core.models.services import AnyModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint
 from dstack._internal.utils import common as common_utils
@@ -649,6 +651,16 @@ class ServiceSpec(CoreModel):
 
     def get_domain(self) -> Optional[str]:
         return urlparse(self.url).hostname
+
+    def get_model_options(self) -> Optional[AnyModel]:
+        """
+        Returns the `model` of the service configuration, as the server saved it in `options`.
+        `None` if the service declares no model.
+        """
+        model_options = self.options.get("openai", {}).get("model")
+        if model_options is None:
+            return None
+        return validate_extra_ignore(AnyModel, model_options)
 
 
 class RunStatus(str, Enum):
