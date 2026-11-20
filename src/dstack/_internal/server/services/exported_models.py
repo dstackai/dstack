@@ -11,11 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, raiseload
 
 from dstack._internal.core.errors import ServerClientError
-from dstack._internal.core.models.common import (
-    EntityReference,
-    validate_extra_ignore,
-    validate_json_extra_ignore,
-)
+from dstack._internal.core.models.common import EntityReference, validate_json_extra_ignore
 from dstack._internal.core.models.runs import RunStatus, ServiceSpec
 from dstack._internal.core.models.services import AnyModel
 from dstack._internal.server.models import (
@@ -178,10 +174,7 @@ def get_service_model(run_model: RunModel) -> Optional[AnyModel]:
     if run_model.service_spec is None:
         return None
     service_spec = validate_json_extra_ignore(ServiceSpec, run_model.service_spec)
-    model = service_spec.options.get("openai", {}).get("model")
-    if model is None:
-        return None
-    return validate_extra_ignore(AnyModel, model)
+    return service_spec.get_model_options()
 
 
 def get_running_service_filters() -> list[ColumnElement[bool]]:
@@ -210,6 +203,8 @@ def _get_cannot_serve_message(run_model: RunModel, model: AnyModel) -> str:
         ),
         name=gateway_model.name,
     )
+    if gateway_model.wildcard_domain is None:
+        return f"{run_model.run_name!r} runs on {gateway_ref.format()!r}, which has no domain"
     return (
         f"{run_model.run_name!r} runs on {gateway_ref.format()!r},"
         " which has ${{ run.project_name }} in its domain"
