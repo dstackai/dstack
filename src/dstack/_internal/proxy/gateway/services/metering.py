@@ -20,7 +20,7 @@ from dstack._internal.proxy.lib.schemas.usage import (
     UsageKey,
 )
 from dstack._internal.proxy.lib.services.usage import (
-    VLLM_PROFILE,
+    METERING_PROFILES,
     UsageAttempt,
     UsageObserver,
     normalize_usage,
@@ -94,7 +94,7 @@ class MeteringCollector(UsageObserver):
         async with self._lock:
             self._reconfiguring = True
             try:
-                if any(profile != VLLM_PROFILE for profile in profiles.values()):
+                if any(profile not in METERING_PROFILES for profile in profiles.values()):
                     raise ProxyError("Unsupported metering profile")
                 changed = {
                     key
@@ -128,7 +128,7 @@ class MeteringCollector(UsageObserver):
             or self._storage_error
             or self._clock_error
             or self.profile_for(key.service_id) != profile
-            or profile != VLLM_PROFILE
+            or profile not in METERING_PROFILES
         ):
             raise ProxyError("Usage metering is unavailable", 503)
         keys = set(self._entries) | {attempt.key for attempt in self._attempts} | {key}
@@ -275,7 +275,7 @@ class MeteringCollector(UsageObserver):
                 logger.error("Usage finalization paused after a backward clock jump")
                 raise
             previous = self._entries.get(attempt.key) or UsageEntry(**attempt.key.model_dump())
-            usage = attempt.usage or TokenUsage()
+            usage = attempt.usage or attempt.partial_usage or TokenUsage()
             values = {
                 name: getattr(previous, name) + getattr(usage, name)
                 for name in TokenUsage.model_fields
@@ -361,12 +361,16 @@ class MeteringAttempt(UsageAttempt):
         self.upstream_done = False
         self.finished = False
         self.usage: TokenUsage | None = None
+        self.partial_usage: TokenUsage | None = None
         self._finish_task: asyncio.Task[None] | None = None
 
     def observe_usage(self, usage: Any) -> None:
         confirmed = normalize_usage(usage, self.profile)
         if confirmed is not None:
             self.usage = confirmed
+
+    def observe_partial_usage(self, usage: TokenUsage | None) -> None:
+        self.partial_usage = usage
 
     def mark_dispatched(self) -> None:
         self.dispatched = True

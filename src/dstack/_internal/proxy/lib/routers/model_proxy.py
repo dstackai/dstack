@@ -88,7 +88,12 @@ async def post_chat_completions(
                 return await client.generate(body)
             return await client.generate(body, attempt=attempt)
         source = client.stream(body) if attempt is None else client.stream(body, attempt=attempt)
-        adaptor = StreamingAdaptor(source, attempt=attempt)
+        include_usage = (
+            attempt is not None
+            and body.stream_options is not None
+            and body.stream_options.include_usage
+        )
+        adaptor = StreamingAdaptor(source, attempt=attempt, include_usage=include_usage)
         stream = await adaptor.get_stream()
         response = MeteredStreamingResponse(
             stream,
@@ -112,10 +117,15 @@ class StreamingAdaptor:
     """
 
     def __init__(
-        self, stream: AsyncIterator[ChatCompletionsChunk], attempt: UsageAttempt | None = None
+        self,
+        stream: AsyncIterator[ChatCompletionsChunk],
+        attempt: UsageAttempt | None = None,
+        *,
+        include_usage: bool = False,
     ) -> None:
         self._stream = stream
         self._attempt = attempt
+        self._include_usage = include_usage
         self._close_task: asyncio.Task | None = None
 
     async def get_stream(self) -> AsyncIterator[bytes]:
@@ -153,9 +163,9 @@ class StreamingAdaptor:
             if self._attempt is not None:
                 await self._attempt.finish()
 
-    @staticmethod
-    def _encode_chunk(chunk: ChatCompletionsChunk) -> bytes:
-        encoded = chunk.model_dump_json(exclude={"usage"} if chunk.usage is None else None)
+    def _encode_chunk(self, chunk: ChatCompletionsChunk) -> bytes:
+        exclude = {"usage"} if chunk.usage is None and not self._include_usage else None
+        encoded = chunk.model_dump_json(exclude=exclude)
         return f"data:{encoded}\n\n".encode()
 
 

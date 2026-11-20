@@ -173,9 +173,22 @@ ssh -i /tmp/gateway.key ubuntu@$GATEWAY_IP_ADDR sudo journalctl -u dstack.gatewa
 ## Gateway usage metering (DS-002)
 
 Metering is opt-in per registered OpenAI service via the private `/api/config` field
-`usage_metering_profiles` (`service.id` → `vllm-0.19.1-prompt-details`). Legacy updates
-that omit the field preserve it; an empty map disables it. Drain changed services
-and cross a minute boundary before changing the profile.
+`usage_metering_profiles`, which maps each service ID to a profile. Updates that omit
+the field preserve it. An empty map disables it. Drain changed services and cross a
+minute boundary before changing the profile.
+
+| Profile | Upstream behavior |
+|---|---|
+| `vllm-0.19.1-prompt-details` | Original final-only profile. Use it for a route that reports final usage in JSON or an SSE usage-only event. |
+| `vllm-0.19.1-per-choice` | vLLM 0.19.1 choice-scoped progress, including through SMG HTTP when the worker forces usage. Older SMG HTTP can drop the per-request continuous option. |
+| `dynamo-1.6.2-rust` | Dynamo 1.6.2 default chat processor with request-wide progress and a final usage-only event. |
+| `dynamo-1.6.2-vllm` | Dynamo 1.6.2 Python vLLM chat processor with request-wide progress and usage on the finishing choice. |
+
+The progress profiles request `continuous_usage_stats` privately. Streaming callers
+who request usage receive one request-wide final SSE event when the Gateway has a
+complete measurement. The collector books the authoritative final or the measured
+prefix once in the minute the attempt closes. A prefix contributes to the measured
+totals, and `unknown_usage_attempts` includes attempts with an unmeasured remainder.
 
 The existing Python model proxy observes backend JSON/SSE usage and obtains a verified
 user ID from server's additive `authorize_proxy` endpoint. Counters use that user ID

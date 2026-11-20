@@ -83,6 +83,12 @@ def make_backend() -> FastAPI:
                     }
                 ],
             }
+            if (body.get("stream_options") or {}).get("continuous_usage_stats"):
+                content["usage"] = {
+                    "prompt_tokens": expected["prompt_tokens"],
+                    "completion_tokens": 1,
+                    "total_tokens": expected["prompt_tokens"] + 1,
+                }
             raw = ("data: " + json.dumps(content, ensure_ascii=False) + "\r\n\r\n").encode()
             for offset in range(0, len(raw), 3):
                 yield raw[offset : offset + 3]

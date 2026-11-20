@@ -215,8 +215,12 @@ async def test_json_and_streaming_usage(harness, stream, case):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("after_usage", [False, True])
-async def test_stream_disconnect(harness, after_usage):
+@pytest.mark.parametrize(
+    "after_usage,progressive",
+    [(False, False), (True, False), (False, True)],
+    ids=["before-usage", "after-final", "after-progress"],
+)
+async def test_stream_disconnect(harness, after_usage, progressive):
     h = harness
     await h.backend_control(hold=["disconnect"], after_usage=after_usage)
     body = {
@@ -227,6 +231,11 @@ async def test_stream_disconnect(harness, after_usage):
         "stream_options": {"include_usage": True},
     }
     async with httpx.AsyncClient(base_url=h.gateway_url, timeout=10) as client:
+        if progressive:
+            config = await client.post(
+                "/api/config", json={"usage_metering_profiles": {PAIR[1]: "dynamo-1.6.2-rust"}}
+            )
+            config.raise_for_status()
         async with client.stream(
             "POST",
             "/api/models/p/chat/completions",
@@ -243,9 +252,31 @@ async def test_stream_disconnect(harness, after_usage):
                 if (not after_usage and saw_content) or (after_usage and event.get("usage")):
                     break
             assert saw_content  # Content arrives while final usage / DONE is still held.
+            if progressive:
+                assert event["usage"] is None
+                await close_minute(h)
+                assert (await h.batches())["batches"] == []
     await h.wait_finalized("disconnect")
     await close_minute(h)
-    assert totals((await h.batches())["batches"][0]) == expected("A" if after_usage else "cut")
+    wanted = expected("A" if after_usage else "cut")
+    if progressive:
+        wanted.update(completion_tokens=1, total_tokens=1)
+    (batch,) = (await h.batches())["batches"]
+    assert totals(batch) == wanted
+    if progressive:
+        receiver = MockReceiver(
+            h.gateway_url,
+            h.state / "partial.sqlite",
+            gateway_replica_id="replica-a",
+            gateway_id="gateway-a",
+        )
+        try:
+            receipt = await receiver.collect_once()
+            assert receipt.acked_ids == [batch["batch_id"]]
+            assert receiver.totals() == {PAIR: wanted}
+            assert (await h.batches())["batches"] == []
+        finally:
+            await receiver.close()
     await h.backend_control(release=["disconnect"])
 
 

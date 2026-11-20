@@ -1,10 +1,13 @@
 import json
+from contextlib import asynccontextmanager
 
 import httpx
 import pytest
 from fastapi import FastAPI
 
+from dstack._internal.proxy.gateway.deps import get_metering
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.routers.usage import router as usage_router
 from dstack._internal.proxy.gateway.services.metering import MeteringCollector
 from dstack._internal.proxy.gateway.services.metering_store import MeteringStore
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
@@ -89,7 +92,7 @@ async def test_backend_usage_is_observed_and_forwarded(tmp_path, stream, include
             assert requests[0]["stream_options"]["include_usage"] is True
             assert request.stream_options is not None
             assert request.stream_options.include_usage is include_usage
-            assert len(chunks) == (3 if include_usage else 1)
+            assert len(chunks) == (2 if include_usage else 1)
             if include_usage:
                 usage = chunks[-1].usage
                 assert usage is not None and usage.prompt_tokens_details is not None
@@ -159,6 +162,275 @@ class MeteredInjector(ProxyTestDependencyInjector):
 
     def get_usage_observer(self):
         return self.collector
+
+
+@asynccontextmanager
+async def metered_endpoint(tmp_path, monkeypatch, profile, backend_handler):
+    clock = FakeClock()
+    collector = MeteringCollector(MeteringStore(tmp_path / "usage.json"), clock=clock)
+    await collector.configure_profiles({"s": profile})
+    try:
+        repo = GatewayProxyRepo()
+        await repo.set_service(make_service("p", "run", run_id="s"))
+        await repo.set_model(
+            ChatModel(
+                project_name="p",
+                name="test",
+                run_name="run",
+                created_at=clock.utc_now(),
+                format_spec=OpenAIChatModelFormat(format="openai", prefix="/v1"),
+            )
+        )
+        app = FastAPI()
+        app.state.proxy_dependency_injector = MeteredInjector(repo, collector)
+        app.include_router(model_router, prefix="/models")
+        app.dependency_overrides[get_metering] = lambda: collector
+        app.include_router(usage_router, prefix="/api/usage")
+        async with (
+            httpx.AsyncClient(
+                transport=httpx.MockTransport(backend_handler), base_url="http://backend"
+            ) as backend,
+            httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app),
+                base_url="http://gateway",
+                headers={"Authorization": "Bearer token"},
+            ) as client,
+        ):
+
+            async def connection(*args, **kwargs):
+                return backend
+
+            monkeypatch.setattr(
+                "dstack._internal.proxy.lib.routers.model_proxy.get_service_replica_client",
+                connection,
+            )
+            yield client, collector, clock
+    finally:
+        await collector.close()
+
+
+def sse_choice(index, *, content="", finish_reason=None, usage=None):
+    return {
+        "id": "answer",
+        "model": "test",
+        "created": 17,
+        "choices": [
+            {"index": index, "delta": {"content": content}, "finish_reason": finish_reason}
+        ],
+        **({"usage": usage} if usage is not None else {}),
+    }
+
+
+def token_counts(prompt, completion, *, cached=None):
+    return {
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+        "total_tokens": prompt + completion,
+        **({"prompt_tokens_details": {"cached_tokens": cached}} if cached is not None else {}),
+    }
+
+
+def sse_reply(events, *, done=True):
+    wire = "".join("data: " + json.dumps(event) + "\n\n" for event in events)
+    return httpx.Response(
+        200, stream=FragmentedStream((wire + ("data: [DONE]\n\n" if done else "")).encode())
+    )
+
+
+async def public_chat(client, **options):
+    return await client.post(
+        "/models/p/chat/completions", json={"model": "test", "messages": [], **options}
+    )
+
+
+def public_events(response):
+    assert response.status_code == 200
+    data = [line[5:].strip() for line in response.text.splitlines() if line.startswith("data:")]
+    assert data[-1] == "[DONE]"
+    return [json.loads(event) for event in data[:-1]]
+
+
+async def close_minute(collector, clock):
+    clock.advance()
+    await collector.rotate_if_due()
+    (batch,) = (await collector.get_batches()).batches
+    (entry,) = batch.entries
+    return entry
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("include", [False, True])
+async def test_dynamo_inline_usage_preserves_last_text_and_settles_once(
+    tmp_path, monkeypatch, include
+):
+    # Live client-option matrix, Dynamo 1.6.2 with the Python vLLM processor.
+    measured = token_counts(57, 32, cached=48)
+    requests = []
+
+    def backend(request):
+        requests.append(json.loads(request.content))
+        return sse_reply(
+            [
+                sse_choice(0, content="Okay", usage=token_counts(57, 1)),
+                sse_choice(0, content=" the", finish_reason="length", usage=measured),
+            ]
+        )
+
+    async with metered_endpoint(tmp_path, monkeypatch, "dynamo-1.6.2-vllm", backend) as (
+        client,
+        collector,
+        clock,
+    ):
+        response = await public_chat(
+            client, stream=True, **({"stream_options": {"include_usage": True}} if include else {})
+        )
+        events = public_events(response)
+        assert [e["choices"][0]["delta"]["content"] for e in events if e["choices"]] == [
+            "Okay",
+            " the",
+        ]
+        assert events[1]["choices"][0]["finish_reason"] == "length"
+        if include:
+            assert [e["usage"] for e in events] == [None, None, measured]
+            assert events[2]["choices"] == []
+            assert events[2]["id"] == "answer" and events[2]["created"] == 17
+        else:
+            assert len(events) == 2 and all("usage" not in e for e in events)
+        (request,) = requests
+        assert request["stream_options"] == {"include_usage": True, "continuous_usage_stats": True}
+        entry = await close_minute(collector, clock)
+        assert (entry.prompt_tokens, entry.cached_prompt_tokens, entry.completion_tokens) == (
+            57,
+            48,
+            32,
+        )
+        assert (entry.total_tokens, entry.unknown_usage_attempts) == (89, 0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("per_choice", [False, True])
+@pytest.mark.parametrize("done", [False, True])
+async def test_stream_counts_interleaved_choices_using_profile(
+    tmp_path, monkeypatch, per_choice, done
+):
+    first_finish = sse_choice(
+        1, finish_reason="stop", usage=token_counts(10, 5 if per_choice else 6)
+    )
+    events = [sse_choice(0, content="Hi", usage=token_counts(10, 1)), first_finish, first_finish]
+    if done:
+        events.extend(
+            [
+                sse_choice(0, content=" last", usage=token_counts(10, 2 if per_choice else 7)),
+                first_finish,
+                sse_choice(
+                    0, finish_reason="stop", usage=token_counts(10, 3 if per_choice else 8)
+                ),
+            ]
+        )
+    profile = "vllm-0.19.1-per-choice" if per_choice else "dynamo-1.6.2-vllm"
+    async with metered_endpoint(
+        tmp_path, monkeypatch, profile, lambda request: sse_reply(events, done=done)
+    ) as (client, collector, clock):
+        reply = await public_chat(client, stream=True, n=2, stream_options={"include_usage": True})
+        if done:
+            assert public_events(reply)[-1]["usage"] == {
+                **token_counts(10, 8),
+                "prompt_tokens_details": None,
+            }
+        else:
+            assert reply.status_code == 200
+            assert "data: [DONE]" not in reply.text and '"choices":[]' not in reply.text
+        entry = await close_minute(collector, clock)
+        assert (entry.prompt_tokens, entry.completion_tokens, entry.total_tokens) == (
+            (10, 8, 18) if done else (0, 6, 6)
+        )
+        assert entry.unknown_usage_attempts == int(not done)
+
+
+@pytest.mark.asyncio
+async def test_replayed_earlier_finish_cannot_supply_missing_final_total(tmp_path, monkeypatch):
+    first_finish = sse_choice(0, finish_reason="stop", usage=token_counts(10, 6))
+    events = [
+        first_finish,
+        sse_choice(1, content="last", finish_reason="stop"),
+        first_finish,
+    ]
+    async with metered_endpoint(
+        tmp_path, monkeypatch, "dynamo-1.6.2-vllm", lambda request: sse_reply(events)
+    ) as (client, collector, clock):
+        reply = await public_chat(client, stream=True, n=2, stream_options={"include_usage": True})
+        assert all(event["choices"] and event["usage"] is None for event in public_events(reply))
+        entry = await close_minute(collector, clock)
+        assert (entry.total_tokens, entry.unknown_usage_attempts) == (6, 1)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("regression", ["prompt", "cache", "conflicting-finish"])
+async def test_inconsistent_progress_does_not_displace_last_verified_prefix(
+    tmp_path, monkeypatch, regression
+):
+    if regression == "conflicting-finish":
+        events = [
+            sse_choice(0, finish_reason="stop", usage=token_counts(10, 2, cached=5)),
+            sse_choice(0, finish_reason="stop", usage=token_counts(10, 3, cached=5)),
+        ]
+    else:
+        events = [
+            sse_choice(0, usage=token_counts(10, 2, cached=5)),
+            sse_choice(0, usage=token_counts(8 if regression == "prompt" else 10, 3, cached=4)),
+            sse_choice(0, finish_reason="stop", usage=token_counts(10, 4, cached=5)),
+        ]
+    async with metered_endpoint(
+        tmp_path, monkeypatch, "vllm-0.19.1-per-choice", lambda request: sse_reply(events)
+    ) as (client, collector, clock):
+        reply = await public_chat(client, stream=True, stream_options={"include_usage": True})
+        assert all(event["choices"] and event["usage"] is None for event in public_events(reply))
+        entry = await close_minute(collector, clock)
+        assert (
+            entry.prompt_tokens,
+            entry.cached_prompt_tokens,
+            entry.completion_tokens,
+            entry.unknown_usage_attempts,
+        ) == (10, 5, 2, 1)
+
+
+@pytest.mark.asyncio
+async def test_final_usage_supersedes_progress_and_public_extension_is_rejected(
+    tmp_path, monkeypatch
+):
+    requests = []
+    final = token_counts(10, 28, cached=2)
+
+    def backend(request):
+        requests.append(json.loads(request.content))
+        return sse_reply(
+            [
+                sse_choice(0, content="Hi", usage=token_counts(10, 30)),
+                sse_choice(0, finish_reason="stop", usage=token_counts(10, 30)),
+                {**sse_choice(0), "choices": [], "usage": final},
+            ]
+        )
+
+    async with metered_endpoint(tmp_path, monkeypatch, "dynamo-1.6.2-rust", backend) as (
+        client,
+        collector,
+        clock,
+    ):
+        denied = await public_chat(
+            client,
+            stream=True,
+            stream_options={"include_usage": True, "continuous_usage_stats": True},
+        )
+        assert denied.status_code == 422
+        assert requests == []
+        reply = await public_chat(client, stream=True, stream_options={"include_usage": True})
+        assert [e["usage"] for e in public_events(reply)] == [None, None, final]
+        entry = await close_minute(collector, clock)
+        assert (entry.total_tokens, entry.cached_prompt_tokens, entry.unknown_usage_attempts) == (
+            38,
+            2,
+            0,
+        )
 
 
 @pytest.mark.asyncio
