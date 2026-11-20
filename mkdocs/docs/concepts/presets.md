@@ -361,9 +361,23 @@ The `CONSTRAINTS` column is what the creation was asked for, and `BENCHMARK` is 
 
 When `concurrency` is a list, `CONSTRAINTS` shows it as `c=min..max`, and the `BENCHMARK` metrics become ranges over the concurrencies that met the constraints, e.g. `tps/user=min..max` and `ttft=min..max`.
 
-The glyphs after the benchmark are one per trial: height is the trial's highest throughput across its concurrency values that met the constraints, a yellow bar is a trial that broke a constraint at every concurrency, and a red `·` is one that produced no benchmark at all. The shape shows whether a run converged or wandered.
 
-Pass `-w` to watch in realtime, `-v` for more detail, or `--json` for complete preset objects. Filter with `--base` or `--repo`.
+!!! info "Sparkline legend"
+
+    Each bar in the sparklines represents one trial. The bar height is the trial's highest tok/s across concurrency values that met the constraints.
+    
+    | Bar color | Semantics |
+    | --- | --- |
+    | Red | A trial that broke constraints at every concurrency. |
+    | Green | The best trial that met the constraints. |
+    | Gray | A trial that met the constraints but had lower tok/s than the best trial. |
+    | Yellow | The best trial, if it broke constraints at every concurrency. |
+    
+    A red `·` represets a trial that produced no benchmark.
+
+For detailed benchmark data at each concurrency, pass `--json` to `dstack preset get`.
+
+To watch in realtime, use `-w` with `dstack preset`. Filter with `--base` or `--repo`. Also, use `-v` for verbose output.
 
 ### Delete presets
 
