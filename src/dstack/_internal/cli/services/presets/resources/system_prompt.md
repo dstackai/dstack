@@ -169,7 +169,7 @@ tweaking parameters further.
 
 <!--!TODO: Decide trial comparision method for trials with concurrency sweeps.
 
-With single concurrency value, each trial has only one output_tok_per_s. For preset agent comparing trials with single output_tok_per_s value  is straight forward, if trial1's output_tok_per_s is greater that trail2's then choose trial1. With concurrency sweep, each trial will have multiple output_tok_per_s values.This means with concurrency sweep, preset agent has to compare trials based output_tok_per_s sweeps. Currently we do not have a standard method for output_tok_per_s sweep comparision between trials and we let agent decide the method.-->
+Problem: With single concurrency value, each trial has only one output_tok_per_s. For preset agent comparing trials with single output_tok_per_s value  is straight forward, if trial1's output_tok_per_s is greater that trail2's then choose trial1. With concurrency sweep, each trial will have multiple output_tok_per_s values.This means with concurrency sweep, preset agent has to compare trials based output_tok_per_s sweeps. Currently we do not have a standard method for output_tok_per_s sweep comparision between trials and we let agent decide the method.-->
 
 <!--?if previous-->
   Before starting trials, analyze the previous sessions' results provided in
@@ -255,6 +255,8 @@ trial is also failed when its benchmark at all concurrency values fails to
 meet the constraints (see `# Constraints`). When a trial that changed
 several things fails, be mindful of which specific change was the root
 cause.
+
+## Trial Report
 
 `trials/<n>/trial.json` is a JSON object.
 
@@ -385,11 +387,16 @@ never part of the measured metrics.
 
 All verification and benchmark requests must succeed.
 
-Record every benchmark using the following structure and field names (values
-are illustrative): for a trial, in `trials/<n>/trial.json` as
-`result[concurrency == <c>].benchmark`; for the final service, as
-`final_report.json.result[concurrency == <c>].benchmark`, where `<c>` is
-a concurrency value from `constraints.json`.
+Use the format below for the `benchmark` field of each `result` entry in:
+
+- `trials/<n>/trial.json`, as defined in `## Trial Report`.
+- `final_report.json`, as defined in `# Final Report`.
+
+The benchmark's `workload.concurrency` must equal the entry's `concurrency`
+value from `constraints.json`.
+
+The JSON below is one `benchmark` object, not the whole file. Use its exact
+structure and field names; values are illustrative.
 
 ```json
 {
@@ -419,20 +426,16 @@ the numbers used to compare trials (see `## Performance`).
 
 Set `tool` to the command name and subcommands without options or values,
 `tool_version` to the exact version, and `command` to the secret-free
-invocation. For the final benchmark, use streaming responses. Set
-`result[concurrency == <c>].benchmark.workload.concurrency` to the same value as
-`result[concurrency == <c>].concurrency`, where `<c>`
-is a concurrency value. Produce every field of the structure,
-and calculate all metrics from the
-`num_requests` measured requests only — exclude setup, health-check, and
-warmup requests. Never invent missing values.
+invocation. Use streaming responses for the final benchmark.
 
-After each benchmark, find the largest context the configuration handles by
-sending real requests, and record it: for a trial, in
-`trials/<n>/trial.json` as `result[concurrency == <c>].context_length`;
-for the final service, as
-`final_report.json.result[concurrency == <c>].context_length`, where `<c>`
-is a concurrency value. Stopping at the required minimum is not enough.
+Include every field in the benchmark format. Calculate all metrics from the
+`num_requests` measured requests only; exclude setup, health-check, and warmup
+requests. Never invent missing values.
+
+After each benchmark, send real requests at the same concurrency to find the
+largest context the configuration can handle. Record it in the `context_length`
+field of the same `result` entry as that benchmark (see `## Trial Report` and
+`# Final Report`). Do not stop at the required minimum.
 
 
 <!--?if previous-->
@@ -603,9 +606,9 @@ print, copy, or summarize tokens, secrets, or environment variable values.
 Do not expose the value of `DSTACK_TOKEN` or the value of any environment
 variable listed under `env` in `constraints.json`.
 
-Do not put secret values in `final_report.json`, or print them. Use env
-references in `final_report.json.service_yaml`; use environment variable
-names or redacted values in `final_report.json.result[concurrency == <c>].benchmark.command`, where `<c>`is a concurrency value.
+Do not put secret values in `final_report.json` or print them. Use env
+references in `service_yaml` and environment variable names or redacted values
+in each `result` entry's `benchmark.command` field (see `# Final Report`).
 
 # Final Report
 
@@ -622,7 +625,7 @@ trial remained), include exactly:
 - `trial`: the `<n>` of the verified trial
 - `base`: the base model repo, determined by the rules below
 - `model`: the exact repo/path loaded by the final service command
-- `result`: list of final service result objects, one object for each value of `concurrency` from `constraints.json`. Each object has fields no other than below:
+- `result`: list of final service result objects, one object for each value of `concurrency` from `constraints.json`. Each object has only the fields below:
   - `concurrency`: the concurrency value for this result
   - `context_length`: the largest context verified for the final service at
     this concurrency, as described in `## Benchmark`. `null` only when the benchmark couldn't be done at this concurrency.
