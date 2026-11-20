@@ -12,7 +12,7 @@
 
 `dstack-proxy` acts as a reverse proxy and load balancer for services.
 
-The in-server proxy uses a custom reverse proxy implementation based on FastAPI and httpx. It routes requests based on the `/proxy/services/<project>/<service>` path. It performs load balancing by selecting a random service replica for each forwarded request.
+The in-server proxy uses a custom reverse proxy implementation based on FastAPI and httpx2. It routes requests based on the `/proxy/services/<project>/<service>` path. It performs load balancing by selecting a random service replica for each forwarded request.
 
 The gateway uses Nginx. It automatically maintains Nginx configs for each service in `/etc/nginx/sites-enabled/*`. Each service is published at a subdomain. Nginx performs load balancing using the round-robin method. Nginx forwards requests directly to service replicas, so traffic does not go through the gateway app.
 

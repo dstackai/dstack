@@ -6,8 +6,7 @@ unchanged, and the tokens that the model reports in `usage` are metered.
 import asyncio
 from typing import Annotated, Any, AsyncIterator, Coroutine, Optional, TypeVar
 
-import anyio
-import httpx
+import httpx2 as httpx
 from fastapi import Request, Response, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -256,20 +255,21 @@ async def _run_until_disconnect(request: Request, coro: Coroutine[Any, Any, T]) 
     Awaits `coro`. If the client disconnects first, cancels `coro` and raises `ProxyError`.
     The tokens of the response are then not metered, since nobody receives it.
     """
-    # Cancelled with an anyio scope, which httpx handles. If requests to the client that
-    # services share are cancelled with `asyncio.Task.cancel()`, some of their connections
-    # are never released (measured: 16-18 of 3000 requests, a third of them cancelled
-    # before the response and a third during it).
-    with anyio.CancelScope() as scope:
-        disconnect_watcher = asyncio.ensure_future(_cancel_on_disconnect(request, scope))
-        try:
-            return await coro
-        finally:
-            disconnect_watcher.cancel()
-    raise ProxyError("Client disconnected")
+    task = asyncio.ensure_future(coro)
+    disconnect_watcher = asyncio.ensure_future(_wait_for_disconnect(request))
+    try:
+        await asyncio.wait([task, disconnect_watcher], return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        disconnect_watcher.cancel()
+        if not task.done():
+            task.cancel()
+            # The cancelled request releases its connection before the handler goes on.
+            await asyncio.wait([task])
+    if task.cancelled():
+        raise ProxyError("Client disconnected")
+    return task.result()
 
 
-async def _cancel_on_disconnect(request: Request, scope: anyio.CancelScope) -> None:
+async def _wait_for_disconnect(request: Request) -> None:
     while (await request.receive())["type"] != "http.disconnect":
         pass
-    scope.cancel()

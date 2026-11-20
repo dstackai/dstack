@@ -5,8 +5,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Dict, Optional
 
-import httpx
-from httpx import AsyncHTTPTransport
+import httpx2 as httpx
+from httpx2 import AsyncHTTPTransport
 
 from dstack._internal.core.services.ssh.tunnel import (
     SSH_DEFAULT_OPTIONS,
@@ -37,6 +37,11 @@ REPLICA_DRAIN_TIMEOUT = 300
 
 
 class ServiceClient(httpx.AsyncClient):
+    """
+    The client that the requests to a service share. An httpx2 client, since a request is
+    cancelled when its client disconnects, and httpx then leaves some connections unreleased.
+    """
+
     def build_request(self, *args, **kwargs) -> httpx.Request:
         self.cookies.clear()  # the client is shared by all users, don't leak cookies
         return super().build_request(*args, **kwargs)
