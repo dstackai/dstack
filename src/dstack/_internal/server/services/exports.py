@@ -275,6 +275,8 @@ async def update_export(
             raise ServerClientError(
                 "Cannot change global status and add/remove importers at the same time"
             )
+        # A global export cannot have models yet, so, like importers,
+        # models are not changed in the same update as the global status.
         if (set_global or unset_global) and (
             add_exported_model_names or remove_exported_model_names
         ):
