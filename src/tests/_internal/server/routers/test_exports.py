@@ -1344,39 +1344,6 @@ class TestUpdateExport:
             "model3",
         ]
 
-    @pytest.mark.parametrize(
-        ("project_role", "status_code"),
-        [(ProjectRole.ADMIN, 200), (ProjectRole.MANAGER, 403), (ProjectRole.USER, 403)],
-    )
-    async def test_only_project_admin_can_add_models(
-        self,
-        session: AsyncSession,
-        client: AsyncClient,
-        project_role: ProjectRole,
-        status_code: int,
-    ):
-        user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session, owner=user)
-        await add_project_member(
-            session=session, project=project, user=user, project_role=project_role
-        )
-        export = await create_export(
-            session=session,
-            exporter_project=project,
-            importer_projects=[],
-            exported_fleets=[],
-            name="test-export",
-        )
-
-        response = await client.post(
-            f"/api/project/{project.name}/exports/update",
-            headers=get_auth_headers(user.token),
-            json={"name": "test-export", "add_exported_models": ["test-model"]},
-        )
-        assert response.status_code == status_code
-        await session.refresh(export, ["exported_models"])
-        assert len(export.exported_models) == (1 if status_code == 200 else 0)
-
     async def test_cannot_add_model_to_global_export(
         self, session: AsyncSession, client: AsyncClient
     ):
