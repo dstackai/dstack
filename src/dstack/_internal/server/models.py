@@ -7,6 +7,7 @@ from pydantic import ConfigDict
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -18,6 +19,7 @@ from sqlalchemy import (
     Text,
     TypeDecorator,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import false
@@ -1512,12 +1514,49 @@ class ProviderRefModel(BaseModel):
 
 class UsageBatchModel(BaseModel):
     __tablename__ = "usage_batches"
+    _first_row = text("batch_row_number = 0")
     __table_args__ = (
-        UniqueConstraint("gateway_replica_id", "batch_id", name="uq_usage_batches_replica_batch"),
         UniqueConstraint(
-            "gateway_replica_id", "interval_start", name="uq_usage_batches_replica_minute"
+            "gateway_replica_id",
+            "batch_id",
+            "user_id",
+            "run_id",
+            name="uq_usage_batches_replica_batch_pair",
+        ),
+        Index(
+            "uq_usage_batches_replica_batch",
+            "gateway_replica_id",
+            "batch_id",
+            unique=True,
+            sqlite_where=_first_row,
+            postgresql_where=_first_row,
+        ),
+        Index(
+            "uq_usage_batches_replica_minute",
+            "gateway_replica_id",
+            "interval_start",
+            unique=True,
+            sqlite_where=_first_row,
+            postgresql_where=_first_row,
         ),
         Index("ix_usage_batches_gateway_interval", "gateway_id", "interval_start"),
+        CheckConstraint(
+            "prompt_tokens >= 0 AND cached_prompt_tokens >= 0 "
+            "AND cached_prompt_tokens <= prompt_tokens AND completion_tokens >= 0 "
+            "AND total_tokens >= 0 AND total_tokens - prompt_tokens = completion_tokens "
+            "AND unknown_usage_attempts >= 0",
+            name="counters",
+        ),
+        CheckConstraint(
+            "typeof(prompt_tokens) = 'integer' AND typeof(cached_prompt_tokens) = 'integer' "
+            "AND typeof(completion_tokens) = 'integer' AND typeof(total_tokens) = 'integer' "
+            "AND typeof(unknown_usage_attempts) = 'integer'",
+            name="integer_counters",
+        ).ddl_if(dialect="sqlite"),
+        CheckConstraint(
+            "typeof(batch_row_number) = 'integer' AND batch_row_number >= 0", name="row_number"
+        ).ddl_if(dialect="sqlite"),
+        CheckConstraint("batch_row_number >= 0", name="row_number").ddl_if(dialect="postgresql"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -1525,25 +1564,18 @@ class UsageBatchModel(BaseModel):
     )
     # Historical snapshots deliberately have no FK to deletable infrastructure.
     gateway_replica_id: Mapped[uuid.UUID] = mapped_column(UUIDType(binary=False))
-    gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False), nullable=True)
-    """NULL only for unresolved legacy history; new ingestion requires a parent."""
+    gateway_id: Mapped[uuid.UUID] = mapped_column(UUIDType(binary=False))
     batch_id: Mapped[str] = mapped_column(String(128))
     interval_start: Mapped[datetime] = mapped_column(NaiveDateTime)
     interval_end: Mapped[datetime] = mapped_column(NaiveDateTime)
     received_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
-    content: Mapped[str] = mapped_column(Text)
-    """Canonical normalized counters, never prompts, responses, or bearer tokens."""
-
-
-class UsageCounterModel(BaseModel):
-    __tablename__ = "usage_counters"
-
-    usage_baches_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("usage_batches.id"), primary_key=True
+    batch_row_number: Mapped[int] = mapped_column(Integer)
+    """Row zero claims the batch ID and minute for this replica."""
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), index=True
     )
-    consumer_subject_id: Mapped[str] = mapped_column(String(128), primary_key=True)
-    service_id: Mapped[str] = mapped_column(String(128), primary_key=True)
-    # Historical source IDs deliberately have no cascading foreign keys to users/runs.
+    run_id: Mapped[uuid.UUID] = mapped_column(UUIDType(binary=False), index=True)
+    """Historical run UUID retained after physical deletion."""
     prompt_tokens: Mapped[int] = mapped_column(BigInteger)
     cached_prompt_tokens: Mapped[int] = mapped_column(BigInteger)
     completion_tokens: Mapped[int] = mapped_column(BigInteger)

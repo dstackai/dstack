@@ -38,7 +38,6 @@ from dstack._internal.server.models import (
     ServiceRegistrationModel,
     ServiceReplicaRegistrationModel,
     UsageBatchModel,
-    UsageCounterModel,
 )
 from dstack._internal.server.testing.common import (
     AsyncContextManager,
@@ -677,7 +676,8 @@ class TestGatewayReplicaWorkerRunning:
     async def test_collects_minute_batch_for_claimed_replica(
         self, test_db, session, worker, mock_gateway_connection
     ):
-        project = await create_project(session)
+        user = await create_user(session)
+        project = await create_project(session, owner=user)
         backend = await create_backend(session, project.id)
         gateway = await create_gateway(
             session, project.id, backend.id, status=GatewayStatus.RUNNING
@@ -687,16 +687,18 @@ class TestGatewayReplicaWorkerRunning:
         await session.commit()
         mock_gateway_connection.return_value.ip_address = replica.ip_address
         client = _get_client_mock(mock_gateway_connection)
-        client.fetch_usage_batches.return_value = UsageBatchPage(batches=[batch()])
+        client.fetch_usage_batches.return_value = UsageBatchPage(batches=[batch(user.id)])
         client.list_services.return_value = []
 
         await worker.process(_replica_to_pipeline_item(replica))
 
-        receipt = (await session.scalars(select(UsageBatchModel))).one_or_none()
-        assert receipt is not None
-        assert (receipt.gateway_replica_id, receipt.gateway_id) == (replica.id, gateway.id)
-        counter = (await session.scalars(select(UsageCounterModel))).one()
-        assert counter.usage_baches_id == receipt.id and counter.total_tokens == 23
+        row = (await session.scalars(select(UsageBatchModel))).one()
+        assert (row.gateway_replica_id, row.gateway_id, row.user_id) == (
+            replica.id,
+            gateway.id,
+            user.id,
+        )
+        assert row.batch_row_number == 0 and row.total_tokens == 23
         client.acknowledge_usage.assert_awaited_once_with(["batch-1"])
 
     @pytest.mark.parametrize(
@@ -788,7 +790,8 @@ class TestGatewayReplicaWorkerRunning:
             sealed=waiting != "inflight", empty=waiting == "drained"
         )
         if waiting == "ack_failed":
-            client.fetch_usage_batches.return_value = UsageBatchPage(batches=[batch()])
+            user = await create_user(session)
+            client.fetch_usage_batches.return_value = UsageBatchPage(batches=[batch(user.id)])
             client.acknowledge_usage.side_effect = TimeoutError("ACK timed out")
         elif waiting == "unreachable":
             client.drain_usage.side_effect = TimeoutError("Gateway is unavailable")
@@ -802,6 +805,10 @@ class TestGatewayReplicaWorkerRunning:
         else:
             assert replica.status == GatewayReplicaStatus.RUNNING
             assert replica.active and replica.scale_in
+        if waiting == "ack_failed":
+            row = (await session.scalars(select(UsageBatchModel))).one()
+            assert (row.batch_id, row.batch_row_number, row.total_tokens) == ("batch-1", 0, 23)
+            client.acknowledge_usage.assert_awaited_once_with(["batch-1"])
         assert replica.lock_token is None
 
 

@@ -4,12 +4,13 @@ import sqlite3
 import uuid
 from contextlib import asynccontextmanager
 from datetime import timedelta
+from functools import partial
 from unittest.mock import Mock
 
 import httpx
 import pytest
 import pytest_asyncio
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import OperationalError
 
 from dstack._internal.proxy.lib.schemas.usage import (
@@ -24,7 +25,6 @@ from dstack._internal.server.models import (
     GatewayModel,
     GatewayReplicaModel,
     UsageBatchModel,
-    UsageCounterModel,
 )
 from dstack._internal.server.services.gateways import usage
 from dstack._internal.server.services.gateways.connection import GatewayConnection
@@ -37,7 +37,8 @@ from dstack._internal.server.testing.common import (
     create_user,
 )
 from dstack._internal.utils.common import get_current_datetime
-from tests._internal.server.services.test_usage import batch
+from tests._internal.server.services.test_usage import OTHER_RUN_ID, entry
+from tests._internal.server.services.test_usage import batch as make_batch
 
 
 class GatewayQueue:
@@ -72,9 +73,18 @@ async def claim(session, replica):
 
 
 @pytest_asyncio.fixture
-async def replica(session):
-    user = await create_user(session)
-    project = await create_project(session, owner=user)
+async def usage_user(session):
+    return await create_user(session)
+
+
+@pytest.fixture
+def batch(usage_user):
+    return partial(make_batch, usage_user.id)
+
+
+@pytest_asyncio.fixture
+async def replica(session, usage_user):
+    project = await create_project(session, owner=usage_user)
     backend = await create_backend(session, project.id)
     gateway = await create_gateway(session, project.id, backend.id)
     replica = await create_gateway_replica(session, backend, gateway_id=gateway.id)
@@ -83,10 +93,11 @@ async def replica(session):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestDrainGatewayUsage:
     @pytest.mark.parametrize("unsupported", [False, True])
     async def test_continues_collecting_closed_minutes_while_drain_is_pending(
-        self, session, replica, monkeypatch, unsupported
+        self, session, replica, batch, monkeypatch, unsupported
     ):
         queue = GatewayQueue(replica.ip_address, [batch()])
 
@@ -103,9 +114,9 @@ class TestDrainGatewayUsage:
             queue.connection, replica.id, replica.gateway_id, replica.lock_token
         )
         assert queue.acks == [["batch-1"]]
-        assert (await session.scalars(select(UsageCounterModel.total_tokens))).all() == [23]
+        assert (await session.scalars(select(UsageBatchModel.total_tokens))).all() == [23]
 
-    async def test_recovers_lost_final_ack_response(self, session, replica, monkeypatch):
+    async def test_recovers_lost_final_ack_response(self, session, replica, batch, monkeypatch):
         queue = GatewayQueue(replica.ip_address, [batch()])
         acknowledge = queue.acknowledge_usage
 
@@ -118,7 +129,7 @@ class TestDrainGatewayUsage:
         assert not await usage.drain_gateway_usage(*args)
         assert queue.acks == [["batch-1"]] and queue.items == []
         assert await usage.drain_gateway_usage(*args)
-        assert (await session.scalars(select(UsageCounterModel.total_tokens))).all() == [23]
+        assert (await session.scalars(select(UsageBatchModel.total_tokens))).all() == [23]
 
     async def test_does_not_start_drain_for_stale_claim_or_different_gateway(
         self, replica, monkeypatch
@@ -141,12 +152,14 @@ class TestDrainGatewayUsage:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestCollectGatewayUsage:
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_commit_before_ack_and_retry_after_lost_ack(
-        self, session, test_db, replica, monkeypatch
+        self, session, test_db, replica, batch, usage_user, monkeypatch
     ):
-        queue = GatewayQueue(replica.ip_address, [batch()])
+        entries = [entry(usage_user.id), entry(usage_user.id, OTHER_RUN_ID, completion=7)]
+        items = [batch(entries=entries), batch("next", offset=1)]
+        queue = GatewayQueue(replica.ip_address, items)
         sessions = []
         get_session = test_db.get_session
 
@@ -168,27 +181,39 @@ class TestCollectGatewayUsage:
         async def lose_first_ack(ids):
             transactions_during_io.append(any(s.in_transaction() for s in sessions))
             async with get_session() as observer:
-                batches = (await observer.scalars(select(UsageBatchModel.batch_id))).all()
-                counters = (await observer.scalars(select(UsageCounterModel.total_tokens))).all()
-            observed_at_ack.append((ids, batches, counters))
+                rows = (
+                    await observer.execute(
+                        select(
+                            UsageBatchModel.batch_id,
+                            UsageBatchModel.batch_row_number,
+                            UsageBatchModel.total_tokens,
+                        ).order_by(
+                            UsageBatchModel.interval_start, UsageBatchModel.batch_row_number
+                        )
+                    )
+                ).all()
+            observed_at_ack.append((ids, rows))
             raise httpx.WriteError("ACK lost in transit")
 
         monkeypatch.setattr(queue, "fetch_usage_batches", tracked_fetch)
         monkeypatch.setattr(queue, "acknowledge_usage", lose_first_ack)
         await usage.collect_gateway_usage(queue.connection, replica.id, replica.lock_token)
         assert transactions_during_io == [False, False]
-        assert observed_at_ack == [(["batch-1"], ["batch-1"], [23])]
-        assert queue.items == [batch()]
+        assert observed_at_ack == [
+            (["batch-1", "next"], [("batch-1", 0, 23), ("batch-1", 1, 27), ("next", 0, 23)])
+        ]
+        assert queue.items == items
+        queue.items = [batch(entries=entries[::-1]), items[1]]
         monkeypatch.setattr(queue, "acknowledge_usage", acknowledge)
         # A replacement worker fetches the already committed page from the Gateway.
         await claim(session, replica)
         await usage.collect_gateway_usage(queue.connection, replica.id, replica.lock_token)
         assert queue.fetches == 2
-        assert queue.acks == [["batch-1"]]
+        assert queue.acks == [["batch-1", "next"]]
         assert queue.items == []
-        assert (await session.scalars(select(UsageCounterModel.total_tokens))).all() == [23]
+        assert sorted(await session.scalars(select(UsageBatchModel.total_tokens))) == [23, 23, 27]
 
-    async def test_conflict_rolls_back_entire_page_without_ack(self, session, replica):
+    async def test_conflict_rolls_back_entire_page_without_ack(self, session, replica, batch):
         await ingest_usage_batch(session, replica.id, replica.gateway_id, batch())
         await session.commit()
         items = [batch("new", offset=1), batch(tokens=4)]
@@ -198,9 +223,33 @@ class TestCollectGatewayUsage:
         assert queue.acks == []
         assert queue.items == items
         assert (await session.scalars(select(UsageBatchModel.batch_id))).all() == ["batch-1"]
-        assert (await session.scalars(select(UsageCounterModel.total_tokens))).all() == [23]
+        assert (await session.scalars(select(UsageBatchModel.total_tokens))).all() == [23]
 
-    async def test_page_budget_leaves_remainder_for_next_poll(self, session, replica, monkeypatch):
+    async def test_invalid_last_row_rolls_back_page_without_ack(
+        self, session, replica, batch, usage_user
+    ):
+        missing = uuid.UUID(int=2**128 - 1)
+        assert usage_user.id < missing
+        last = batch("last", offset=1, entries=[entry(usage_user.id), entry(missing)])
+        items = [batch(), last]
+        queue = GatewayQueue(replica.ip_address, items)
+        await usage.collect_gateway_usage(queue.connection, replica.id, replica.lock_token)
+        assert queue.fetches == 1
+        assert queue.acks == [] and queue.items == items
+        assert (await session.scalars(select(UsageBatchModel))).all() == []
+
+    async def test_empty_page_caught_up_but_empty_batch_unacknowledged(self, replica, batch):
+        queue = GatewayQueue(replica.ip_address, [])
+        args = queue.connection, replica.id, replica.gateway_id, replica.lock_token
+        assert await usage.drain_gateway_usage(*args)
+        queue.items = [batch(entries=[])]
+        assert not await usage.drain_gateway_usage(*args)
+        assert queue.fetches == 1
+        assert queue.acks == [] and queue.items == [batch(entries=[])]
+
+    async def test_page_budget_leaves_remainder_for_next_poll(
+        self, session, replica, batch, monkeypatch
+    ):
         items = [batch(f"b-{i}", i) for i in range(5)]
         queue = GatewayQueue(replica.ip_address, items)
         monkeypatch.setattr(usage, "PAGE_SIZE", 2)
@@ -220,7 +269,9 @@ class TestCollectGatewayUsage:
             "b-4",
         ]
 
-    async def test_timeout_during_fetch_leaves_page_pending(self, session, replica, monkeypatch):
+    async def test_timeout_during_fetch_leaves_page_pending(
+        self, session, replica, batch, monkeypatch
+    ):
         queue = GatewayQueue(replica.ip_address, [batch()])
         fetch = queue.fetch_usage_batches
 
@@ -243,7 +294,9 @@ class TestCollectGatewayUsage:
         assert (await session.scalars(select(UsageBatchModel))).all() == []
 
     @pytest.mark.parametrize("status_code", [404, 405])
-    async def test_old_gateway_endpoint_skipped(self, replica, monkeypatch, caplog, status_code):
+    async def test_old_gateway_endpoint_skipped(
+        self, replica, batch, monkeypatch, caplog, status_code
+    ):
         queue = GatewayQueue(replica.ip_address, [batch()])
 
         async def unavailable(limit):
@@ -262,7 +315,7 @@ class TestCollectGatewayUsage:
             r.levelno >= logging.WARNING and r.name == usage.__name__ for r in caplog.records
         )
 
-    async def test_multiple_replicas_and_legacy_parent(self, session, replica):
+    async def test_multiple_replicas_and_legacy_parent(self, session, replica, batch):
         backend = await session.get(BackendModel, replica.backend_id)
         second = await create_gateway_replica(
             session, backend, gateway_id=replica.gateway_id, ip_address="2.2.2.2"
@@ -280,11 +333,13 @@ class TestCollectGatewayUsage:
         assert {row.gateway_replica_id for row in rows} == {replica.id, second.id, legacy.id}
         assert {row.gateway_id for row in rows} == {parent.id}
 
-    async def test_unbound_source_can_only_ack_historical_replay(self, session, replica):
+    async def test_unbound_source_can_only_ack_historical_replay(self, session, replica, batch):
         await ingest_usage_batch(session, replica.id, replica.gateway_id, batch())
         parent_id = replica.gateway_id
-        replica.gateway_id = None
+        await session.execute(delete(GatewayModel).where(GatewayModel.id == parent_id))
         await session.commit()
+        await session.refresh(replica)
+        assert replica.gateway_id is None
         queue = GatewayQueue(replica.ip_address, [batch()])
         await usage.collect_gateway_usage(queue.connection, replica.id, replica.lock_token)
         assert queue.acks == [["batch-1"]]
@@ -295,14 +350,14 @@ class TestCollectGatewayUsage:
         row = (await session.scalars(select(UsageBatchModel))).one()
         assert row.batch_id == "batch-1" and row.gateway_id == parent_id
 
-    async def test_ambiguous_address_is_skipped(self, session, replica):
+    async def test_ambiguous_address_is_skipped(self, session, replica, batch):
         backend = await session.get(BackendModel, replica.backend_id)
         await create_gateway_replica(session, backend, ip_address=replica.ip_address)
         queue = GatewayQueue(replica.ip_address, [batch()])
         await usage.collect_gateway_usage(queue.connection, replica.id, replica.lock_token)
         assert queue.fetches == 0
 
-    async def test_address_must_belong_to_claimed_replica(self, session, replica):
+    async def test_address_must_belong_to_claimed_replica(self, session, replica, batch):
         backend = await session.get(BackendModel, replica.backend_id)
         other = await create_gateway_replica(
             session, backend, gateway_id=replica.gateway_id, ip_address="2.2.2.2"
@@ -316,7 +371,9 @@ class TestCollectGatewayUsage:
         await usage.collect_gateway_usage(queue.connection, replica.id, replica.lock_token)
         assert queue.fetches == 0
 
-    async def test_conflicting_modern_and_legacy_parents_are_skipped(self, session, replica):
+    async def test_conflicting_modern_and_legacy_parents_are_skipped(
+        self, session, replica, batch
+    ):
         backend = await session.get(BackendModel, replica.backend_id)
         other_parent = await create_gateway(session, backend.project_id, backend.id, name="other")
         other_parent.gateway_replica_id = replica.id
@@ -325,9 +382,8 @@ class TestCollectGatewayUsage:
         await usage.collect_gateway_usage(queue.connection, replica.id, replica.lock_token)
         assert queue.fetches == 0
 
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_takeover_during_fetch_fences_stale_page(
-        self, session, replica, monkeypatch, test_db
+        self, session, replica, batch, monkeypatch, test_db
     ):
         queue = GatewayQueue(replica.ip_address, [batch()])
         fetch = queue.fetch_usage_batches
@@ -349,7 +405,7 @@ class TestCollectGatewayUsage:
         assert queue.fetches == 1
         await usage.collect_gateway_usage(queue.connection, replica.id, replica.lock_token)
         assert queue.acks == [["batch-1"]]
-        assert (await session.scalars(select(UsageCounterModel.total_tokens))).all() == [23]
+        assert (await session.scalars(select(UsageBatchModel.total_tokens))).all() == [23]
 
 
 @pytest.mark.asyncio
@@ -366,7 +422,7 @@ class TestCollectGatewayUsageSQLiteLock:
             await db.engine.dispose()
 
     async def test_claim_cannot_change_between_revalidation_and_insert(
-        self, session, replica, test_db, monkeypatch
+        self, session, replica, batch, test_db, monkeypatch
     ):
         queue = GatewayQueue(replica.ip_address, [batch()])
         next_token = uuid.uuid4()
@@ -399,4 +455,4 @@ class TestCollectGatewayUsageSQLiteLock:
             await contender.execute(takeover)
             await contender.commit()
         assert await session.scalar(select(GatewayReplicaModel.lock_token)) == next_token
-        assert (await session.scalars(select(UsageCounterModel.total_tokens))).all() == [23]
+        assert (await session.scalars(select(UsageBatchModel.total_tokens))).all() == [23]

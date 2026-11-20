@@ -189,10 +189,13 @@ Never delete/reset these files as a routine repair: reconcile identity/history f
 
 The `GatewayReplicaPipeline` worker holding the running replica's lease polls
 `/api/usage/batches` over its private SSH management connection. It verifies the
-source and lease token, commits the page's receipts and counters, then POSTs
+source and lease token, commits the page's numbered `usage_batches` rows, then POSTs
 `/api/usage/batches/ack` outside the transaction. If the server exits between
 commit and ACK, another server can claim the replica after lease expiry and ACK
-the replayed page. Old Gateways lacking the usage API still get normal state sync.
+the replayed page after matching its full contents. Old Gateways lacking the usage API
+still get normal state sync. For reports, aggregate the counter columns directly in
+`usage_batches` by `user_id`, `run_id`, Gateway or minute. Each row represents one
+user and run in a replica's batch.
 
 On planned removal of a serving Gateway replica, the worker calls the private
 `POST /api/usage/drain`. Nginx fences new public requests and lets open HTTP

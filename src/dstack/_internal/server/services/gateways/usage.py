@@ -1,4 +1,4 @@
-"""Fetch durable minute batches, commit receipts, then ACK over existing SSH connections."""
+"""Fetch durable minute batches, commit usage rows, then ACK over SSH."""
 
 import asyncio
 import uuid
@@ -137,7 +137,7 @@ async def _get_source(
         return None
     if parent is not None and legacy_parent is not None and parent != legacy_parent:
         return None
-    # An unbound replica can only replay an already committed receipt.
+    # An unbound replica can only replay an already committed batch.
     return source_id, parent or legacy_parent
 
 
