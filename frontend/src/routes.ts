@@ -139,10 +139,28 @@ export const ROUTES = {
 
     MODELS: {
         LIST: '/models',
+        // A model's name can have slashes, so it is the rest of the address, and the page's tab is a query parameter
         DETAILS: {
-            TEMPLATE: `/projects/:projectName/models/:runName`,
-            FORMAT: (projectName: string, runName: string) =>
-                buildRoute(ROUTES.MODELS.DETAILS.TEMPLATE, { projectName, runName }),
+            TEMPLATE: `/projects/:projectName/models/*`,
+            FORMAT: (projectName: string, modelName: string) => {
+                const segments = modelName.split('/');
+                // An empty part between slashes wouldn't survive in a path
+                const name = segments.every(Boolean)
+                    ? segments.map(encodeURIComponent).join('/')
+                    : encodeURIComponent(modelName);
+
+                return buildRoute(ROUTES.MODELS.DETAILS.TEMPLATE, { projectName }).replace('*', () => name);
+            },
+            EXPORTS: {
+                TAB: 'exports',
+                FORMAT: (projectName: string, modelName: string) =>
+                    `${ROUTES.MODELS.DETAILS.FORMAT(projectName, modelName)}?tab=${ROUTES.MODELS.DETAILS.EXPORTS.TAB}`,
+            },
+            METERING: {
+                TAB: 'metering',
+                FORMAT: (projectName: string, modelName: string) =>
+                    `${ROUTES.MODELS.DETAILS.FORMAT(projectName, modelName)}?tab=${ROUTES.MODELS.DETAILS.METERING.TAB}`,
+            },
         },
     },
 

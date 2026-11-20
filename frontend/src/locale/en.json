@@ -30,6 +30,7 @@
         "stop": "Stop",
         "abort": "Abort",
         "close": "Close",
+        "clear": "Clear",
         "clearFilter": "Clear filter",
         "server_error": "Server error: {{error}}",
         "login": "Sign in",
@@ -603,9 +604,9 @@
 
     "models": {
         "model_name": "Name",
-        "url": "URL",
+        "status": "Status",
+        "project": "Project",
         "gateway": "Gateway",
-        "type": "Type",
         "run": "Run",
         "resources": "Resources",
         "price": "Price",
@@ -613,7 +614,8 @@
         "user": "User",
         "repository": "Repository",
         "backend": "Backend",
-        "code": "Code",
+        "endpoint": "Endpoint",
+        "active_only": "Active models",
         "empty_message_title": "No models",
         "empty_message_text": "No models to display.",
         "nomatch_message_title": "No matches",
@@ -621,14 +623,35 @@
         "nomatch_message_button_label": "Clear filter",
 
         "details": {
-            "instructions": "System",
-            "instructions_description": "Specify system",
+            "title": "Details",
             "message_placeholder": "Enter your question",
             "chat_empty_title": "No messages yet",
             "chat_empty_message": "Please start a chat",
-            "run_name": "Run name",
-            "view_code": "View code",
+            "thinking": "Thinking",
+            "reply_cut": "The reply was cut at the limit of {{limit}} tokens.",
             "view_code_description": "You can use the following code to start integrating your current prompt and settings into your application."
+        },
+
+        "exports": {
+            "title": "Exports",
+            "name": "Name",
+            "empty_message_title": "No exports",
+            "empty_message_text": "No exports to display."
+        },
+
+        "metering": {
+            "title": "Metering",
+            "tokens": "Tokens",
+            "day": "Day",
+            "month": "Month",
+            "day_utc": "Day (UTC)",
+            "month_utc": "Month (UTC)",
+            "input_tokens": "Input tokens",
+            "cached_input_tokens": "Cached input tokens",
+            "output_tokens": "Output tokens",
+            "total": "Total",
+            "empty_message_title": "No usage",
+            "empty_message_text": "No usage to display."
         }
     },
 

@@ -1,7 +1,7 @@
 from typing import AsyncGenerator, AsyncIterator, Optional
 
 import fastapi
-import httpx
+import httpx2 as httpx
 from fastapi import status
 from starlette.requests import ClientDisconnect
 

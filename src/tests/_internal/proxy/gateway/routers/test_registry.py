@@ -804,7 +804,7 @@ class TestRegisterEntrypoint:
         assert resp.status_code == 200
         assert resp.json() == {"status": "ok"}
         conf = (tmp_path / "sites-enabled" / "443-gateway.gtw.test.conf").read_text()
-        assert "proxy_pass http://localhost:8000/api/models/test-proj/;" in conf
+        assert "proxy_pass http://localhost:8000/api/models/;" in conf
         assert "listen 80;" in conf
         assert "listen 443" not in conf
         assert system_mocks.reload_nginx.call_count == 1
@@ -831,8 +831,56 @@ class TestRegisterEntrypoint:
         )
         assert resp.status_code == 200
         conf = (tmp_path / "sites-enabled" / "443-gateway.gtw.test.conf").read_text()
-        assert "proxy_pass http://localhost:8000/api/models/test-proj/;" in conf
+        assert "proxy_pass http://localhost:8000/api/models/;" in conf
         assert "listen 80;" in conf
         assert "listen 443 ssl;" in conf
         assert system_mocks.reload_nginx.call_count == 1
         assert system_mocks.run_certbot.call_count == 1
+
+
+@pytest.mark.asyncio
+class TestImports:
+    async def test_register_list_unregister(self, tmp_path: Path) -> None:
+        client = make_client(tmp_path)
+        export_id = uuid.uuid4().hex
+        assert (await client.get("/api/registry/imports/list")).json() == {"imports": []}
+        for _ in range(2):  # registering an import again changes nothing
+            resp = await client.post(
+                "/api/registry/Importer-Proj/imports/register",
+                json={
+                    "export_id": export_id,
+                    "exporter_project": "Exporter-Proj",
+                    "name": "Test/Model",
+                },
+            )
+            assert resp.status_code == 200
+            assert resp.json() == {"status": "ok"}
+        imports = {
+            "imports": [
+                {
+                    "importer_project": "importer-proj",
+                    "export_id": export_id,
+                    "exporter_project": "exporter-proj",
+                    "name": "Test/Model",
+                }
+            ]
+        }
+        resp = await client.get("/api/registry/imports/list")
+        assert resp.status_code == 200
+        assert resp.json() == imports
+
+        # The project imports the model through this export, not through the given one.
+        resp = await client.post(
+            "/api/registry/Importer-Proj/imports/unregister",
+            json={"export_id": uuid.uuid4().hex, "name": "Test/Model"},
+        )
+        assert resp.status_code == 200
+        assert (await client.get("/api/registry/imports/list")).json() == imports
+
+        resp = await client.post(
+            "/api/registry/Importer-Proj/imports/unregister",
+            json={"export_id": export_id, "name": "Test/Model"},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"status": "ok"}
+        assert (await client.get("/api/registry/imports/list")).json() == {"imports": []}

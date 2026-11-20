@@ -57,6 +57,8 @@ A gateway requires a `domain` to be specified in the configuration before creati
 
 Once the gateway is created and assigned a hostname, configure your DNS by adding a wildcard record for `*.<gateway domain>` (e.g. `*.example.com`). The record should point to the gateway's hostname and should be of type `A` if the hostname is an IP address (most cases), or of type `CNAME` if the hostname is another domain (load balancers, Kubernetes).
 
+The [models](services.md#model) of a project's services are served at the project's model endpoint on the gateway, `https://gateway.<gateway domain>/<project name>`. Because of that, a service on the gateway can't be named `gateway`.
+
 ??? info "Project name interpolation"
     You can use the `${{ run.project_name }}` variable to include the service’s project name in the domain name. This is especially useful when [exporting](exports.md) the gateway to multiple projects, as it ensures each importer receives a unique domain name.
 
@@ -67,6 +69,8 @@ Once the gateway is created and assigned a hostname, configure your DNS by addin
     region: eu-west-1
     domain: ${{ run.project_name }}.mycompany.example
     ```
+
+    With this domain, a project's services are at `<run name>.<project name>.mycompany.example`, and its model endpoint is `https://gateway.<project name>.mycompany.example/<project name>`.
 
 ### Backend
 

@@ -70,6 +70,7 @@ from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.backends.store import (
     get_project_backend_model_by_type_or_error,
 )
+from dstack._internal.server.services.exported_models import check_can_set_gateway_domain
 from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
 from dstack._internal.server.services.locking import (
@@ -434,6 +435,7 @@ async def set_gateway_wildcard_domain(
             raise ResourceNotExistsError()
         old_domain = gateway.wildcard_domain
         if old_domain != wildcard_domain:
+            await check_can_set_gateway_domain(session, gateway, wildcard_domain)
             gateway.wildcard_domain = wildcard_domain
             if gateway.configuration is not None:
                 conf = get_gateway_configuration(gateway)
@@ -1124,6 +1126,8 @@ async def apply_plan(
                 " Delete it and re-apply."
             )
 
+        if "domain" in diff:
+            await check_can_set_gateway_domain(session, gateway_model, new_configuration.domain)
         gateway_model.wildcard_domain = new_configuration.domain
         if new_configuration.replicas != current_configuration.replicas:
             gateway_model.desired_replica_count = (

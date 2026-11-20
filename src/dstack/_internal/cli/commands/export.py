@@ -51,6 +51,13 @@ class ExportCommand(APIBaseCommand):
             default=[],
         )
         create_parser.add_argument(
+            "--model",
+            action="append",
+            dest="models",
+            help="Model name to export (can be specified multiple times)",
+            default=[],
+        )
+        create_parser.add_argument(
             "--global",
             dest="is_global",
             action="store_true",
@@ -108,6 +115,20 @@ class ExportCommand(APIBaseCommand):
             help="Gateway name to remove (can be specified multiple times)",
             default=[],
         )
+        update_parser.add_argument(
+            "--add-model",
+            action="append",
+            dest="add_models",
+            help="Model name to add (can be specified multiple times)",
+            default=[],
+        )
+        update_parser.add_argument(
+            "--remove-model",
+            action="append",
+            dest="remove_models",
+            help="Model name to remove (can be specified multiple times)",
+            default=[],
+        )
         global_group = update_parser.add_mutually_exclusive_group()
         global_group.add_argument(
             "--set-global",
@@ -156,6 +177,7 @@ class ExportCommand(APIBaseCommand):
                 importer_projects=args.importers,
                 exported_fleets=args.fleets,
                 exported_gateways=args.gateways,
+                exported_models=args.models,
             )
         print_exports_table([export])
 
@@ -172,6 +194,8 @@ class ExportCommand(APIBaseCommand):
                 remove_exported_fleets=args.remove_fleets,
                 add_exported_gateways=args.add_gateways,
                 remove_exported_gateways=args.remove_gateways,
+                add_exported_models=args.add_models,
+                remove_exported_models=args.remove_models,
             )
         print_exports_table([export])
 
@@ -191,6 +215,7 @@ def print_exports_table(exports: list[Export]):
     table.add_column("NAME", no_wrap=True)
     table.add_column("FLEETS")
     table.add_column("GATEWAYS")
+    table.add_column("MODELS")
     table.add_column("IMPORTERS")
 
     for export in exports:
@@ -201,6 +226,9 @@ def print_exports_table(exports: list[Export]):
             ", ".join([g.name for g in export.exported_gateways])
             if export.exported_gateways
             else "-"
+        )
+        models = (
+            ", ".join([m.name for m in export.exported_models]) if export.exported_models else "-"
         )
         if export.is_global:
             importers = "*"
@@ -213,6 +241,7 @@ def print_exports_table(exports: list[Export]):
             "NAME": export.name,
             "FLEETS": fleets,
             "GATEWAYS": gateways,
+            "MODELS": models,
             "IMPORTERS": importers,
         }
         add_row_from_dict(table, row)

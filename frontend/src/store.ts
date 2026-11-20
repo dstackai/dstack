@@ -6,10 +6,13 @@ import notificationsReducer from 'components/Notifications/slice';
 import { artifactApi } from 'services/artifact';
 import { authApi } from 'services/auth';
 import { eventApi } from 'services/events';
+import { exportApi } from 'services/export';
 import { fleetApi } from 'services/fleet';
 import { gatewayApi } from 'services/gateway';
+import { importApi } from 'services/import';
 import { instanceApi } from 'services/instance';
 import { mainApi } from 'services/mainApi';
+import { meteringApi } from 'services/metering';
 import { presetApi } from 'services/preset';
 import { projectApi } from 'services/project';
 import { publicKeysApi } from 'services/publicKeys';
@@ -48,6 +51,9 @@ export const store = configureStore({
         [publicKeysApi.reducerPath]: publicKeysApi.reducer,
         [eventApi.reducerPath]: eventApi.reducer,
         [templateApi.reducerPath]: templateApi.reducer,
+        [importApi.reducerPath]: importApi.reducer,
+        [exportApi.reducerPath]: exportApi.reducer,
+        [meteringApi.reducerPath]: meteringApi.reducer,
     },
 
     middleware: (getDefaultMiddleware) =>
@@ -71,6 +77,9 @@ export const store = configureStore({
             .concat(eventApi.middleware)
             .concat(repoApi.middleware)
             .concat(templateApi.middleware)
+            .concat(importApi.middleware)
+            .concat(exportApi.middleware)
+            .concat(meteringApi.middleware)
             .concat(mainApi.middleware),
 });
 

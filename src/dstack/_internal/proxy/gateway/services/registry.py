@@ -131,6 +131,8 @@ async def unregister_service(
         )
         await repo.delete_models_by_run(project_name, run_name)
         await repo.delete_service(project_name, run_name)
+        # After the service is deleted, so that no request gets a new client.
+        await service_conn_pool.remove_nginx_client(service.domain_safe)
 
     logger.info("Service %s is unregistered now", service.fmt())
 
@@ -339,6 +341,43 @@ async def register_model_entrypoint(
     logger.info("Entrypoint %s is now registered in project %s", domain, project_name)
 
 
+async def register_import(
+    importer_project: str,
+    export_id: str,
+    exporter_project: str,
+    name: str,
+    repo: GatewayProxyRepo,
+) -> None:
+    imported_model = gateway_models.ImportedModel(
+        importer_project=importer_project,
+        export_id=export_id,
+        exporter_project=exporter_project,
+        name=name,
+    )
+    await repo.set_import(imported_model)
+    logger.info(
+        "Import of model %s from project %s is now registered in project %s",
+        name,
+        exporter_project,
+        importer_project,
+    )
+
+
+async def unregister_import(
+    importer_project: str,
+    export_id: str,
+    name: str,
+    repo: GatewayProxyRepo,
+) -> None:
+    await repo.delete_import(importer_project, export_id, name)
+    logger.info(
+        "Import of model %s through export %s is now unregistered in project %s",
+        name,
+        export_id,
+        importer_project,
+    )
+
+
 async def apply_service(
     service: models.Service,
     old_service: Optional[models.Service],
@@ -501,7 +540,6 @@ async def apply_entrypoint(
     config = ModelEntrypointConfig(
         domain=entrypoint.domain,
         https=entrypoint.https,
-        project_name=entrypoint.project_name,
         read_timeout=entrypoint.read_timeout,
     )
     acme = (await repo.get_config()).acme_settings
@@ -519,8 +557,10 @@ async def _migrate_cors_enabled(repo: GatewayProxyRepo) -> None:
     openai_run_names: set[tuple[str, str]] = set()
     for service in services:
         for model in await repo.list_models(service.project_name):
-            if model.run_name == service.run_name and isinstance(
-                model.format_spec, models.OpenAIChatModelFormat
+            if (
+                model.project_name == service.project_name  # not a model the project imports
+                and model.run_name == service.run_name
+                and isinstance(model.format_spec, models.OpenAIChatModelFormat)
             ):
                 openai_run_names.add((service.project_name, service.run_name))
     for service in services:

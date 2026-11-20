@@ -7,10 +7,14 @@ from dstack._internal.proxy.gateway.deps import get_gateway_proxy_repo, get_ngin
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.schemas.common import OkResponse
 from dstack._internal.proxy.gateway.schemas.registry import (
+    ImportListItem,
+    ImportListResponse,
     RegisterEntrypointRequest,
+    RegisterImportRequest,
     RegisterReplicaRequest,
     RegisterServiceRequest,
     SetServiceIdRequest,
+    UnregisterImportRequest,
     UpdateReplicaProxyJumpKeysRequest,
     UpdateReplicaProxyJumpKeysResponse,
 )
@@ -158,5 +162,53 @@ async def register_entrypoint(
         read_timeout=body.read_timeout,
         repo=repo,
         nginx=nginx,
+    )
+    return OkResponse()
+
+
+@router.get("/imports/list")
+async def list_imports(
+    repo: Annotated[GatewayProxyRepo, Depends(get_gateway_proxy_repo)],
+) -> ImportListResponse:
+    return ImportListResponse(
+        imports=[
+            ImportListItem(
+                importer_project=imported_model.importer_project,
+                export_id=imported_model.export_id,
+                exporter_project=imported_model.exporter_project,
+                name=imported_model.name,
+            )
+            for imported_model in await repo.list_imports()
+        ]
+    )
+
+
+@router.post("/{importer_project}/imports/register")
+async def register_import(
+    importer_project: str,
+    body: RegisterImportRequest,
+    repo: Annotated[GatewayProxyRepo, Depends(get_gateway_proxy_repo)],
+) -> OkResponse:
+    await registry_services.register_import(
+        importer_project=importer_project.lower(),
+        export_id=body.export_id,
+        exporter_project=body.exporter_project.lower(),
+        name=body.name,
+        repo=repo,
+    )
+    return OkResponse()
+
+
+@router.post("/{importer_project}/imports/unregister")
+async def unregister_import(
+    importer_project: str,
+    body: UnregisterImportRequest,
+    repo: Annotated[GatewayProxyRepo, Depends(get_gateway_proxy_repo)],
+) -> OkResponse:
+    await registry_services.unregister_import(
+        importer_project=importer_project.lower(),
+        export_id=body.export_id,
+        name=body.name,
+        repo=repo,
     )
     return OkResponse()

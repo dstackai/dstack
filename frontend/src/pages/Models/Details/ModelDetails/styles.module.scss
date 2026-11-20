@@ -1,0 +1,67 @@
+.modelDetailsLayout {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 219px);
+    margin-bottom: -40px;
+}
+
+.general {
+    flex-shrink: 0;
+}
+
+.modelForm {
+    position: relative;
+    flex-grow: 1;
+    min-height: 300px;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 60px 1fr auto;
+    grid-template-areas: "buttons"
+                          "chat"
+                          "form";
+}
+
+.buttons {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+
+    & > button {
+        flex-shrink: 0;
+    }
+}
+
+.chat {
+    overflow-y: auto;
+    grid-area: chat;
+    padding: 0 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+
+    .message {
+        p {
+            white-space: pre-wrap;
+        }
+    }
+}
+
+.messageForm {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 20px;
+    grid-area: form;
+    border-top: 1px solid #b6bec9;
+    margin-right: -20px;
+    padding: 20px;
+
+    textarea {
+        resize: none !important;
+        max-height: calc(100vh - 550px);
+    }
+
+    .buttons {
+        align-self: flex-end;
+    }
+}

@@ -3,7 +3,7 @@ import json
 import uuid
 from typing import AsyncIterator, Dict, List
 
-import httpx
+import httpx2 as httpx
 import jinja2
 import jinja2.sandbox
 from fastapi import status

@@ -22,6 +22,11 @@ class ImportCommand(APIBaseCommand):
         )
         list_parser.set_defaults(subfunc=self._list)
 
+        for parser in [self._parser, list_parser]:
+            parser.add_argument(
+                "-v", "--verbose", action="store_true", help="Show more information"
+            )
+
         delete_parser = subparsers.add_parser(
             "delete", help="Delete an import", formatter_class=self._parser.formatter_class
         )
@@ -42,7 +47,7 @@ class ImportCommand(APIBaseCommand):
         response = self.api.client.imports.list_imports(self.api.project)
         for warning in response.warnings:
             warn(warning)
-        print_imports_table(response.imports)
+        print_imports_table(response.imports, verbose=args.verbose)
 
     def _delete(self, args: argparse.Namespace):
         parts = args.name.split("/")
@@ -66,11 +71,16 @@ class ImportCommand(APIBaseCommand):
         console.print(f"Import [code]{args.name}[/] deleted")
 
 
-def print_imports_table(imports: list[Import]):
+def print_imports_table(imports: list[Import], verbose: bool = False):
     table = Table(box=None)
     table.add_column("NAME", no_wrap=True)
     table.add_column("FLEETS")
     table.add_column("GATEWAYS")
+    if verbose:
+        table.add_column("MODEL")
+        table.add_column("URL")
+    else:
+        table.add_column("MODELS")
 
     for imp in imports:
         name = f"{imp.export.project_name}/{imp.export.name}"
@@ -84,13 +94,22 @@ def print_imports_table(imports: list[Import]):
             if imp.export.exported_gateways
             else "-"
         )
+        exported_models = imp.export.exported_models
+        models = ", ".join([m.name for m in exported_models]) if exported_models else "-"
 
         row = {
             "NAME": name,
             "FLEETS": fleets,
             "GATEWAYS": gateways,
+            "MODELS": models,
+            "MODEL": exported_models[0].name if exported_models else "-",
+            "URL": exported_models[0].base_url if exported_models else None,
         }
         add_row_from_dict(table, row)
+        if verbose:
+            # Each model has its own row with its URL
+            for model in exported_models[1:]:
+                add_row_from_dict(table, {"MODEL": model.name, "URL": model.base_url})
 
     console.print(table)
     console.print()
