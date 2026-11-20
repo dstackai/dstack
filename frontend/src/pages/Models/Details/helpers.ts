@@ -104,10 +104,10 @@ export const getCurlModelCode = ({ model, projectName, token }: TModelCodeParams
 };
 
 /**
- * The Metering tab, with a model's usage, is for global admins and for the admins of the project that runs the model
+ * The Metering tab is for global admins and for the admins of the project that runs the model
  * or of a project that imports it, where the server has the metering API.
  */
-export const hasModelUsage = (model: IModelExtended, projects: IProject[], user: IUser | null): boolean => {
+export const hasModelMetering = (model: IModelExtended, projects: IProject[], user: IUser | null): boolean => {
     if (!product.hasBilling || !user) {
         return false;
     }

@@ -6,7 +6,7 @@ import { selectUserData } from 'App/slice';
 
 import { mergeModels } from '../helpers';
 import { useProjectsImports, useRunModels } from '../hooks';
-import { hasModelUsage } from './helpers';
+import { hasModelMetering } from './helpers';
 
 /**
  * Loads the model that `projectName` runs as `modelName`: the project's own model or one that the user's projects import.
@@ -42,7 +42,7 @@ export const useModel = (projectName: IProject['project_name'], modelName: IMode
         error,
         // Not while a request runs, and not when one has failed
         isNotFound: !isLoading && !error && !model,
-        hasUsage: !!model && hasModelUsage(model, imports.projects, userData),
+        hasMetering: !!model && hasModelMetering(model, imports.projects, userData),
         // The user's projects and their import lists, for the Exports tab
         projects: imports.projects,
         projectsImports: imports.projectsImports,

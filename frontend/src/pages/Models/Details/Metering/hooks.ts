@@ -7,9 +7,9 @@ import { useLazyGetMeteringQuery } from 'services/metering';
 
 import { useIsValidRange } from 'pages/Events/List/hooks/useTimeRange';
 
-import { DEFAULT_TIME_RANGE, getFilteringOptions, TUsageFilters } from './helpers';
+import { DEFAULT_TIME_RANGE, getFilteringOptions, TMeteringFilters } from './helpers';
 
-type RequestParamsKeys = keyof TUsageFilters;
+type RequestParamsKeys = keyof TMeteringFilters;
 
 const filterKeys: Record<string, RequestParamsKeys> = {
     PROJECT_NAME: 'project_name',
@@ -50,7 +50,7 @@ export const useFilters = () => {
     const filteringRequestParams = useMemo(() => {
         return tokensToRequestParams<RequestParamsKeys>({
             tokens: propertyFilterQuery.tokens,
-        }) as TUsageFilters;
+        }) as TMeteringFilters;
     }, [propertyFilterQuery]);
 
     return {

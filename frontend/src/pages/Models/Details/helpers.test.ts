@@ -2,7 +2,7 @@ import type OpenAI from 'openai';
 
 import { ROUTES } from 'routes';
 
-import { addChunkToMessage, getCurlModelCode, getPythonModelCode, hasModelUsage } from './helpers';
+import { addChunkToMessage, getCurlModelCode, getPythonModelCode, hasModelMetering } from './helpers';
 
 import { IModelExtended } from '../List/types';
 import { Message } from './types';
@@ -142,11 +142,11 @@ describe('Chat reply', () => {
 
 describe('Model metering tab', () => {
     test('a global admin gets it', () => {
-        expect(hasModelUsage(model, [], makeUser('admin'))).toBe(true);
+        expect(hasModelMetering(model, [], makeUser('admin'))).toBe(true);
     });
 
     test.each(['exporter-proj', 'importer-proj'])('an admin of %s gets it', (projectName) => {
-        expect(hasModelUsage(model, [makeProject(projectName, 'admin')], makeUser('user'))).toBe(true);
+        expect(hasModelMetering(model, [makeProject(projectName, 'admin')], makeUser('user'))).toBe(true);
     });
 
     test.each([
@@ -154,12 +154,12 @@ describe('Model metering tab', () => {
         ['importer-proj', 'manager'],
         ['other-proj', 'admin'],
     ] as const)('a member of %s with the %s role does not get it', (projectName, projectRole) => {
-        expect(hasModelUsage(model, [makeProject(projectName, projectRole)], makeUser('user'))).toBe(false);
+        expect(hasModelMetering(model, [makeProject(projectName, projectRole)], makeUser('user'))).toBe(false);
     });
 
     test('nobody gets it where the server has no metering', () => {
         mockHasBilling = false;
 
-        expect(hasModelUsage(model, [makeProject('exporter-proj', 'admin')], makeUser('admin'))).toBe(false);
+        expect(hasModelMetering(model, [makeProject('exporter-proj', 'admin')], makeUser('admin'))).toBe(false);
     });
 });

@@ -28,8 +28,8 @@ import { selectAuthToken } from 'App/slice';
 import { ModelExports } from './Exports';
 import { getCurlModelCode, getModelUrl, getPythonModelCode } from './helpers';
 import { useModel } from './hooks';
+import { ModelMetering } from './Metering';
 import { ModelDetails } from './ModelDetails';
-import { ModelUsage } from './Usage';
 
 import styles from './styles.module.scss';
 
@@ -59,7 +59,7 @@ export const ModelDetailsPage: React.FC = () => {
     // Exports exist only where the server enables them
     const isExportsTab = product.hasExports && searchParams.get('tab') === ROUTES.MODELS.DETAILS.EXPORTS.TAB;
 
-    const { model, isLoading, error, isNotFound, hasUsage, projects, projectsImports } = useModel(
+    const { model, isLoading, error, isNotFound, hasMetering, projects, projectsImports } = useModel(
         paramProjectName,
         paramModelName,
     );
@@ -128,8 +128,8 @@ export const ModelDetailsPage: React.FC = () => {
             id: ModelTab.Exports,
             href: ROUTES.MODELS.DETAILS.EXPORTS.FORMAT(paramProjectName, paramModelName),
         },
-        hasUsage && {
-            label: t('models.metering'),
+        hasMetering && {
+            label: t('models.metering.title'),
             id: ModelTab.Metering,
             href: ROUTES.MODELS.DETAILS.METERING.FORMAT(paramProjectName, paramModelName),
         },
@@ -143,7 +143,7 @@ export const ModelDetailsPage: React.FC = () => {
     const modelKey = `${paramProjectName}/${paramModelName}`;
 
     // A user who doesn't get the Metering tab doesn't get its page either
-    if (model && isMeteringTab && !hasUsage) {
+    if (model && isMeteringTab && !hasMetering) {
         return <Navigate to={ROUTES.MODELS.DETAILS.FORMAT(paramProjectName, paramModelName)} replace />;
     }
 
@@ -178,7 +178,7 @@ export const ModelDetailsPage: React.FC = () => {
                         {activeTabId === ModelTab.Exports && (
                             <ModelExports key={modelKey} model={model} projects={projects} projectsImports={projectsImports} />
                         )}
-                        {activeTabId === ModelTab.Metering && <ModelUsage key={modelKey} model={model} />}
+                        {activeTabId === ModelTab.Metering && <ModelMetering key={modelKey} model={model} />}
                     </>
                 )}
             </ContentLayout>
