@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, cast
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -11,6 +11,7 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import TaskConfiguration
+from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import (
     JobStatus,
@@ -27,7 +28,13 @@ from dstack._internal.server.background.pipeline_tasks.jobs_terminating import (
     JobTerminatingWorker,
     _get_related_instance_lock_owner,
 )
-from dstack._internal.server.models import InstanceModel, JobModel, VolumeAttachmentModel
+from dstack._internal.server.models import (
+    GatewayReplicaModel,
+    InstanceModel,
+    JobModel,
+    ServiceReplicaRegistrationModel,
+    VolumeAttachmentModel,
+)
 from dstack._internal.server.schemas.runner import LogEvent, PullResponse
 from dstack._internal.server.services.runner.client import (
     PeerConnectionError,
@@ -36,6 +43,9 @@ from dstack._internal.server.services.runner.client import (
 )
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
+    create_backend,
+    create_gateway,
+    create_gateway_replica,
     create_instance,
     create_job,
     create_project,
@@ -106,6 +116,68 @@ def _lock_job(job_model: JobModel):
     job_model.lock_token = uuid.uuid4()
     job_model.lock_expires_at = get_current_datetime() + timedelta(seconds=30)
     job_model.lock_owner = JobTerminatingPipeline.__name__
+
+
+async def _create_terminating_service_replica(
+    session: AsyncSession,
+    termination_reason: JobTerminationReason,
+    run_termination_reason: Optional[RunTerminationReason] = None,
+) -> tuple[JobModel, list[GatewayReplicaModel]]:
+    """Creates a terminating replica of a service behind a gateway with two replicas."""
+    project = await create_project(session=session)
+    user = await create_user(session=session)
+    backend = await create_backend(session=session, project_id=project.id)
+    gateway = await create_gateway(
+        session=session,
+        project_id=project.id,
+        backend_id=backend.id,
+        status=GatewayStatus.RUNNING,
+    )
+    gateway_replicas = [
+        await create_gateway_replica(
+            session=session, backend=backend, gateway_id=gateway.id, replica_num=replica_num
+        )
+        for replica_num in range(2)
+    ]
+    instance = await create_instance(session=session, project=project, status=InstanceStatus.BUSY)
+    repo = await create_repo(session=session, project_id=project.id)
+    run = await create_run(
+        session=session,
+        project=project,
+        repo=repo,
+        user=user,
+        gateway=gateway,
+        status=RunStatus.RUNNING if run_termination_reason is None else RunStatus.TERMINATING,
+        termination_reason=run_termination_reason,
+    )
+    job = await create_job(
+        session=session,
+        run=run,
+        status=JobStatus.TERMINATING,
+        termination_reason=termination_reason,
+        job_provisioning_data=get_job_provisioning_data(dockerized=True),
+        instance=instance,
+        running_at=get_current_datetime() - timedelta(minutes=1),
+        ready=True,
+        registered=True,
+    )
+    return job, gateway_replicas
+
+
+def _register_replica(
+    session: AsyncSession,
+    job_model: JobModel,
+    gateway_replica_model: GatewayReplicaModel,
+    is_registered: bool = True,
+):
+    session.add(
+        ServiceReplicaRegistrationModel(
+            job_id=job_model.id,
+            gateway_replica_id=gateway_replica_model.id,
+            is_registered=is_registered,
+            register_attempt=0 if is_registered else 1,
+        )
+    )
 
 
 @pytest.mark.asyncio
@@ -663,6 +735,171 @@ class TestJobTerminatingWorker:
         await session.refresh(job)
         assert job.status == expected_status
         assert job.runner_timestamp == 2
+
+    @pytest.mark.parametrize(
+        ("termination_reason", "graceful_termination_attempts"),
+        [
+            pytest.param(JobTerminationReason.SCALED_DOWN, None, id="scaled_down"),
+            pytest.param(JobTerminationReason.TERMINATED_BY_USER, 0, id="stopped"),
+        ],
+    )
+    async def test_waits_for_replica_to_be_unregistered_from_gateway(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobTerminatingWorker,
+        termination_reason: JobTerminationReason,
+        graceful_termination_attempts: Optional[int],
+    ):
+        job, gateway_replicas = await _create_terminating_service_replica(
+            session=session, termination_reason=termination_reason
+        )
+        job.graceful_termination_attempts = graceful_termination_attempts
+        # Unregistered from one gateway replica, but not from the other yet
+        _register_replica(session, job, gateway_replicas[1])
+        _lock_job(job)
+        await session.commit()
+
+        with (
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating.stop_runner",
+                new=AsyncMock(),
+            ) as stop_runner,
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating._stop_container",
+                new=AsyncMock(return_value=True),
+            ) as stop_container,
+        ):
+            await worker.process(_job_to_pipeline_item(job))
+
+        stop_runner.assert_not_awaited()
+        stop_container.assert_not_awaited()
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.graceful_termination_attempts == graceful_termination_attempts
+        assert job.remove_at is None
+        assert job.unregister_deadline is not None
+        assert job.unregister_deadline > get_current_datetime() + timedelta(seconds=30)
+        # Gateway replicas are synced right away instead of on their schedule
+        for gateway_replica in gateway_replicas:
+            await session.refresh(gateway_replica)
+            assert gateway_replica.skip_min_processing_interval
+        hint_fetch = cast(Mock, worker._pipeline_hinter.hint_fetch)
+        hint_fetch.assert_called_once_with(GatewayReplicaModel.__name__)
+
+    async def test_keeps_waiting_for_replica_to_be_unregistered_until_deadline(
+        self, test_db, session: AsyncSession, worker: JobTerminatingWorker
+    ):
+        job, gateway_replicas = await _create_terminating_service_replica(
+            session=session, termination_reason=JobTerminationReason.TERMINATED_BY_USER
+        )
+        job.graceful_termination_attempts = 0
+        unregister_deadline = get_current_datetime() + timedelta(seconds=10)
+        job.unregister_deadline = unregister_deadline
+        _register_replica(session, job, gateway_replicas[0])
+        _lock_job(job)
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.stop_runner",
+            new=AsyncMock(),
+        ) as stop_runner:
+            await worker.process(_job_to_pipeline_item(job))
+
+        stop_runner.assert_not_awaited()
+
+        await session.refresh(job)
+        assert job.remove_at is None
+        assert job.unregister_deadline == unregister_deadline
+        # Gateway replicas were already asked to sync when the wait started
+        await session.refresh(gateway_replicas[0])
+        assert not gateway_replicas[0].skip_min_processing_interval
+        cast(Mock, worker._pipeline_hinter.hint_fetch).assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("registered", "gateway_replica_status", "deadline_passed"),
+        [
+            pytest.param(False, GatewayReplicaStatus.RUNNING, False, id="unregistered"),
+            # A gateway replica that is not running is not synced, so it never unregisters
+            pytest.param(True, GatewayReplicaStatus.TERMINATING, False, id="gateway_terminating"),
+            # A gateway replica that cannot be reached must not hold the job forever
+            pytest.param(True, GatewayReplicaStatus.RUNNING, True, id="deadline_passed"),
+        ],
+    )
+    async def test_stops_replica_once_unregistered_from_gateway(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobTerminatingWorker,
+        registered: bool,
+        gateway_replica_status: GatewayReplicaStatus,
+        deadline_passed: bool,
+    ):
+        job, gateway_replicas = await _create_terminating_service_replica(
+            session=session, termination_reason=JobTerminationReason.TERMINATED_BY_USER
+        )
+        job.graceful_termination_attempts = 0
+        job.unregister_deadline = get_current_datetime() + timedelta(
+            seconds=-1 if deadline_passed else 10
+        )
+        gateway_replicas[0].status = gateway_replica_status
+        if registered:
+            _register_replica(session, job, gateway_replicas[0])
+        else:
+            # A failed registration leaves a record behind
+            _register_replica(session, job, gateway_replicas[0], is_registered=False)
+        _lock_job(job)
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.stop_runner",
+            new=AsyncMock(),
+        ) as stop_runner:
+            await worker.process(_job_to_pipeline_item(job))
+
+        stop_runner.assert_awaited_once()
+
+        await session.refresh(job)
+        assert job.graceful_termination_attempts == 1
+        assert job.remove_at is not None
+
+    async def test_does_not_wait_for_aborted_replica_to_be_unregistered_from_gateway(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobTerminatingWorker,
+        ssh_tunnel_mock: Mock,
+        runner_client_mock: Mock,
+    ):
+        job, gateway_replicas = await _create_terminating_service_replica(
+            session=session,
+            termination_reason=JobTerminationReason.ABORTED_BY_USER,
+            run_termination_reason=RunTerminationReason.ABORTED_BY_USER,
+        )
+        _register_replica(session, job, gateway_replicas[0])
+        _lock_job(job)
+        await session.commit()
+
+        runner_client_mock.pull.return_value = PullResponse(
+            job_states=[], job_logs=[], runner_logs=[], last_updated=0, has_more=True
+        )
+        with (
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating.logs_services.write_logs"
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating._stop_container",
+                new=AsyncMock(return_value=True),
+            ) as stop_container,
+        ):
+            await worker.process(_job_to_pipeline_item(job))
+
+        stop_container.assert_awaited_once()
+
+        await session.refresh(job)
+        assert job.status == JobStatus.ABORTED
+        assert job.unregister_deadline is None
 
     async def test_does_not_wait_for_logs_if_runner_no_longer_runs_job(
         self,
