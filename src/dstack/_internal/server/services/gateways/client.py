@@ -11,13 +11,13 @@ from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.configurations import RateLimit, ServiceConfiguration
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import JobSpec, JobSubmission, get_service_port
-from dstack._internal.proxy.gateway.models import ImportedModel
 from dstack._internal.proxy.gateway.schemas.metering import (
     CollectMeteringRequest,
     CollectMeteringResponse,
     MeteringBatch,
 )
 from dstack._internal.proxy.gateway.schemas.registry import (
+    ImportListItem,
     ImportListResponse,
     RegisterImportRequest,
     ReplicaProxyJumpKeyUpdate,
@@ -231,7 +231,7 @@ class GatewayClient:
         resp.raise_for_status()
         self.is_server_ready = True
 
-    async def list_imports(self) -> list[ImportedModel]:
+    async def list_imports(self) -> list[ImportListItem]:
         resp = await self._client.get(self._url("/api/registry/imports/list"))
         resp.raise_for_status()
         self.is_server_ready = True

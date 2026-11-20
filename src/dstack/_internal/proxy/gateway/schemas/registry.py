@@ -3,7 +3,6 @@ from typing import Annotated, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.proxy.gateway.models import ImportedModel
 from dstack._internal.proxy.lib.const import DEFAULT_SERVICE_READ_TIMEOUT
 from dstack._internal.proxy.lib.models import RateLimit
 
@@ -87,8 +86,16 @@ class UnregisterImportRequest(BaseModel):
     name: str
 
 
+class ImportListItem(BaseModel):
+    importer_project: str
+    export_id: str
+    exporter_project: str
+    name: str
+    """The model's name in the exporter project."""
+
+
 class ImportListResponse(BaseModel):
-    imports: list[ImportedModel]
+    imports: list[ImportListItem]
 
 
 class ReplicaProxyJumpKeyUpdate(BaseModel):
