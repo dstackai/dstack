@@ -1296,13 +1296,27 @@ projects:
 
     Each `tolerations` item is `key[=value][:effect]`, the `kubectl taint` format, so a taint added with `kubectl taint` can be copied as is. Without `=value`, any value is tolerated; without `:effect`, any effect. If `tolerations` isn't set, `dstack` tolerates the GPU node taints when every node is tainted, but not if `node_selector` is set.
 
-    !!! warning "Changing `cpu`, `memory`, `node_selector`, and `tolerations`"
+    By default, the jump pod runs `testcontainers/sshd`. To run your own image instead, e.g., one built on your organization's base image, scanned by your registry, or with your SSH policy, set `proxy_jump.image`:
+
+    ```yaml
+    contexts:
+    - name: gpu-cluster-a
+      proxy_jump:
+        image: registry.example.com/sshd:1.0@sha256:...
+    ```
+
+    The image must run OpenSSH `sshd` at `/usr/sbin/sshd` as root and provide `/bin/sh` and `ssh-keygen`: `dstack` writes the authorized keys, regenerates the host keys with `ssh-keygen -A`, and starts `sshd`. Pin the image by digest.
+
+    !!! warning "Changing `image`, `cpu`, `memory`, `node_selector`, and `tolerations`"
         New values don't apply to an existing jump pod. To apply them, update the jump pod's ReplicaSet in the context's namespace and delete the pod so that Kubernetes recreates it:
 
         ```shell
         # cpu and memory
         kubectl -n <namespace> set resources replicaset dstack-<project>-ssh-jump-pod \
           --requests=cpu=1,memory=2Gi --limits=cpu=1,memory=2Gi
+        # image
+        kubectl -n <namespace> set image replicaset dstack-<project>-ssh-jump-pod \
+          dstack-<project>-ssh-jump-pod-container=registry.example.com/sshd:1.0@sha256:...
         # node_selector and tolerations: edit spec.template.spec.affinity and .tolerations
         kubectl -n <namespace> edit replicaset dstack-<project>-ssh-jump-pod
         # Recreate the pod

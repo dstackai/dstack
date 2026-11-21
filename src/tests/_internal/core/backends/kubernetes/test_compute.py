@@ -18,7 +18,11 @@ from dstack._internal.core.backends.kubernetes.compute import (
     _get_pod_spec_parameters_for_gpu,
     _KubernetesSkipOfferCache,
 )
-from dstack._internal.core.backends.kubernetes.models import KubeconfigConfig, KubernetesConfig
+from dstack._internal.core.backends.kubernetes.models import (
+    JUMP_POD_DEFAULT_IMAGE,
+    KubeconfigConfig,
+    KubernetesConfig,
+)
 from dstack._internal.core.backends.kubernetes.resources import (
     KubernetesOfferBackendData,
     build_base_labels,
@@ -231,6 +235,7 @@ class TestCreateJumpPodServiceIfNotExists:
         api: Mock,
         apps_api: Mock,
         jump_pod_port: Optional[int] = None,
+        image: str = JUMP_POD_DEFAULT_IMAGE,
         cpu: str = "500m",
         memory: str = "1Gi",
         node_selector: Optional[list[str]] = None,
@@ -245,6 +250,7 @@ class TestCreateJumpPodServiceIfNotExists:
             jump_pod_service_name=JUMP_POD_SERVICE_NAME,
             jump_pod_port=jump_pod_port,
             authorized_keys=["ssh-ed25519 AAAA project"],
+            image=image,
             cpu_request_limit=cpu,
             memory_request_limit=memory,
             node_selector=node_selector,
@@ -257,7 +263,12 @@ class TestCreateJumpPodServiceIfNotExists:
         return replica_set.spec.template.spec
 
     def assert_replica_set_created(
-        self, apps_api: Mock, *, cpu: str = "500m", memory: str = "1Gi"
+        self,
+        apps_api: Mock,
+        *,
+        image: str = JUMP_POD_DEFAULT_IMAGE,
+        cpu: str = "500m",
+        memory: str = "1Gi",
     ) -> None:
         apps_api.create_namespaced_replica_set.assert_called_once()
         replica_set = apps_api.create_namespaced_replica_set.call_args.kwargs["body"]
@@ -265,6 +276,7 @@ class TestCreateJumpPodServiceIfNotExists:
         assert replica_set.spec.replicas == 1
         assert replica_set.spec.selector.match_labels == JUMP_POD_SELECTOR
         assert replica_set.spec.template.metadata.labels == JUMP_POD_LABELS
+        assert replica_set.spec.template.spec.containers[0].image == image
         resources = replica_set.spec.template.spec.containers[0].resources
         # Equal CPU and memory requests and limits for the Guaranteed QoS class, and
         # an ephemeral-storage request without a limit
@@ -302,6 +314,15 @@ class TestCreateJumpPodServiceIfNotExists:
         api.create_namespace.assert_not_called()
         self.assert_replica_set_created(apps_api)
         self.assert_service_created(api, selector=JUMP_POD_SELECTOR, node_port=None)
+
+    def test_sets_jump_pod_image(self):
+        api, apps_api = self.make_apis()
+
+        self.call(api, apps_api, image="registry.example.com/sshd:1@sha256:" + "0" * 64)
+
+        self.assert_replica_set_created(
+            apps_api, image="registry.example.com/sshd:1@sha256:" + "0" * 64
+        )
 
     def test_sets_jump_pod_resources(self):
         api, apps_api = self.make_apis()

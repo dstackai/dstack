@@ -39,6 +39,8 @@ def _get_kubernetes_proxy_jump_excludes(
 ) -> IncludeExcludeStrDictType:
     # A field is excluded only if it's unset in all `proxy_jumps`
     excludes: IncludeExcludeStrDictType = {}
+    if all(proxy_jump.image is None for proxy_jump in proxy_jumps):
+        excludes["image"] = True
     if all(proxy_jump.cpu is None for proxy_jump in proxy_jumps):
         excludes["cpu"] = True
     if all(proxy_jump.memory is None for proxy_jump in proxy_jumps):

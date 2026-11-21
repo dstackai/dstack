@@ -65,6 +65,18 @@ class TestGetBackendConfigExcludes:
 
         assert _request_body(config)["proxy_jump"] == {"hostname": None, "port": None, "cpu": "1"}
 
+    def test_keeps_set_kubernetes_proxy_jump_image(self):
+        config = KubernetesBackendConfigWithCreds(
+            kubeconfig=KubeconfigConfig(data="mocked"),
+            proxy_jump=KubernetesProxyJumpConfig(image="registry.example.com/sshd:1"),
+        )
+
+        assert _request_body(config)["proxy_jump"] == {
+            "hostname": None,
+            "port": None,
+            "image": "registry.example.com/sshd:1",
+        }
+
     def test_keeps_set_kubernetes_proxy_jump_placement(self):
         config = KubernetesBackendConfigWithCreds(
             kubeconfig=KubeconfigConfig(data="mocked"),
