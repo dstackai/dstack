@@ -506,6 +506,30 @@ class TestChatCompletionsPassthrough:
             (0, 4, 0),
         ]
 
+    async def test_stream_has_last_usage_that_service_sent_with_choices(
+        self, mock_service
+    ) -> None:
+        # Dynamo sends the last `usage` in the last chunk with choices
+        mock_service(
+            lambda request: httpx.Response(
+                200, content=sse(chunk("Hello", usage(9, 1)), chunk(" there", usage(9, 2, 4)))
+            )
+        )
+        auth = ProxyTestAuthProvider({"test-proj": {"token"}})
+        client = make_http_client(await make_repo(), auth, ProxyTestMeter())
+        request_body = {
+            "model": "test-model",
+            "messages": [],
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
+        resp = await client.post(CHAT_COMPLETIONS_URL, json=request_body, headers=AUTH_HEADERS)
+
+        assert resp.status_code == 200
+        chunks = parse_sse(resp.content)
+        assert [c.get("usage") for c in chunks] == [None, None, usage(9, 2, 4)]
+        assert chunks[2]["choices"] == []
+
     async def test_meters_stopped_stream_up_to_its_last_chunk(self, mock_service) -> None:
         is_stream_closed = asyncio.Event()
 
