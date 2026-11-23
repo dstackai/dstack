@@ -239,7 +239,8 @@ server = [
     "aiosqlite",
     "docker>=6.0.0",
     "python-dxf>=12.1.1",
-    "sentry-sdk[fastapi]>=2.27.0",
+    # sentry-sdk 3 removed APIs that the server uses (#4513).
+    "sentry-sdk[fastapi]>=2.27.0,<3",
     "alembic-postgresql-enum",
     "asyncpg",
     "python-json-logger>=3.1.0",
