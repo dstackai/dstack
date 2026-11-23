@@ -1006,12 +1006,8 @@ def get_fleet_master_instance_provisioning_data(
     return None
 
 
-def can_create_new_cloud_instance_in_fleet(
-    fleet_model: FleetModel, fleet_spec: FleetSpec, job_project_id: uuid.UUID
-) -> bool:
+def can_create_new_cloud_instance_in_fleet(fleet_model: FleetModel, fleet_spec: FleetSpec) -> bool:
     if fleet_spec.configuration.ssh_config is not None:
-        return False
-    if fleet_model.project_id != job_project_id:
         return False
     active_instances = [i for i in fleet_model.instances if i.status.is_active()]
     # nodes.max is a soft limit that can be exceeded when provisioning concurrently.
@@ -1025,11 +1021,17 @@ def can_create_new_cloud_instance_in_fleet(
     return True
 
 
-def check_can_create_new_cloud_instance_in_fleet(
-    fleet_model: FleetModel, fleet_spec: FleetSpec, job_project_id: uuid.UUID
-):
-    if not can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec, job_project_id):
+def check_can_create_new_cloud_instance_in_fleet(fleet_model: FleetModel, fleet_spec: FleetSpec):
+    if not can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec):
         raise ValueError("Cannot fit new cloud instance into fleet")
+
+
+def new_instances_in_fleet_require_create_instance_support(
+    fleet_model: FleetModel, job_project_id: uuid.UUID
+) -> bool:
+    # In imported fleets, only VM-based backends can provision new instances for importers' jobs.
+    # This limitation is to be lifted after further consideration and testing.
+    return fleet_model.project_id != job_project_id
 
 
 async def _create_fleet(

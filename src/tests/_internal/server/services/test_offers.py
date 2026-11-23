@@ -57,6 +57,37 @@ class TestGetOffersByRequirements:
         assert res == [(aws_backend_mock, aws_offer)]
 
     @pytest.mark.asyncio
+    async def test_returns_create_instance_support_offers(self):
+        profile = Profile(name="test")
+        requirements = Requirements(resources=ResourcesSpec())
+        aws_backend_mock = Mock()
+        aws_backend_mock.TYPE = BackendType.AWS
+        aws_offer = get_instance_offer_with_availability(backend=BackendType.AWS, price=1)
+        aws_backend_mock.compute.return_value.get_offers.return_value = [aws_offer]
+        runpod_backend_mock = Mock()
+        runpod_backend_mock.TYPE = BackendType.RUNPOD
+        runpod_offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD, price=2)
+        runpod_backend_mock.compute.return_value.get_offers.return_value = [runpod_offer]
+        # Wrapper backends are kept, and their offers are filtered by base backend.
+        dstack_backend_mock = Mock()
+        dstack_backend_mock.TYPE = BackendType.DSTACK
+        dstack_gcp_offer = get_instance_offer_with_availability(backend=BackendType.GCP, price=3)
+        dstack_vastai_offer = get_instance_offer_with_availability(
+            backend=BackendType.VASTAI, price=4
+        )
+        dstack_backend_mock.compute.return_value.get_offers.return_value = [
+            dstack_gcp_offer,
+            dstack_vastai_offer,
+        ]
+        res = await get_offers_by_requirements(
+            backends=[aws_backend_mock, runpod_backend_mock, dstack_backend_mock],
+            profile=profile,
+            requirements=requirements,
+            create_instance_support=True,
+        )
+        assert res == [(aws_backend_mock, aws_offer), (dstack_backend_mock, dstack_gcp_offer)]
+
+    @pytest.mark.asyncio
     async def test_returns_volume_offers(self):
         profile = Profile(name="test")
         requirements = Requirements(resources=ResourcesSpec())

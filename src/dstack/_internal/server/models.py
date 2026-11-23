@@ -527,7 +527,7 @@ class JobModel(PipelineModelMixin, BaseModel):
     run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
     run: Mapped["RunModel"] = relationship()
 
-    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
+    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"), index=True)
     """`fleet_id` keeps jobs attached to fleets because we may choose an optimal fleet for a master
     job but not yet create an instance for it.
     """

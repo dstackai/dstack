@@ -1,9 +1,8 @@
 ---
 title: "Serve GLM-5.3 Coding Agents Faster and Cheaper on GB200 NVL72"
-date: 2026-11-13
+date: 2026-11-17
 description: "Optimized with dstack presets, 14 GB200 NVL72 nodes serve 48 GLM-5.3 coding agents as fast as the three fastest OpenRouter endpoints, with lower p50 TTFT, and self-hosting them costs less than buying the same tokens."
 slug: glm53-gb200-nvl72-coding-agents
-unlisted: true
 image: https://dstack.ai/static-assets/static-assets/images/dstack-glm-53-gb200-nvl72-crusoe.png
 categories:
   - Benchmarks
@@ -131,7 +130,7 @@ Almost all of the gain came from layout decisions: whether to disaggregate, how 
 
 Both presets are public: [aggregated](https://sky.dstack.ai/presets/dstackai/glm53-gb200-nvl72-agentic-c48) and [PD disaggregated](https://sky.dstack.ai/presets/dstackai/glm53-gb200-nvl72-agentic-pd-c128). They can be deployed via `dstack` to any GPU cloud, Kubernetes, or bare-metal cluster with GB200 NVL72 nodes and a CPU node for the router.
 
-To deploy on Crusoe, use `dstack`'s native integration: it can provision [VMs](../../docs/examples/clusters/crusoe.md#vms) through the `crusoe` backend or use a [Kubernetes](../../docs/examples/clusters/crusoe.md#kubernetes) cluster through the `kubernetes` backend. Any other nodes can be added as an [SSH fleet](../../docs/concepts/fleets.md).
+To deploy on Crusoe, use `dstack`'s native integration: it can provision [VMs](../../docs/examples/clusters/crusoe.md#vms) through the `crusoe` backend or use a [Kubernetes](../../docs/examples/clusters/crusoe.md#kubernetes) cluster through the `kubernetes` backend. Any other nodes can be added as an [SSH fleet](../../docs/concepts/fleets.md). For a step-by-step setup of the GB200 NVL72 rack, from creating the VMs and enabling IMEX to validating NVLink, see Crusoe's [post](https://www.crusoe.ai/resources/blog/serving-glm-5-3-coding-agents-faster-on-nvidia-gb200-nvl72) on this work.
 
 Once the fleet is created, pull a preset, export it as a service configuration, and apply it:
 

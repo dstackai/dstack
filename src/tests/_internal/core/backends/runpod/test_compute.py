@@ -62,7 +62,6 @@ def _job() -> MagicMock:
 
 def _run() -> MagicMock:
     run = MagicMock()
-    run.project_name = "main"
     run.user = "test-user"
     return run
 
@@ -80,6 +79,7 @@ def _run_job(
             run=_run(),
             job=job if job is not None else _job(),
             instance_offer=offer,
+            project_name="main",
             project_ssh_public_key=PROJECT_SSH_PUBLIC_KEY,
             project_ssh_private_key="private-key",
             volumes=[],
@@ -104,6 +104,7 @@ def _run_jobs(compute: RunpodCompute, offer: InstanceOfferWithAvailability, job_
             run=_run(),
             job_configurations=job_configurations,
             instance_offer=offer,
+            project_name="main",
             project_ssh_public_key=PROJECT_SSH_PUBLIC_KEY,
             project_ssh_private_key="private-key",
             placement_group=None,

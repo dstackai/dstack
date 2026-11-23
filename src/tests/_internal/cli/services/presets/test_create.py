@@ -826,7 +826,7 @@ class TestPerformanceConstraints:
     def test_throughput_is_derived_not_read(self):
         # A miscomputed field must not become the number we rank on.
         preset = get_preset()
-        benchmark = preset.benchmark
+        benchmark = get_or_error(preset.result[0].benchmark)
         benchmark.metrics.output_tok_per_s = 999999.0
         benchmark.metrics.per_user_tok_per_s = 999999.0
 
@@ -863,7 +863,7 @@ class TestBuildConstraints:
             "min_context_length": 32768,
             "max_ttft": 5000,
             "trials_num": 3,
-            "concurrency": 8,
+            "concurrency": [8],
             "input_tokens": 1024,
             "output_tokens": 1024,
             "shared_prefix_tokens": 0,
@@ -897,7 +897,7 @@ class TestBuildConstraints:
             "min_context_length": 32768,
             "max_ttft": 5000,
             "trials_num": 3,
-            "concurrency": 8,
+            "concurrency": [8],
             "dataset": "spec_bench",
             "baseline": True,
             "fleets": ["gpu-fleet"],
@@ -927,7 +927,7 @@ class TestBuildConstraints:
         assert data["model"] == {"repo": "Qwen/Qwen3-32B-AWQ", "name": "qwen3"}
         assert data["min_context_length"] == 32768
         assert data["trials_num"] == 10
-        assert data["concurrency"] == 16
+        assert data["concurrency"] == [16]
         assert data["fleets"] == ["a", "b"]
 
 
@@ -1234,7 +1234,7 @@ class TestSessionLog:
             lambda: tmp_path,
         )
 
-        listed = {entry["id"]: entry["status"] for entry in list_preset_sessions()}
+        listed = {entry.id: entry.status for entry in list_preset_sessions()}
 
         assert listed == {"dead0000": "failed", "beef0000": "success"}
 

@@ -16,11 +16,18 @@ from dstack._internal.cli.models.preset_agent import (
     PresetSessionRun,
     PresetSessionState,
     PresetSessionWorkspace,
+    PresetTrialBenchmark,
+    PresetTrialResult,
 )
-from dstack._internal.cli.models.presets import VerifiedPreset
+from dstack._internal.cli.models.presets import (
+    PresetSessionEntry,
+    PresetTrialsSummary,
+    VerifiedPreset,
+)
 from dstack._internal.cli.services.presets.agents.base import PresetAgentSpec
 from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.compat import IS_WINDOWS
+from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.configurations import (
     DEFAULT_REPLICA_GROUP_NAME,
     PresetConfiguration,
@@ -28,7 +35,9 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.instances import Disk, Gpu, Resources
 from dstack._internal.core.models.presets import (
+    AnyPresetConstraints,
     PresetBenchmark,
+    PresetResult,
     PresetVerificationReplicaGroup,
 )
 from dstack._internal.core.models.resources import ResourcesSpec
@@ -169,9 +178,14 @@ def get_preset(
                 "env": ["HF_TOKEN"],
             }
         ),
-        context_length=context_length,
         best_trial=1,
-        benchmark=get_preset_benchmark(),
+        result=[
+            PresetResult(
+                concurrency=1,
+                context_length=context_length,
+                benchmark=get_preset_benchmark(),
+            )
+        ],
         verified_on=[
             PresetVerificationReplicaGroup(name=DEFAULT_REPLICA_GROUP_NAME, replicas=[resources])
         ],
@@ -267,6 +281,82 @@ def get_session_run(**overrides: Any) -> PresetSessionRun:
     return PresetSessionRun(**fields)
 
 
+def get_preset_constraints(**overrides: Any) -> AnyPresetConstraints:
+    """`constraints.json` as a session records it: synthetic by default, a
+    dataset one when `dataset` is given."""
+    fields: dict[str, Any] = {
+        "run_name_prefix": "qwen-ab12cd34",
+        "model": {"base": "Qwen/Qwen3.5-27B"},
+        "min_context_length": 8192,
+        "max_ttft": 5000,
+        "trials_num": 3,
+        "concurrency": [1],
+        "baseline": True,
+        "fleets": ["gpu-fleet"],
+        "env": [],
+    }
+    if "dataset" not in overrides:
+        fields.update({"input_tokens": 1024, "output_tokens": 1024, "shared_prefix_tokens": 0})
+    fields.update(overrides)
+    return validate_extra_ignore(AnyPresetConstraints, fields)
+
+
+def get_trial_result(
+    *,
+    tok_s: float = 42.0,
+    tpot_ms: Optional[float] = None,
+    ttft_ms: Optional[float] = None,
+    concurrency: int = 1,
+    context_length: Optional[int] = None,
+    failed: bool = False,
+) -> PresetTrialResult:
+    """One `result` entry of a `trial.json`, with a benchmark that measured
+    `tok_s` over one second, so it must be a whole number of tokens. `tpot_ms`
+    sets the mean and `ttft_ms` the p50, the statistics the listing shows."""
+    benchmark = get_preset_benchmark().model_dump()
+    benchmark["workload"]["concurrency"] = concurrency
+    benchmark["metrics"].update({"duration_seconds": 1.0, "total_output_tokens": tok_s})
+    if tpot_ms is not None:
+        benchmark["metrics"]["tpot_ms"]["mean"] = tpot_ms
+    if ttft_ms is not None:
+        benchmark["metrics"]["ttft_ms"]["p50"] = ttft_ms
+    return PresetTrialResult(
+        concurrency=concurrency,
+        context_length=context_length,
+        benchmark=PresetTrialBenchmark.model_validate(benchmark),
+        failed=failed,
+    )
+
+
+def get_trials_summary(count: int = 0, **overrides: Any) -> PresetTrialsSummary:
+    """`count` trials that produced no benchmark, unless `series` and `failed`
+    say otherwise."""
+    fields: dict[str, Any] = {"count": count, "series": [None] * count, "failed": [False] * count}
+    fields.update(overrides)
+    return PresetTrialsSummary(**fields)
+
+
+def get_session_entry(**overrides: Any) -> PresetSessionEntry:
+    """A session as `dstack preset list` reads it. `model`, `trials_num` and
+    `created_at` go to the stored state; the rest are entry fields."""
+    state_overrides = {
+        key: overrides.pop(key)
+        for key in ("model", "trials_num", "created_at")
+        if key in overrides
+    }
+    fields: dict[str, Any] = {
+        "id": "ab12cd34",
+        "name": None,
+        "status": "running",
+        "trials": get_trials_summary(),
+        "verification": None,
+        "constraints": None,
+    }
+    fields.update(overrides)
+    state = get_session_state(id=fields["id"], status=fields["status"], **state_overrides)
+    return PresetSessionEntry(state=state, **fields)
+
+
 def get_successful_preset_report(run: Run) -> PresetAgentSuccess:
     return PresetAgentSuccess.model_validate(
         {
@@ -277,8 +367,13 @@ def get_successful_preset_report(run: Run) -> PresetAgentSuccess:
             "trial": 1,
             "base": "Qwen/Qwen3.5-27B",
             "model": "community/Qwen3.5-27B-GPTQ-Int4",
-            "context_length": 32768,
-            "benchmark": get_preset_benchmark(),
+            "result": [
+                {
+                    "concurrency": 1,
+                    "context_length": 32768,
+                    "benchmark": get_preset_benchmark(),
+                }
+            ],
         }
     )
 

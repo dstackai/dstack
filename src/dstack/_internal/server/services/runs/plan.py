@@ -42,6 +42,7 @@ from dstack._internal.server.services.fleets import (
     get_fleet_master_instance_provisioning_data,
     get_fleet_requirements,
     get_fleet_spec,
+    new_instances_in_fleet_require_create_instance_support,
 )
 from dstack._internal.server.services.instances import (
     filter_instances,
@@ -312,6 +313,7 @@ async def select_run_candidate_fleet_models_with_filters(
         .where(*fleet_filters)
         .where(*instance_filters)
         .options(contains_eager(FleetModel.instances))
+        .options(contains_eager(FleetModel.project).selectinload(ProjectModel.backends))
         .execution_options(populate_existing=True)
     )
     if lock_instances:
@@ -339,6 +341,7 @@ async def select_run_candidate_fleet_models_with_filters(
             )
         )
         .options(raiseload(FleetModel.instances))
+        .options(contains_eager(FleetModel.project).selectinload(ProjectModel.backends))
         .execution_options(populate_existing=True)
     )
     fleet_models_without_instances = list(res.unique().scalars().all())
@@ -424,7 +427,7 @@ async def find_optimal_fleet_with_offers(
             # Limit multinode runs to cluster fleets to guarantee best connectivity.
             continue
 
-        if not _run_can_fit_into_fleet(project, run_spec, fleet_model, fleet_spec):
+        if not _run_can_fit_into_fleet(run_spec, fleet_model, fleet_spec):
             logger.debug(
                 "Skipping fleet %s from consideration: run cannot fit into fleet",
                 fleet_model.name,
@@ -727,7 +730,7 @@ def _get_required_instance_offers(run_spec: RunSpec, job: Job) -> int:
 
 
 def _run_can_fit_into_fleet(
-    project: ProjectModel, run_spec: RunSpec, fleet_model: FleetModel, fleet_spec: FleetSpec
+    run_spec: RunSpec, fleet_model: FleetModel, fleet_spec: FleetSpec
 ) -> bool:
     """
     Returns `False` if the run cannot fit into fleet for sure.
@@ -738,8 +741,8 @@ def _run_can_fit_into_fleet(
     and eventually removed by the fleet consolidation logic.
     """
     nodes_required_num = get_nodes_required_num(run_spec)
-    if fleet_spec.configuration.ssh_config is not None or fleet_model.project_id != project.id:
-        # SSH fleets and imported cloud fleets cannot provision new instances for the run,
+    if fleet_spec.configuration.ssh_config is not None:
+        # SSH fleets cannot provision new instances for the run,
         # so only idle blocks of existing instances count.
         # Currently assume that each idle block can run a job.
         # TODO: Take resources / eligible offers into account.
@@ -783,9 +786,7 @@ async def _get_backend_offers_in_fleet(
     if fleet_spec is None:
         fleet_spec = get_fleet_spec(fleet_model)
     try:
-        check_can_create_new_cloud_instance_in_fleet(
-            fleet_model, fleet_spec, job_project_id=project.id
-        )
+        check_can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec)
         profile, requirements = get_run_profile_and_requirements_in_fleet(
             job=job,
             run_spec=run_spec,
@@ -802,7 +803,9 @@ async def _get_backend_offers_in_fleet(
         # Handle multinode for old jobs that don't have requirements.multinode set.
         # TODO: Drop multinode param.
         multinode = requirements.multinode or is_multinode_job(job)
-        async with backends_cache.lease_project_backends(project) as backends:
+        # Offers come from the fleet's project backends, which differ from
+        # the run's project backends if the fleet is imported.
+        async with backends_cache.lease_project_backends(fleet_model.project) as backends:
             backends_with_offers = await get_offers_by_requirements(
                 backends=backends,
                 profile=profile,
@@ -812,6 +815,9 @@ async def _get_backend_offers_in_fleet(
                 volumes=volumes,
                 privileged=job.job_spec.privileged,
                 instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+                create_instance_support=new_instances_in_fleet_require_create_instance_support(
+                    fleet_model, job_project_id=project.id
+                ),
                 max_offers=max_offers,
                 full_offers=full_offers,
                 unallocated_resources=unallocated_resources,

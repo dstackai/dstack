@@ -149,6 +149,7 @@ class Compute(ABC):
         run: Run,
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
+        project_name: str,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
@@ -160,6 +161,11 @@ class Compute(ABC):
         Launches a new instance for the job. It should return `JobProvisioningData` ASAP.
         If required to wait to get the IP address or SSH port, return partially filled `JobProvisioningData`
         and implement `update_provisioning_data()`.
+
+        `project_name`, `project_ssh_public_key`, and `project_ssh_private_key` belong to the
+        project that will own the provisioned resources -- the project of the job's fleet. It
+        differs from `run.project_name` if the fleet is imported from another project, so name
+        and tag the resources using `project_name`, not `run.project_name`.
 
         `extra_authorized_keys` are the public keys to authorize on the job container in addition
         to `project_ssh_public_key`, as decided by the caller -- typically the user key, or
@@ -432,6 +438,7 @@ class ComputeWithCreateInstanceSupport(ABC):
         run: Run,
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
+        project_name: str,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
@@ -447,7 +454,7 @@ class ComputeWithCreateInstanceSupport(ABC):
         submits the keys to the shim later, see `Compute.run_job()`.
         """
         instance_config = InstanceConfiguration(
-            project_name=run.project_name,
+            project_name=project_name,
             instance_name=get_job_instance_name(run, job),
             user=run.user,
             ssh_keys=[SSHKey(public=project_ssh_public_key.strip())],
@@ -530,6 +537,7 @@ class ComputeWithGroupProvisioningSupport(ABC):
         run: Run,
         job_configurations: List[JobConfiguration],
         instance_offer: InstanceOfferWithAvailability,
+        project_name: str,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         placement_group: Optional[PlacementGroup],
@@ -849,6 +857,7 @@ def generate_unique_instance_name(
 def generate_unique_instance_name_for_job(
     run: Run,
     job: Job,
+    project_name: str,
     max_length: int = _DEFAULT_MAX_RESOURCE_NAME_LEN,
     with_provider_ref: bool = False,
 ) -> str:
@@ -860,7 +869,7 @@ def generate_unique_instance_name_for_job(
     """
     return generate_unique_backend_name(
         resource_name=get_job_instance_name(run, job),
-        project_name=run.project_name,
+        project_name=project_name,
         max_length=max_length,
         provider_ref=get_job_provider_ref(job) if with_provider_ref else None,
     )

@@ -14,6 +14,7 @@ from dstack._internal.cli.commands import BaseCommand
 from dstack._internal.cli.models.presets import (
     AnyStoredPreset,
     PresetListOutput,
+    PresetSessionEntry,
     UnverifiedPreset,
 )
 from dstack._internal.cli.services.completion import ProjectNameCompleter
@@ -284,7 +285,7 @@ class PresetCommand(BaseCommand):
 
     def _list_presets_and_sessions(
         self, *, base: str | None, repo: str | None
-    ) -> tuple[list[AnyStoredPreset], list[dict]]:
+    ) -> tuple[list[AnyStoredPreset], list[PresetSessionEntry]]:
         self._reconcile()
         presets = PresetStore().list()
         sessions = list_preset_sessions()
@@ -552,15 +553,13 @@ def _filter_presets(
 
 
 def _session_matches_model(
-    session: dict,
+    session: PresetSessionEntry,
     *,
     base: str | None,
     repo: str | None,
     repo_to_base: dict[str, str],
 ) -> bool:
-    model = str(session.get("model") or "")
-    if not model:
-        return False
+    model = session.state.model
     if repo is not None:
         return model == repo
     return model == base or repo_to_base.get(model) == base

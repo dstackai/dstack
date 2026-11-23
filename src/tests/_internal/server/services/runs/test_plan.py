@@ -871,7 +871,7 @@ class TestGetBackendOffersInRunCandidateFleets:
 class TestGetBackendOffersInFleet:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_no_offers_for_imported_fleet(
+    async def test_returns_offers_from_fleet_project_backends_for_imported_fleet(
         self, test_db, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         user = await create_user(session=session)
@@ -896,10 +896,20 @@ class TestGetBackendOffersInFleet:
             configuration=TaskConfiguration(image="debian", commands=["echo"]),
         )
         jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
-        get_offers_by_requirements_mock = AsyncMock()
+        offer = get_instance_offer_with_availability()
+        vm_backend = AsyncMock()
+        vm_backend.TYPE = BackendType.AWS
+        container_backend = AsyncMock()
+        container_backend.TYPE = BackendType.KUBERNETES
+        get_offers_by_requirements_mock = AsyncMock(return_value=[(vm_backend, offer)])
         monkeypatch.setattr(
             "dstack._internal.server.services.runs.plan.get_offers_by_requirements",
             get_offers_by_requirements_mock,
+        )
+        lease_project_backends_mock = mock_lease([vm_backend, container_backend])
+        monkeypatch.setattr(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            lease_project_backends_mock,
         )
 
         offers = await _get_backend_offers_in_fleet(
@@ -910,8 +920,55 @@ class TestGetBackendOffersInFleet:
             volumes=None,
         )
 
-        assert offers == []
-        get_offers_by_requirements_mock.assert_not_awaited()
+        assert offers == [offer]
+        lease_project_backends_mock.assert_called_once()
+        assert lease_project_backends_mock.call_args.args[0].id == exporter_project.id
+        call_kwargs = get_offers_by_requirements_mock.call_args.kwargs
+        assert call_kwargs["backends"] == [vm_backend, container_backend]
+        # Container-based backends are not used for importers' runs
+        assert call_kwargs["create_instance_support"] is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_offers_from_container_backends_for_own_fleet(
+        self, test_db, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=2)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(image="debian", commands=["echo"]),
+        )
+        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+        offer = get_instance_offer_with_availability(backend=BackendType.KUBERNETES)
+        container_backend = AsyncMock()
+        container_backend.TYPE = BackendType.KUBERNETES
+        get_offers_by_requirements_mock = AsyncMock(return_value=[(container_backend, offer)])
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan.get_offers_by_requirements",
+            get_offers_by_requirements_mock,
+        )
+        monkeypatch.setattr(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([container_backend]),
+        )
+
+        offers = await _get_backend_offers_in_fleet(
+            project=project,
+            fleet_model=fleet,
+            run_spec=run_spec,
+            job=jobs[0],
+            volumes=None,
+        )
+
+        assert offers == [offer]
+        call_kwargs = get_offers_by_requirements_mock.call_args.kwargs
+        assert call_kwargs["backends"] == [container_backend]
+        assert call_kwargs["create_instance_support"] is False
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

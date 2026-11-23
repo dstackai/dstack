@@ -234,6 +234,7 @@ class KubernetesCompute(
         run: Run,
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
+        project_name: str,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: list[Volume],
@@ -259,13 +260,13 @@ class KubernetesCompute(
         # There is one jump pod per project that is used as an ssh proxy jump to connect
         # to all job pods of the same project.
         # The service is created here and configured later in update_provisioning_data()
-        jump_pod_name = f"dstack-{run.project_name}-ssh-jump-pod"
+        jump_pod_name = f"dstack-{project_name}-ssh-jump-pod"
         jump_pod_service_name = get_pod_service_name(jump_pod_name)
         _create_jump_pod_service_if_not_exists(
             api=api,
             apps_api=client.AppsV1Api(cluster.api_client),
             namespace=namespace,
-            project_name=run.project_name,
+            project_name=project_name,
             jump_pod_name=jump_pod_name,
             jump_pod_service_name=jump_pod_service_name,
             jump_pod_port=cluster.proxy_jump.port,
@@ -277,13 +278,13 @@ class KubernetesCompute(
         )
 
         pod_name = generate_unique_instance_name_for_job(
-            run, job, max_length=LABEL_VALUE_MAX_LENGTH
+            run, job, project_name, max_length=LABEL_VALUE_MAX_LENGTH
         )
 
         base_labels = build_base_labels(
             component="job",
             unique_name=pod_name,
-            project=run.project_name,
+            project=project_name,
             name=job.job_spec.job_name,
             user=run.user,
             provider_ref=get_job_provider_ref(job),

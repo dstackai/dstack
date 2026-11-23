@@ -344,7 +344,6 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
 
     groups:
       - replicas: 1
-        # For now the router group must have replicas: 1
         commands:
           - pip install smg
           - |
@@ -788,8 +787,7 @@ scales the service to 4 replicas.
 Setting the minimum number of replicas to `0` allows the service to scale down to zero when there are no requests.
 
 Each [replica group](#replica-groups) can set its own `replicas` range and `scaling` rules, so
-worker groups scale independently. For now, a group with [`router`](#router) must have
-`replicas: 1` and cannot be scaled.
+the router and worker groups scale independently.
 
 > The `scaling` property requires creating a [gateway](gateways.md).
 

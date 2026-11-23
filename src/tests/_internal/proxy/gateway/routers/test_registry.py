@@ -1,3 +1,4 @@
+import asyncio
 import re
 import uuid
 from datetime import datetime, timezone
@@ -93,6 +94,28 @@ def sample_model_options(name: str = "test-model") -> dict:
             }
         }
     }
+
+
+def hold_drains(mocks: Mocks) -> asyncio.Event:
+    """Keep the connections of removed replicas draining until the returned event is set."""
+    drained = asyncio.Event()
+
+    async def wait_until_idle(socket_path: Path) -> bool:
+        await drained.wait()
+        return True
+
+    mocks.wait_until_idle.side_effect = wait_until_idle
+    return drained
+
+
+async def wait_for_closed_connections(mocks: Mocks, count: int) -> None:
+    """Wait for drained connections, which are closed in the background."""
+
+    async def closed() -> None:
+        while mocks.close_conn.await_count < count:
+            await asyncio.sleep(0)
+
+    await asyncio.wait_for(closed(), timeout=5)
 
 
 @pytest.mark.asyncio
@@ -656,6 +679,7 @@ class TestUnregisterService:
         assert system_mocks.reload_nginx.call_count == 0
 
     async def test_unregister_with_replicas(self, tmp_path: Path, system_mocks: Mocks) -> None:
+        drained = hold_drains(system_mocks)
         client = make_client(tmp_path)
         # register service
         resp = await client.post(
@@ -676,7 +700,10 @@ class TestUnregisterService:
         assert resp.status_code == 200
         assert not (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").exists()
         assert system_mocks.reload_nginx.call_count == 4
-        assert system_mocks.close_conn.call_count == 2
+        # Requests already sent to the replicas can still finish
+        system_mocks.close_conn.assert_not_awaited()
+        drained.set()
+        await wait_for_closed_connections(system_mocks, 2)
 
     async def test_unregister_with_model(self, tmp_path: Path, system_mocks: Mocks) -> None:
         repo = GatewayProxyRepo()
@@ -698,6 +725,7 @@ class TestUnregisterService:
 @pytest.mark.asyncio
 class TestUnregisterReplica:
     async def test_unregister(self, tmp_path: Path, system_mocks: Mocks) -> None:
+        drained = hold_drains(system_mocks)
         client = make_client(tmp_path)
         # register service
         resp = await client.post(
@@ -725,7 +753,11 @@ class TestUnregisterReplica:
         assert "replica xxx-xxx" in conf
         assert "replica yyy-yyy" not in conf
         assert system_mocks.reload_nginx.call_count == 4
-        assert system_mocks.close_conn.call_count == 1
+        # Requests already sent to the replica can still finish
+        system_mocks.close_conn.assert_not_awaited()
+        drained.set()
+        await wait_for_closed_connections(system_mocks, 1)
+        system_mocks.wait_until_idle.assert_awaited_once()
 
     async def test_unregister_no_replica_error(self, tmp_path: Path, system_mocks: Mocks) -> None:
         client = make_client(tmp_path)

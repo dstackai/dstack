@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Dict, Literal, Optional, Union
+from typing import Annotated, Any, Dict, Literal, Optional, Self, Union
 
 import yaml
 from pydantic import (
@@ -9,11 +9,12 @@ from pydantic import (
     ValidationError,
     ValidatorFunctionWrapHandler,
     WrapValidator,
+    model_validator,
 )
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import PresetAgentProvider, ServiceConfiguration
-from dstack._internal.core.models.presets import PresetBenchmark
+from dstack._internal.core.models.presets import PresetBenchmark, PresetResult
 
 
 class PresetAgentInvalidService(CoreModel):
@@ -52,8 +53,7 @@ class PresetAgentSuccess(CoreModel):
     trial: PositiveInt
     base: Annotated[str, Field(min_length=1)]
     model: Annotated[str, Field(min_length=1)]
-    context_length: PositiveInt
-    benchmark: PresetBenchmark
+    result: Annotated[list[PresetResult], Field(min_length=1)]
 
 
 class PresetAgentFailure(CoreModel):
@@ -64,6 +64,80 @@ class PresetAgentFailure(CoreModel):
 
 
 AnyPresetAgentResult = Union[PresetAgentSuccess, PresetAgentFailure]
+
+
+class PresetTrialBenchmark(PresetBenchmark):
+    """A trial's benchmark, which the agent writes into `trials/<n>/trial.json`
+    after benchmarking the trial at a concurrency, read by the CLI for
+    `dstack preset list`. `PresetBenchmark.validate_metrics` is overridden
+    because its rule is for the final report; applied to `trial.json` it would
+    drop the whole trial from the listing."""
+
+    @model_validator(mode="after")
+    def validate_metrics(self) -> Self:
+        return self
+
+
+class PresetTrialResult(CoreModel):
+    """One `result` entry of `trials/<n>/trial.json`, as the system prompt
+    defines it: the agent writes one per concurrency in `constraints.json` once
+    the trial is benchmarked, and the CLI reads them for `dstack preset list`.
+    The entry's `learned` field is left out: the CLI does not use it, because
+    the agent writes it for its own reading in later sessions."""
+
+    concurrency: Optional[PositiveInt] = None
+    context_length: Optional[PositiveInt] = None
+    benchmark: Optional[PresetTrialBenchmark] = None
+    failed: bool = False
+
+    @model_validator(mode="after")
+    def fail_without_benchmark(self) -> Self:
+        """An entry without a benchmark is one the agent could not measure, which
+        the prompt defines as failed; the flag is set in case the agent left it out."""
+        if self.benchmark is None:
+            self.failed = True
+        return self
+
+
+def _entry_or_failed(value: Any, handler: ValidatorFunctionWrapHandler) -> Any:
+    try:
+        return handler(value)
+    except ValidationError:
+        # A broken entry counts as a failed one, so the other entries of the
+        # trial are still listed.
+        return PresetTrialResult(failed=True)
+
+
+class PresetTrial(CoreModel):
+    """The `trials/<n>/trial.json` record as defined in the system_prompt.md.
+    The agent writes it once trial `<n>` is benchmarked, and its presence is
+    what marks the trial completed; the CLI reads it for `dstack preset list`."""
+
+    resources: Optional[dict[str, Any]] = None
+    groups: Optional[list[list[dict[str, Any]]]] = None
+    # Required and non-empty: `system_prompt.md` states that `trial.json` has
+    # one `result` entry per concurrency value.
+    result: Annotated[
+        list[Annotated[PresetTrialResult, WrapValidator(_entry_or_failed)]],
+        Field(min_length=1),
+    ]
+
+    @model_validator(mode="before")
+    @classmethod
+    def convert_to_result_list(cls, data: Any) -> Any:
+        # An old `trial.json` has no `result` list. Its `benchmark`,
+        # `context_length` and `failed` are at the top level, and a failed one
+        # may have no `benchmark` at all.
+        if isinstance(data, dict) and "result" not in data:
+            data = dict(data)
+            data["result"] = [
+                {
+                    key: data.pop(key)
+                    for key in ("benchmark", "context_length", "failed")
+                    if key in data
+                }
+            ]
+        return data
 
 
 PresetSessionStatus = Literal["running", "interrupted", "success", "failed"]
