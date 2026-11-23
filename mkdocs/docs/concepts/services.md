@@ -302,6 +302,9 @@ Below are examples for running `Qwen/Qwen3.8-Flash-Next` with SMG and `zai-org/G
 
     </div>
 
+> If you don't have a dedicated CPU-only node in the fleet, set `router` on a GPU replica group and launch both the router
+> and a worker in its `commands`.
+
 [`groups`](../reference/dstack.yml/service.md#groups) and top-level [`replicas`](../reference/dstack.yml/service.md#replicas) are mutually exclusive. If `groups` is set, top-level `resources` is ignored. Set `resources` in each group.
 
 > Properties such as `regions`, `port`, `env` and some other cannot be configured per replica group. This support is coming soon.
