@@ -18,13 +18,13 @@ for running tasks, dev environments, and services. Imported fleets and gateways 
 (e.g., `team-a/my-fleet`) to distinguish them from the project's own resources.
 
 Currently, [fleets](fleets.md), [gateways](gateways.md), and [models](services.md#model) can be exported.
-Exported models are not used in runs: members of the importer projects access them at their project's [model endpoint](#imported-models).
 
 ??? info "Limitations"
     - [Container-based](backends.md#container-based) backends of the exporter project cannot be used for fleet importers' runs.
     - Runs that mount [network volumes](volumes.md#network-volumes) cannot use imported backend fleets.
-    - Models cannot be added to [global exports](#global-exports), and an export with models cannot be made global.
-    - If an imported model has the same name as a model that the importer project runs on the same gateway, the project's own model is used. If two imported models on the same gateway have the same name, the model from the older export is used.
+    - Models cannot be added to [global exports](#global-exports).
+    - Importer projects can access an exported model only if its service uses the `openai` model format (the default) and a [gateway](gateways.md) whose `domain` doesn't include `${{ run.project_name }}`.
+    - If the importer project runs a model with the same name on the same gateway, the project's own model is used.
 
 ??? info "Required role"
     The user creating or updating an export must have the project admin role on both the exporter project and
@@ -141,7 +141,7 @@ Only promoting an export to global requires the global admin role. Regular proje
 
 ### Export models
 
-To export a [model](services.md#model), pass its name with `--model`. This is the name set in the `model` property of the service that runs the model:
+To export a [model](services.md#model), pass the name set in the service's `model` property with `--model`:
 
 <div class="termy">
 
@@ -154,16 +154,7 @@ $ dstack export create my-models --model Qwen/Qwen3.8-27B-FP8 --importer team-b
 
 </div>
 
-Use `--add-model` and `--remove-model` with `dstack export update` to change the models of an existing export.
-
-An export holds a model by its name, not by the service that runs it. You can export a model before any service declares it, and the model stays exported when its service is stopped and applied again, or replaced by another service with the same `model`.
-
-Importer projects can access an exported model only while it runs on a service of the exporter project that:
-
-1. Uses the `openai` model format (the default).
-2. Runs on a [gateway](gateways.md) whose `domain` doesn't include `${{ run.project_name }}`.
-
-If running services already declare the model and none of them meets both requirements, `dstack` refuses to export it. `dstack` also refuses to move the service in place to run without a gateway or on a gateway with `${{ run.project_name }}` in its domain if that leaves the exported model without such a service. While a running service on a gateway serves an exported model to importer projects, `dstack` refuses to remove the gateway's domain or to add `${{ run.project_name }}` to it. Stopping the service is always allowed.
+Models are exported by name, so an export stays in place when the model's service is stopped, replaced, or not started yet.
 
 ## Access imported resources
 
@@ -220,7 +211,7 @@ fleets:
 
 ### Imported models
 
-Members of the importer project access an imported model at their project's model endpoint on the gateway where the model runs. The gateway itself doesn't have to be imported. Use `dstack import list -v` to see the URL of each imported model:
+Imported models are available at the importer project's [model endpoint](services.md#model). Use `dstack import list -v` to see their URLs:
 
 <div class="termy">
 
@@ -234,40 +225,17 @@ $ dstack import list -v
 
 </div>
 
-In the UI, imported models show on the `Models` page, next to the project's own models. On a model's page, the `Endpoint` button shows how to call the model at your project's URL, and the `Exports` tab lists the model's exports and the projects that import it.
-
-The URL is an OpenAI-compatible endpoint with `/models` and `/chat/completions`. Use a `dstack` user token of a member of the importer project as the API key:
-
-<div class="termy">
-
-```shell
-$ curl https://gateway.example.com/team-b/chat/completions \
-    -H 'Content-Type: application/json' \
-    -H 'Authorization: Bearer &lt;user token&gt;' \
-    -d '{
-        "model": "Qwen/Qwen3.8-27B-FP8",
-        "messages": [
-            {
-                "role": "user",
-                "content": "Compose a poem that explains the concept of recursion in programming."
-            }
-        ]
-    }'
-```
-
-</div>
-
-A model has no URL while no service of the exporter project can serve it to importer projects, e.g. the service is stopped or not started yet. Requests to such a model get a 404 error. Once a service starts, the model becomes accessible within about 20 seconds.
+A model has a URL only while its service is running.
 
 !!! info "Tenant isolation"
     Exported fleets share the same access model as regular fleets. See [Tenant isolation](../guides/tenant-isolation.md) for details.
 
-    Requests to an imported model, including the user token, are sent to the gateway that the exporter project runs the model on.
+    Requests to imported models, including user tokens, go through the exporter project's gateway.
 
 !!! info "What's next?"
     1. Check the [`dstack export` CLI reference](../reference/cli/dstack/export.md)
-    1. Check the [`dstack import` CLI reference](../reference/cli/dstack/import.md)
-    1. Learn how to manage [fleets](fleets.md)
-    1. Learn how to manage [gateways](gateways.md)
-    1. Learn how to run models as [services](services.md#model)
-    1. Read about [projects](projects.md) and project roles
+    2. Check the [`dstack import` CLI reference](../reference/cli/dstack/import.md)
+    3. Learn how to manage [fleets](fleets.md)
+    4. Learn how to manage [gateways](gateways.md)
+    5. Learn how to run [services](services.md)
+    6. Read about [projects](projects.md) and project roles

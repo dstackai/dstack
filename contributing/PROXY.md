@@ -30,17 +30,15 @@ The in-server proxy validates the tokens by querying the correct token from the 
 
 On gateways, Nginx makes a headers-only subrequest to the gateway app to check authorization for each incoming request. The gateway app then makes a request to the `dstack` server to validate the token. Responses from the `dstack` server are cached for 60 seconds. If the `dstack` server does not respond, the incoming request is denied.
 
-For requests to models, the gateway app also needs the user to meter the tokens for, so it requests the user of each token from the `dstack` server and caches it for an hour.
+For requests to models, the gateway app also requests the token's user from the `dstack` server, to meter tokens per user, and caches it for an hour.
 
 ### OpenAI-compatible API
 
-The OpenAI interface emulates the real OpenAI API for chat completion models. It can list running models in the project and forward requests to the correct service.
-
-Requests to models with the `openai` format and their responses are not converted. `dstack-proxy` reads `model` and `stream` from the request and `usage` from the response, and forwards the bodies as they are, with two exceptions for streaming requests: it sets `stream_options` to get token counts on every chunk (see [Token metering](#token-metering)), and it removes from the stream the `usage` that the client did not ask for. Of the service's response headers, it keeps `Content-Type` and `Retry-After`. Requests to models with the `tgi` format are converted between the OpenAI and TGI formats through typed schemas.
+The OpenAI interface emulates the real OpenAI API for chat completion models. It can list running models in the project, convert between OpenAI and TGI request formats, and forward requests to the correct service. Requests to models with the `openai` format and their responses are forwarded without conversion.
 
 Only members of the project and global admins can use the interface.
 
-On gateways, the models of a project include the models it imports from other projects through exports. Where exports are enabled, `GatewayReplicaPipeline` registers an import on the gateway's replicas for each exported model that a service on the gateway can serve to importer projects and each importer project: the importer project, the export, the exporter project, and the model's name. The gateway keeps one import per importer project and model name, and registering another one replaces it. When a request arrives, the gateway app finds the model and its service in the exporter project by that name, so the import follows the model to whichever service has registered it. An import is skipped if the importer project has its own model with the same name, and while the exporter project has no such model with the `openai` format.
+On gateways, the models of a project include the models it imports through exports. `GatewayReplicaPipeline` registers an import on the gateway for each exported model and importer project, and the gateway app finds the model in the exporter project by its name when a request arrives.
 
 The in-server proxy forwards requests directly to service replicas.
 
@@ -62,12 +60,9 @@ sequenceDiagram
 
 ### Token metering
 
-`dstack-proxy` meters the tokens of requests to models with the `openai` format: input, cached input, and output tokens per hour, project, user, service, and export. The project is the one in the URL of the request. For a model that the project imports, the service is the exporter project's, and the export is the one that the request came through. For a project's own models, there is no export.
+`dstack-proxy` meters the tokens of requests to models with the `openai` format: input, cached input, and output tokens per hour, project, user, service, and export. It reads them from `usage` in the model's responses. For streaming requests, it asks the model for `usage` on every chunk (`stream_options.include_usage` and `stream_options.continuous_usage_stats`), so a stream stopped by the client is metered up to its last chunk, and removes the `usage` that the client did not ask for.
 
-- For streaming requests, it asks the model for token counts on every chunk (`stream_options.include_usage` and `stream_options.continuous_usage_stats`) and adds what is new since the previous chunk as each chunk arrives. So a stream stopped by the client is metered up to its last chunk. `usage` that the client did not ask for is removed from the stream. If the model reports per-choice counts on each chunk, as vLLM and SGLang do, a stopped stream with `n` above 1 is metered with the tokens of its longest choice.
-- For non-streaming requests, the tokens are added when the response ends. If the client disconnects earlier, `dstack-proxy` closes the connection to the service, and nothing is metered.
-
-Metering is only supported on gateways. The gateway app keeps the counts in memory, writes them every 5 seconds to a numbered batch file in `~/dstack/metering/`, and returns the batches from `POST /api/metering/collect`. The caller passes the number of the last batch it has saved, and the gateway deletes the batches up to that number. Batches that nobody collects are deleted after 7 days. The open-source `dstack` server does not collect metering. An extension of the server can collect it in a hook that `GatewayReplicaPipeline` calls each time it processes a running gateway replica (`register_process_running_gateway_replica_hook` in `server/background/pipeline_tasks/gateway_replicas.py`).
+Metering is only supported on gateways. The gateway app writes the counts every 5 seconds to batch files in `~/dstack/metering/` and returns them from `POST /api/metering/collect`, deleting the batches that the caller has saved. Batches that nobody collects are deleted after 7 days. The open-source `dstack` server does not collect them. A server extension can collect them in a hook registered with `register_process_running_gateway_replica_hook`.
 
 ### Stats collector
 

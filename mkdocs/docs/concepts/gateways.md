@@ -57,8 +57,6 @@ A gateway requires a `domain` to be specified in the configuration before creati
 
 Once the gateway is created and assigned a hostname, configure your DNS by adding a wildcard record for `*.<gateway domain>` (e.g. `*.example.com`). The record should point to the gateway's hostname and should be of type `A` if the hostname is an IP address (most cases), or of type `CNAME` if the hostname is another domain (load balancers, Kubernetes).
 
-The [models](services.md#model) of a project's services are served at the project's model endpoint on the gateway, `https://gateway.<gateway domain>/<project name>`. Because of that, a service on the gateway can't be named `gateway`.
-
 ??? info "Project name interpolation"
     You can use the `${{ run.project_name }}` variable to include the service’s project name in the domain name. This is especially useful when [exporting](exports.md) the gateway to multiple projects, as it ensures each importer receives a unique domain name.
 
@@ -69,8 +67,6 @@ The [models](services.md#model) of a project's services are served at the projec
     region: eu-west-1
     domain: ${{ run.project_name }}.mycompany.example
     ```
-
-    With this domain, a project's services are at `<run name>.<project name>.mycompany.example`, and its model endpoint is `https://gateway.<project name>.mycompany.example/<project name>`.
 
 ### Backend
 
@@ -258,6 +254,17 @@ Replicated gateways do not support automatic certificate issuance via Let's Encr
 
 Gateways can be exported to other projects, allowing those projects to use the exported gateways
 for running services. See [Exports](exports.md) for more details.
+
+## Meter tokens
+
+Gateways meter the input, cached input, and output tokens of requests to the project's
+[model endpoint](services.md#model), per user and model. Requests to
+[imported models](exports.md#imported-models) are metered under the importer project.
+Project admins can view the tokens on the `Metering` tab of the model's page.
+
+To meter cached input tokens, make sure the model reports them, e.g. by passing `--enable-cache-report` to SGLang or `--enable-prompt-tokens-details` to vLLM.
+
+> Token metering is only supported in [dstack Sky](https://dstack.ai/products/sky/) and [dstack Factory](https://dstack.ai/products/factory/).
 
 ## Manage gateways
 

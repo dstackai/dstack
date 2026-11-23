@@ -262,7 +262,7 @@ resources:
 - Without gateway: `<server URL>/proxy/services/<project name>/<run name>/`
 - With gateway: `https://<run name>.<gateway domain>/`
 - Authentication: Unless `auth` is `false`, include `Authorization: Bearer <user token>` on service requests.
-- Model endpoint: If `model` is set, `service.model.base_url` from `dstack run get <run name> --json` provides the model endpoint. Without a gateway, for OpenAI-compatible models (the default, unless format is set otherwise), this will be `service.url` + `/v1`. With a gateway, it is the project's model endpoint, `https://gateway.<gateway domain>/<project name>`, which serves `/models` and `/chat/completions` and always requires a user token; the model's other routes are at `service.url` + `/v1`.
+- Model endpoint: If `model` is set, `service.model.base_url` from `dstack run get <run name> --json` provides the model endpoint. Without a gateway, for OpenAI-compatible models (the default, unless format is set otherwise), this will be `service.url` + `/v1`. With a gateway, it is the project's model endpoint, `https://gateway.<gateway domain>/<project name>`, which supports only `/models` and `/chat/completions` and always requires a user token.
 - Example (with gateway):
   ```bash
   curl -sS -X POST "https://<run name>.<gateway domain>/v1/chat/completions" \

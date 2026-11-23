@@ -595,6 +595,7 @@ Here are cases where a service may need a [gateway](gateways.md):
 
 * To use [auto-scaling](#scaling) or [rate limits](#rate-limits)
 * To enable HTTPS for the endpoint and map it to your domain
+* To [export](exports.md#export-models) models to other projects or [meter tokens](gateways.md#meter-tokens)
 * If your service requires WebSockets
 * If your service cannot work with a [path prefix](#path-prefix)
 
@@ -754,33 +755,11 @@ See the [reference](../reference/dstack.yml/service.md#probes) for more probe co
 If the service runs a model with an OpenAI-compatible interface, you can set the [`model`](#model) property to make the model accessible through `dstack`'s chat UI on the `Models` page.
 In this case, `dstack` will use the service's `/v1/chat/completions` service.
 
-If the service runs with a [gateway](gateways.md), its model is also served at the project's model endpoint, `https://gateway.<gateway domain>/<project name>`.
-It's one OpenAI-compatible endpoint with `/models` and `/chat/completions` for all the project's models on that gateway.
-`dstack apply` shows it as the model's URL, next to the service's own URL.
-Use a `dstack` user token as the API key:
+If you have a [gateway](gateways.md) created, the model is also accessible at the project's OpenAI-compatible model endpoint, `https://gateway.<gateway domain>/<project name>`, with a `dstack` user token as the API key.
 
-<div class="termy">
-
-```shell
-$ curl https://gateway.example.com/main/chat/completions \
-    -H 'Content-Type: application/json' \
-    -H 'Authorization: Bearer &lt;user token&gt;' \
-    -d '{
-        "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
-        "messages": [
-            {
-                "role": "user",
-                "content": "Compose a poem that explains the concept of recursion in programming."
-            }
-        ]
-    }'
-```
-
-</div>
-
-For streaming requests, the model endpoint sets `stream_options.include_usage` and `stream_options.continuous_usage_stats` to get token counts from the model, so the model's API has to accept these options. The client gets only the `usage` it asked for.
-
-The model endpoint accepts requests of up to 1MB. Larger requests, e.g. with images, get a 413 error there and have to be sent to the service's own URL.
+??? info "Limitations"
+    The model endpoint supports only `/models` and `/chat/completions`, and requests of up to 1MB.
+    For other routes or larger requests (e.g. with images), use the service endpoint.
 
 When `model` is set, `dstack` automatically configures [`probes`](#probes) to verify model health.
 To customize or disable this, set `probes` explicitly.
@@ -846,7 +825,7 @@ The rps limit sets the max requests per second, tracked in milliseconds (e.g., `
 
 Limits apply to the whole service (all replicas) and per client (by IP). Clients exceeding the limit get a 429 error.
 
-Requests that reach the service through the project's [model endpoint](#model) are not limited per client: they all count as one client, and a limit partitioned by a client header, such as `Authorization`, doesn't apply to them.
+Requests to the project's [model endpoint](#model) are not limited per client.
 
 ??? info "Partitioning key"
     Instead of partitioning requests by client IP address,
