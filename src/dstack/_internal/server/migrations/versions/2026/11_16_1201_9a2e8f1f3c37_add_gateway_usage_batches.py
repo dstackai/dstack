@@ -1,7 +1,7 @@
 """Add Gateway usage batches with one row per user and run
 
 Revision ID: 9a2e8f1f3c37
-Revises: 6b5610ff36c1
+Revises: 2d2692d5b3c2
 Create Date: 2026-11-16 12:01:47.939623+00:00
 
 """
@@ -14,7 +14,7 @@ from dstack._internal.server.models import NaiveDateTime
 
 # revision identifiers, used by Alembic.
 revision = "9a2e8f1f3c37"
-down_revision = "6b5610ff36c1"
+down_revision = "2d2692d5b3c2"
 branch_labels = None
 depends_on = None
 

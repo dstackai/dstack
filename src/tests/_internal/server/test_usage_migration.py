@@ -30,7 +30,7 @@ def run_case(conn, populated):
     for table, id_ in zip(parents, (user, run, gateway, replica)):
         conn.execute(table.insert().values(id=id_))
     migration = importlib.import_module(MIGRATION)
-    assert (migration.revision, migration.down_revision) == ("9a2e8f1f3c37", "6b5610ff36c1")
+    assert (migration.revision, migration.down_revision) == ("9a2e8f1f3c37", "2d2692d5b3c2")
     with Operations.context(MigrationContext.configure(conn)):
         migration.upgrade()
         inspector = sa.inspect(conn)
