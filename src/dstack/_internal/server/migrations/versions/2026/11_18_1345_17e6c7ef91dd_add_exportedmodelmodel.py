@@ -1,7 +1,7 @@
 """Add ExportedModelModel
 
 Revision ID: 17e6c7ef91dd
-Revises: 2d2692d5b3c2
+Revises: bb3f3be7c111
 Create Date: 2026-11-18 13:45:02.088337+00:00
 
 """
@@ -12,7 +12,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "17e6c7ef91dd"
-down_revision = "2d2692d5b3c2"
+down_revision = "bb3f3be7c111"
 branch_labels = None
 depends_on = None
 
