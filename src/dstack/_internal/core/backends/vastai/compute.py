@@ -20,6 +20,7 @@ from dstack._internal.core.backends.vastai.api_client import (
 )
 from dstack._internal.core.backends.vastai.models import VastAIConfig
 from dstack._internal.core.backends.vastai.profile_options import (
+    VASTAI_DEFAULT_MIN_INET_DOWN,
     VASTAI_DEFAULT_MIN_RELIABILITY,
     VASTAI_DEFAULT_OFFER_ORDER,
     VastAIOfferOrder,
@@ -63,7 +64,9 @@ class VastAICompute(
                 if options.min_reliability is not None
                 else VASTAI_DEFAULT_MIN_RELIABILITY
             },
-            "inet_down": {"gt": 128},
+            "inet_down": {"gte": options.min_inet_down}
+            if options.min_inet_down is not None
+            else {"gt": VASTAI_DEFAULT_MIN_INET_DOWN},
             "verified": {"eq": True},
             "cuda_max_good": {"gte": 12.8},
             "compute_cap": {"gte": 600},

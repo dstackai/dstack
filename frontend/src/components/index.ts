@@ -57,6 +57,7 @@ export type { ChatBubbleProps } from '@cloudscape-design/chat-components/chat-bu
 export { default as Avatar } from '@cloudscape-design/chat-components/avatar';
 export type { AvatarProps } from '@cloudscape-design/chat-components/avatar';
 export { default as LineChart } from '@cloudscape-design/components/line-chart';
+export { default as BarChart } from '@cloudscape-design/components/bar-chart';
 export { default as PropertyFilter } from '@cloudscape-design/components/property-filter';
 export type { PropertyFilterProps } from '@cloudscape-design/components/property-filter';
 export { default as DateRangePicker } from '@cloudscape-design/components/date-range-picker';
