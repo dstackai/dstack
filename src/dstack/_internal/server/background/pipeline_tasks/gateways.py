@@ -407,7 +407,7 @@ async def _process_submitted_gateway(gateway_model: GatewayModel) -> _SubmittedR
         update_map["hostname"] = backend_data.hostname
         update_map["backend_data"] = backend_data.backend_data
 
-    scale_result = _reconcile_gateway_replica_count(gateway_model, gateway_replicas=[])
+    scale_result = await _reconcile_gateway_replica_count(gateway_model, gateway_replicas=[])
     update_map["status"] = GatewayStatus.PROVISIONING
     update_map.update(scale_result.gateway_update_map)
     return _SubmittedResult(
@@ -444,7 +444,7 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
             log_lock_token_mismatch(logger, item)
             return
 
-    result = _process_provisioning_gateway(gateway_model)
+    result = await _process_provisioning_gateway(gateway_model)
     gateway_update_map = result.gateway_update_map
     set_processed_update_map_fields(gateway_update_map)
     set_unlock_update_map_fields(gateway_update_map)
@@ -481,12 +481,12 @@ class _ProvisioningResult:
     scale_result: _ReplicaScalingResult = field(default_factory=_ReplicaScalingResult)
 
 
-def _process_provisioning_gateway(gateway_model: GatewayModel) -> _ProvisioningResult:
+async def _process_provisioning_gateway(gateway_model: GatewayModel) -> _ProvisioningResult:
     gateway_replicas = get_gateway_replica_models(gateway_model)
     # Provisioning gateways must have a replica.
     assert len(gateway_replicas) > 0
 
-    scale_result = _reconcile_gateway_replica_count(gateway_model, gateway_replicas)
+    scale_result = await _reconcile_gateway_replica_count(gateway_model, gateway_replicas)
     statuses = {
         replica.status
         for replica in gateway_replicas
@@ -553,7 +553,7 @@ async def _process_running_item(item: GatewayPipelineItem):
             return
 
     gateway_replicas = get_gateway_replica_models(gateway_model)
-    scale_result = _reconcile_gateway_replica_count(gateway_model, gateway_replicas)
+    scale_result = await _reconcile_gateway_replica_count(gateway_model, gateway_replicas)
 
     update_map = _GatewayUpdateMap()
     update_map.update(
@@ -736,7 +736,7 @@ def _get_active_replica_filters() -> list[ColumnElement[bool]]:
     ]
 
 
-def _reconcile_gateway_replica_count(
+async def _reconcile_gateway_replica_count(
     gateway_model: GatewayModel,
     gateway_replicas: list[GatewayReplicaModel],
 ) -> _ReplicaScalingResult:
@@ -773,7 +773,7 @@ def _reconcile_gateway_replica_count(
         }
         new_nums = itertools.islice(get_lowest_unused_nums(used_nums), diff)
         new_gateway_replica_models = [
-            gateways_services.create_gateway_replica_model(
+            await gateways_services.create_gateway_replica_model(
                 gateway_model=gateway_model,
                 replica_num=replica_num,
             )

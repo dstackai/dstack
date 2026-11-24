@@ -85,6 +85,7 @@ from dstack._internal.utils.common import (
     get_current_datetime,
     get_or_error,
     interpolate_gateway_domain,
+    run_async,
 )
 from dstack._internal.utils.logging import get_logger
 
@@ -195,14 +196,14 @@ async def get_gateway_by_name(
     return gateway_model_to_gateway(gateway, default_gateway_id=project.default_gateway_id)
 
 
-def create_gateway_replica_model(
+async def create_gateway_replica_model(
     gateway_model: GatewayModel,
     replica_num: int,
 ) -> GatewayReplicaModel:
     configuration = get_gateway_configuration(gateway_model)
     replica_name = f"{gateway_model.name}-{replica_num}"
 
-    private_bytes, public_bytes = crypto.generate_rsa_key_pair_bytes()
+    private_bytes, public_bytes = await run_async(crypto.generate_rsa_key_pair_bytes)
     gateway_ssh_private_key = private_bytes.decode()
     gateway_ssh_public_key = public_bytes.decode()
 
