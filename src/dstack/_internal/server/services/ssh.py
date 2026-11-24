@@ -71,8 +71,9 @@ def get_container_ssh_credentials(
             # As of 2026-03-13, the only container-based backend with SSH proxy is Kubernetes,
             # which is implemented as follows: the jump pod (JobProvisioningData.ssh_proxy)
             # is created once per project via Compute.run_job() with a public key submitted as
-            # a method argument, that is, with the public key of the project of the first (within
-            # that project) job submitted to the cluster.
+            # a method argument, that is, with the public key of the fleet's project. It is the
+            # job's project, since container-based backends are not used for importers' jobs
+            # (see `new_instances_in_fleet_require_create_instance_support()`).
             hosts.append((jpd.ssh_proxy, job_project_key))
         target_host = SSHConnectionParams(
             hostname=jpd.hostname,

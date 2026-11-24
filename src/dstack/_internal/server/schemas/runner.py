@@ -25,6 +25,9 @@ class JobStateEvent(CoreModel):
     termination_reason: Optional[str] = None
     termination_message: Optional[str] = None
     exit_status: Optional[int] = None
+    """`exit_status` is `-N` if the job's process was killed by signal `N`.
+    See `JobSubmission.exit_status`.
+    """
 
 
 class LogEvent(CoreModel):

@@ -3,11 +3,10 @@ import subprocess
 import tempfile
 from asyncio import Lock
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 import jinja2
 from pydantic import BaseModel
-from typing_extensions import Literal
 
 from dstack._internal.proxy.gateway.const import PROXY_PORT_ON_GATEWAY
 from dstack._internal.proxy.gateway.models import ACMESettings

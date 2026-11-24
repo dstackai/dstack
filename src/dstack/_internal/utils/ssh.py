@@ -9,6 +9,7 @@ import sys
 import tempfile
 from contextlib import suppress
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Optional, Union
 
@@ -341,6 +342,12 @@ def pkey_from_str(private_string: str) -> PKey:
 def generate_public_key(private_key: PKey) -> str:
     public_key = f"{private_key.get_name()} {private_key.get_base64()}"
     return public_key
+
+
+@lru_cache(maxsize=128)
+def get_public_key_from_private_key(private_key: str) -> str:
+    """Derive an OpenSSH public key, reusing results for identical private keys."""
+    return generate_public_key(pkey_from_str(private_key))
 
 
 def resolve_ssh_key(

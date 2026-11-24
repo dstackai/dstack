@@ -72,6 +72,7 @@ def _run_job(compute: VastAICompute, offer: InstanceOfferWithAvailability):
             run=run,
             job=job,
             instance_offer=offer,
+            project_name="main",
             project_ssh_public_key=PROJECT_SSH_PUBLIC_KEY,
             project_ssh_private_key="private-key",
             volumes=[],

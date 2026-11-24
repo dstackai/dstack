@@ -24,6 +24,7 @@ import {
     SelectCSD,
     SpaceBetween,
     StatusIndicator,
+    TokenVisibilityButton,
 } from 'components';
 import { HotspotIds } from 'layouts/AppLayout/TutorialPanel/constants';
 
@@ -72,7 +73,9 @@ export const ProjectSettings: React.FC = () => {
     const location = useLocation();
     const paramProjectName = params.projectName ?? '';
     const [isExpandedCliSection, setIsExpandedCliSection] = React.useState(false);
-    const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: paramProjectName });
+    const [configCliCommand, copyCliCommand, isTokenVisible, setIsTokenVisible] = useConfigProjectCliCommand({
+        projectName: paramProjectName,
+    });
 
     const { isAvailableDeletingPermission, isProjectManager, isProjectAdmin, isAvailableProjectManaging } =
         useCheckAvailableProjectPermission();
@@ -366,20 +369,26 @@ export const ProjectSettings: React.FC = () => {
                                         <Code className={styles.code}>{configCliCommand}</Code>
 
                                         <div className={styles.copy}>
-                                            <Popover
-                                                dismissButton={false}
-                                                position="top"
-                                                size="small"
-                                                triggerType="custom"
-                                                content={<StatusIndicator type="success">{t('common.copied')}</StatusIndicator>}
-                                            >
-                                                <Button
-                                                    formAction="none"
-                                                    iconName="copy"
-                                                    variant="normal"
-                                                    onClick={copyCliCommand}
-                                                />
-                                            </Popover>
+                                            <SpaceBetween direction="horizontal" size="xs">
+                                                <TokenVisibilityButton visible={isTokenVisible} onChange={setIsTokenVisible} />
+
+                                                <Popover
+                                                    dismissButton={false}
+                                                    position="top"
+                                                    size="small"
+                                                    triggerType="custom"
+                                                    content={
+                                                        <StatusIndicator type="success">{t('common.copied')}</StatusIndicator>
+                                                    }
+                                                >
+                                                    <Button
+                                                        formAction="none"
+                                                        iconName="copy"
+                                                        variant="normal"
+                                                        onClick={copyCliCommand}
+                                                    />
+                                                </Popover>
+                                            </SpaceBetween>
                                         </div>
                                     </Hotspot>
                                 </div>

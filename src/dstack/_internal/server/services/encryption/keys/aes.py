@@ -1,10 +1,9 @@
 import os
 from base64 import b64decode, b64encode
-from typing import Literal
+from typing import Annotated, Literal
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from pydantic import Field, field_validator
-from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.server.services.encryption.keys.base import EncryptionKey

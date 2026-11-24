@@ -71,6 +71,8 @@ class ProcessResult:
     new_placement_group_models: list[PlacementGroupModel] = field(default_factory=list)
     schedule_pg_deletion_fleet_id: Optional[uuid.UUID] = None
     schedule_pg_deletion_except_id: Optional[uuid.UUID] = None
+    event_messages: list[str] = field(default_factory=list)
+    """Extra instance events to emit after the update is applied."""
 
 
 async def can_terminate_fleet_instances_on_idle_duration(

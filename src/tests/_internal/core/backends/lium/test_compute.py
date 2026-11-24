@@ -118,6 +118,7 @@ def _run_job(compute, **overrides):
         "run": SimpleNamespace(),
         "job": SimpleNamespace(job_spec=job_spec),
         "instance_offer": _offer(compute),
+        "project_name": "main",
         "project_ssh_public_key": PUBLIC_KEY,
         "project_ssh_private_key": "private-key",
         "volumes": [],

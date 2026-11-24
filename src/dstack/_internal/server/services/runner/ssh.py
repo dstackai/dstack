@@ -1,9 +1,8 @@
 import functools
 from collections.abc import Mapping
-from typing import Callable, Optional, TypeVar
+from typing import Callable, Concatenate, Optional, ParamSpec, TypeVar
 
 import requests
-from typing_extensions import Concatenate, ParamSpec
 
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.runs import JobProvisioningData, JobRuntimeData

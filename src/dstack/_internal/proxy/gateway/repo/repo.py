@@ -1,7 +1,8 @@
+import tempfile
 from contextlib import asynccontextmanager
 from itertools import chain
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
 
 from aiorwlock import RWLock
 from pydantic import BaseModel
@@ -52,6 +53,20 @@ class GatewayProxyRepo(BaseProxyRepo):
     async def set_service(self, service: Service) -> None:
         async with self.writer():
             self._state.services.setdefault(service.project_name, {})[service.run_name] = service
+
+    async def set_services(self, services: Iterable[Service]) -> None:
+        """Save a batch before publishing it, so failed saves remain retryable."""
+        async with self._lock.writer:
+            services_by_project = {
+                name: entries.copy() for name, entries in self._state.services.items()
+            }
+            for service in services:
+                services_by_project.setdefault(service.project_name, {})[service.run_name] = (
+                    service
+                )
+            state = self._state.model_copy(update={"services": services_by_project})
+            await run_async(self.save, state)
+            self._state = state
 
     async def delete_service(self, project_name: str, run_name: str) -> None:
         async with self.writer():
@@ -124,6 +139,17 @@ class GatewayProxyRepo(BaseProxyRepo):
             state = None
         return GatewayProxyRepo(state=state, file=state_file)
 
-    def save(self) -> None:
-        if self._file is not None:
-            self._file.write_text(self._state.model_dump_json())
+    def save(self, state: Optional[State] = None) -> None:
+        """Write the given state, or the current state, atomically."""
+        if self._file is None:
+            return
+        if state is None:
+            state = self._state
+        with tempfile.NamedTemporaryFile(mode="w", dir=self._file.parent, delete=False) as f:
+            temporary_path = Path(f.name)
+            try:
+                f.write(state.model_dump_json())
+                f.close()
+                temporary_path.replace(self._file)
+            finally:
+                temporary_path.unlink(missing_ok=True)

@@ -1,7 +1,6 @@
-from typing import Callable, List, Optional, Protocol, TypeVar
+from typing import Callable, List, Optional, Protocol, Self, TypeVar
 
 from pydantic import BaseModel
-from typing_extensions import Self
 
 from dstack._internal.core.backends.profile_options import AnyBackendProfileOptions
 from dstack._internal.core.models.profiles import Profile, SpotPolicy

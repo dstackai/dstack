@@ -4,10 +4,9 @@ import re
 import shlex
 import uuid
 from types import TracebackType
-from typing import Optional
+from typing import Optional, Self
 
 import paramiko
-from typing_extensions import Self
 
 from dstack._internal.core.backends.slurm.resources import Node, ResolvedNode
 from dstack._internal.core.errors import ComputeError

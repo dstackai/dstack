@@ -796,6 +796,9 @@ async def list_projects_instance_models(
             if prev_id is None:
                 filters.append(InstanceModel.created_at > prev_created_at)
             else:
+                # Redundant with the OR below, but unlike the OR it lets the database
+                # start the index scan at the cursor instead of scanning from the start.
+                filters.append(InstanceModel.created_at >= prev_created_at)
                 filters.append(
                     or_(
                         InstanceModel.created_at > prev_created_at,
@@ -809,6 +812,7 @@ async def list_projects_instance_models(
             if prev_id is None:
                 filters.append(InstanceModel.created_at < prev_created_at)
             else:
+                filters.append(InstanceModel.created_at <= prev_created_at)
                 filters.append(
                     or_(
                         InstanceModel.created_at < prev_created_at,
@@ -906,7 +910,7 @@ def create_instance_model(
         instance_id = uuid.uuid4()
     provider_ref = issue_provider_ref(
         session=session,
-        project=project,
+        project_id=project.id,
         owner_type=OwnerType.INSTANCE,
         owner_id=instance_id,
         owner_name=instance_name,

@@ -151,7 +151,6 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
 
     groups:
       - replicas: 1
-        # For now replica group with router must have replicas: 1
         commands:
           - pip install smg
           - |
@@ -218,7 +217,6 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
 
         groups:
           - replicas: 1
-            # For now replica group with router must have replicas: 1
             python: "3.12"
             commands:
               - pip install smg

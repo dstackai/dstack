@@ -1,9 +1,8 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Annotated, List, Optional
 from uuid import UUID
 
 from pydantic import Field
-from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.presets import PresetSpec

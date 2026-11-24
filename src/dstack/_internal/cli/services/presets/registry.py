@@ -239,7 +239,7 @@ def _extract_archive(blob: bytes, target: Path) -> None:
         try:
             archive.extractall(target.parent, members=members, filter="data")
         except TypeError:
-            # Python < 3.10.12 / < 3.11.4 has no extraction filter; the member
+            # Python < 3.11.4 has no extraction filter; the member
             # checks above are what make this safe.
             archive.extractall(target.parent, members=members)  # nosec B202
 

@@ -18,6 +18,7 @@ import {
     SpaceBetween,
     Spinner,
     StatusIndicator,
+    TokenVisibilityButton,
 } from 'components';
 
 import { QUICK_START_URL } from 'consts';
@@ -202,7 +203,7 @@ const CliPanel: FC<{ projectName: string }> = ({ projectName }) => {
     const { t } = useTranslation();
     const [searchParams] = useSearchParams();
     const [openHelpPanel] = useHelpPanel();
-    const [configCliCommand] = useConfigProjectCliCommand({ projectName });
+    const [configCliCommand, copyCliCommand, isTokenVisible, setIsTokenVisible] = useConfigProjectCliCommand({ projectName });
 
     return (
         <Container
@@ -227,7 +228,11 @@ const CliPanel: FC<{ projectName: string }> = ({ projectName }) => {
                 </FormField>
 
                 <FormField label={t('runs.launch_page.cli_add_project')}>
-                    <CopyableCode command={configCliCommand} />
+                    <CopyableCode
+                        command={configCliCommand}
+                        onCopy={copyCliCommand}
+                        actions={<TokenVisibilityButton visible={isTokenVisible} onChange={setIsTokenVisible} />}
+                    />
                 </FormField>
 
                 <FormField
@@ -386,7 +391,11 @@ const useHeightToWindowBottom = (ref: React.RefObject<HTMLElement>): number | un
     return height;
 };
 
-const CopyableCode: FC<{ command: string }> = ({ command }) => {
+const CopyableCode: FC<{ command: string; onCopy?: () => void; actions?: React.ReactNode }> = ({
+    command,
+    onCopy = () => copyToClipboard(command),
+    actions,
+}) => {
     const { t } = useTranslation();
 
     return (
@@ -394,15 +403,19 @@ const CopyableCode: FC<{ command: string }> = ({ command }) => {
             <Code className={styles.code}>{command}</Code>
 
             <div className={styles.copy}>
-                <Popover
-                    dismissButton={false}
-                    position="top"
-                    size="small"
-                    triggerType="custom"
-                    content={<StatusIndicator type="success">{t('common.copied')}</StatusIndicator>}
-                >
-                    <Button formAction="none" iconName="copy" variant="normal" onClick={() => copyToClipboard(command)} />
-                </Popover>
+                <SpaceBetween direction="horizontal" size="xs">
+                    {actions}
+
+                    <Popover
+                        dismissButton={false}
+                        position="top"
+                        size="small"
+                        triggerType="custom"
+                        content={<StatusIndicator type="success">{t('common.copied')}</StatusIndicator>}
+                    >
+                        <Button formAction="none" iconName="copy" variant="normal" onClick={onCopy} />
+                    </Popover>
+                </SpaceBetween>
             </div>
         </div>
     );

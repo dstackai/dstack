@@ -1,9 +1,8 @@
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 import yaml
 from pydantic import Field, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing_extensions import Annotated
 
 import dstack._internal.core.backends.configurators
 from dstack._internal.core.backends.models import (

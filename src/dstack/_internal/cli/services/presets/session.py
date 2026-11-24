@@ -25,12 +25,16 @@ from dstack._internal.cli.models.preset_agent import (
     PresetSessionState,
     PresetSessionStatus,
     PresetSessionWorkspace,
+    PresetTrial,
+    PresetTrialResult,
 )
+from dstack._internal.cli.models.presets import PresetSessionEntry, PresetTrialsSummary
 from dstack._internal.cli.utils.common import console, error_console
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 from dstack._internal.core.models.configurations import PresetAgentProvider, PresetConfiguration
+from dstack._internal.core.models.presets import AnyPresetConstraints
 from dstack._internal.utils.common import get_dstack_dir
 
 _PROGRESS_FILENAME = "progress.jsonl"
@@ -515,7 +519,7 @@ def resolve_session_ref(ref: str) -> str:
     return ref
 
 
-def list_preset_sessions() -> list[dict[str, Any]]:
+def list_preset_sessions() -> list[PresetSessionEntry]:
     entries = []
     for session in iter_preset_sessions():
         path = session.path
@@ -525,18 +529,21 @@ def list_preset_sessions() -> list[dict[str, Any]]:
         status = state.status
         if status == "running" and not session_process_alive(state):
             status = "interrupted"
-        entry = state.model_dump(mode="json")
-        entry["id"] = path.name
-        entry["name"] = claimed_session_name(state)
-        entry["status"] = status
-        entry["trials"] = _summarize_session_trials(path / TRIALS_DIRNAME)
-        entry["verification"] = _read_last_session_verification(path / SERVICE_DIRNAME)
-        entry["constraints"] = _read_session_constraints(path)
-        entries.append(entry)
+        entries.append(
+            PresetSessionEntry(
+                state=state,
+                id=path.name,
+                name=claimed_session_name(state),
+                status=status,
+                trials=_summarize_session_trials(path / TRIALS_DIRNAME),
+                verification=_read_last_session_verification(path / SERVICE_DIRNAME),
+                constraints=_read_session_constraints(path),
+            )
+        )
     return entries
 
 
-def _read_session_constraints(path: Path) -> dict[str, Any]:
+def _read_session_constraints(path: Path) -> Optional[AnyPresetConstraints]:
     """Reads the session's own copy first: it outlives the agent workspace (removed
     once the session finishes). The workspace copy is a backward-compat fallback for
     sessions recorded before the session-level copy existed."""
@@ -545,12 +552,12 @@ def _read_session_constraints(path: Path) -> dict[str, Any]:
         path / "workspace" / "w" / _CONSTRAINTS_FILENAME,
     ):
         try:
-            data = json.loads(candidate.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+            return validate_json_extra_ignore(
+                AnyPresetConstraints, candidate.read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError, ValidationError):
             continue
-        if isinstance(data, dict):
-            return data
-    return {}
+    return None
 
 
 def _numbered_subdirs(path: Path) -> list[Path]:
@@ -571,101 +578,116 @@ def _read_record(path: Path) -> Optional[dict[str, Any]]:
     return record if isinstance(record, dict) else None
 
 
-def _read_last_session_verification(path: Path) -> Optional[dict[str, Any]]:
-    """An attempt whose result file has not appeared yet is still in flight
-    (reported as verifying)."""
+def _read_last_session_verification(path: Path) -> Optional[str]:
+    """The last attempt's status; an attempt whose result file has not appeared
+    yet is still in flight (reported as verifying)."""
     attempts = _numbered_subdirs(path)
     if not attempts:
         return None
-    last = attempts[-1]
-    record = _read_record(last / VERIFICATION_RESULT_FILENAME)
+    record = _read_record(attempts[-1] / VERIFICATION_RESULT_FILENAME)
     if record is not None and isinstance(record.get("status"), str):
-        return record
-    return {"status": "verifying"}
+        return record["status"]
+    return "verifying"
 
 
-def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
-    # TODO: Refactor this crap - must be explicit what is this and where is it used; also dicts are prohibited in dstack repo
+def _summarize_session_trials(path: Path) -> PresetTrialsSummary:
     """A trial directory without `trial.json` is still in flight and is not
     counted."""
-    records = []
+    trials = []
     for trial_dir in _numbered_subdirs(path):
-        record = _read_record(trial_dir / TRIAL_RESULT_FILENAME)
-        if record is not None:
-            records.append(record)
-    count = 0
-    best: Optional[dict[str, Any]] = None
-    # The fastest trial that broke a constraint, shown only when nothing passed.
-    best_failed: Optional[dict[str, Any]] = None
-    # One entry per trial in order, `None` for a trial that produced no benchmark.
-    series: list[Optional[float]] = []
-    # Parallel to `series`: True where the trial broke a constraint.
-    failed: list[bool] = []
-    # Kept outside `best` so a run where nothing passed still shows what it ran on.
+        trial = _read_trial(trial_dir / TRIAL_RESULT_FILENAME)
+        if trial is not None:
+            trials.append(trial)
+    # Select the trial with the highest tok/s that meets the constraints, and
+    # show its sweep. When no trial meets them, fallback to the fastest
+    # failed one, marked in the listing.
+    best, best_failed = _select_best_and_best_failed(trials)
+    shown = best or best_failed
+    gpu = _format_trial_gpu(shown) if shown is not None else None
+    if gpu is None:
+        gpu = _last_trial_gpu(trials)
+    return PresetTrialsSummary(
+        count=len(trials),
+        best=best,
+        best_failed=best_failed,
+        series=[_max_tok_s(_scored_trial(trial)) for trial in trials],
+        failed=[_trial_failed(trial) for trial in trials],
+        gpu=gpu,
+    )
+
+
+def _last_trial_gpu(trials: list[PresetTrial]) -> Optional[str]:
+    """Trials can record hardware without ever producing a benchmark."""
     gpu: Optional[str] = None
-    for record in records:
-        count += 1
-        benchmark = record.get("benchmark")
-        failed.append(bool(record.get("failed")))
-        record_gpu = _format_trial_gpu(record)
-        if record_gpu:
-            gpu = record_gpu
-        if not isinstance(benchmark, dict):
-            series.append(None)
-            continue
-        metrics = benchmark.get("metrics") or {}
-        workload = benchmark.get("workload") or {}
-        duration = metrics.get("duration_seconds")
-        tokens = metrics.get("total_output_tokens")
-        if not isinstance(duration, (int, float)) or duration <= 0:
-            series.append(None)
-            continue
-        if not isinstance(tokens, (int, float)):
-            series.append(None)
-            continue
-        tok_s = tokens / duration
-        series.append(tok_s)
-        # A failed trial keeps its benchmark — it is what the next trial learns
-        # from — but it is not a candidate for best, and promoting one would put
-        # a configuration that broke a constraint at the top of the listing.
-        if record.get("failed"):
-            if best_failed is None or tok_s > best_failed["tok_s"]:
-                best_failed = _trial_entry(tok_s, record, metrics, workload, record_gpu)
-            continue
-        if best is None or tok_s > best["tok_s"]:
-            best = _trial_entry(tok_s, record, metrics, workload, record_gpu)
-    return {
-        "count": count,
-        "best": best,
-        "best_failed": best_failed,
-        "series": series,
-        "failed": failed,
-        "gpu": gpu,
-    }
+    for trial in trials:
+        gpu = _format_trial_gpu(trial) or gpu
+    return gpu
 
 
-def _trial_entry(
-    tok_s: float,
-    record: dict[str, Any],
-    metrics: dict[str, Any],
-    workload: dict[str, Any],
-    gpu: Optional[str],
-) -> dict[str, Any]:
-    ttft = (metrics.get("ttft_ms") or {}).get("p50")
-    # Mean, not p50: MTP skews TPOT right, and mean is the delivered decode rate.
-    tpot = (metrics.get("tpot_ms") or {}).get("mean")
-    context_length = record.get("context_length")
-    return {
-        "tok_s": tok_s,
-        "tpot_ms": tpot if isinstance(tpot, (int, float)) and tpot > 0 else None,
-        "ttft_ms": ttft if isinstance(ttft, (int, float)) else None,
-        "context_length": context_length if isinstance(context_length, int) else None,
-        "concurrency": workload.get("concurrency"),
-        "gpu": gpu,
-    }
+def _read_trial(path: Path) -> Optional[PresetTrial]:
+    """None if `trial.json` is missing, half-written, or not a trial record."""
+    record = _read_record(path)
+    if record is None:
+        return None
+    try:
+        return validate_extra_ignore(PresetTrial, record)
+    except ValidationError:
+        return None
 
 
-def _format_trial_gpu(record: dict[str, Any]) -> Optional[str]:
+def _trial_failed(trial: PresetTrial) -> bool:
+    """A trial failed when it broke the constraints at every concurrency."""
+    return all(entry.failed for entry in trial.result)
+
+
+def _passing_trial_results(trial: PresetTrial) -> list[PresetTrialResult]:
+    """The `result` where the trial met the constraints."""
+    return [entry for entry in trial.result if not entry.failed]
+
+
+def _max_tok_s(trial: PresetTrial) -> Optional[float]:
+    """The highest tok/s over the trial's entries that have a benchmark; None
+    when no entry has one."""
+    values = [
+        entry.benchmark.effective_output_tok_per_s
+        for entry in trial.result
+        if entry.benchmark is not None
+    ]
+    if not values:
+        return None
+    return max(values)
+
+
+def _scored_trial(trial: PresetTrial) -> PresetTrial:
+    """Returns trial with only the entries that met the constraints, or the original trial if none did."""
+    if _trial_failed(trial):
+        return trial
+    return trial.model_copy(update={"result": _passing_trial_results(trial)})
+
+
+def _select_best_and_best_failed(
+    trials: list[PresetTrial],
+) -> tuple[Optional[PresetTrial], Optional[PresetTrial]]:
+    """Selects the trial with the highest tok/s that meets the constraints, and
+    the trail with highest tok/s but failed to meet the constraints."""
+    best: Optional[PresetTrial] = None
+    best_tok_s = 0.0
+    best_failed: Optional[PresetTrial] = None
+    best_failed_tok_s = 0.0
+    for trial in trials:
+        kept = _scored_trial(trial)
+        tok_s = _max_tok_s(kept)
+        if tok_s is None:
+            continue
+        if _trial_failed(trial):
+            if best_failed is None or tok_s > best_failed_tok_s:
+                best_failed, best_failed_tok_s = kept, tok_s
+        elif best is None or tok_s > best_tok_s:
+            best, best_tok_s = kept, tok_s
+    return best, best_failed
+
+
+def _format_trial_gpu(trial: PresetTrial) -> Optional[str]:
     """A trial records its hardware in one of two formats, as described in
     `system_prompt.md`: `{"resources": {...}}` without node groups, and
     `{"groups": [[...], ...]}` with them.
@@ -679,7 +701,7 @@ def _format_trial_gpu(record: dict[str, Any]) -> Optional[str]:
     `dstack preset list -v`.
     """
     counts: dict[str, int] = {}
-    for node in _trial_nodes(record):
+    for node in _trial_nodes(trial):
         spec = _format_gpu(node.get("gpu"))
         if spec:
             # Insertion order is group order, so the roles read in the order they ran.
@@ -689,18 +711,10 @@ def _format_trial_gpu(record: dict[str, Any]) -> Optional[str]:
     return " + ".join(spec if n == 1 else f"{spec} x{n}" for spec, n in counts.items())
 
 
-def _trial_nodes(record: dict[str, Any]) -> list[dict[str, Any]]:
-    groups = record.get("groups")
-    if isinstance(groups, list):
-        return [
-            node
-            for group in groups
-            if isinstance(group, list)
-            for node in group
-            if isinstance(node, dict)
-        ]
-    resources = record.get("resources")
-    return [resources] if isinstance(resources, dict) else []
+def _trial_nodes(trial: PresetTrial) -> list[dict[str, Any]]:
+    if trial.groups is not None:
+        return [node for group in trial.groups for node in group]
+    return [trial.resources] if trial.resources is not None else []
 
 
 def _format_gpu(gpu: Any) -> Optional[str]:

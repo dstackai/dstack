@@ -1,9 +1,8 @@
 import time
-from typing import List, Optional
+from typing import List, Optional, assert_never
 
 import gpuhunt
 from gpuhunt.providers.vastai import VastAIProvider
-from typing_extensions import assert_never
 
 from dstack._internal.core.backends.base.authorized_keys import build_authorized_keys
 from dstack._internal.core.backends.base.backend import Compute
@@ -119,6 +118,7 @@ class VastAICompute(
         run: Run,
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
+        project_name: str,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
@@ -127,7 +127,7 @@ class VastAICompute(
         extra_authorized_keys: list[str],
     ) -> JobProvisioningData:
         instance_name = generate_unique_instance_name_for_job(
-            run, job, max_length=MAX_INSTANCE_NAME_LEN
+            run, job, project_name, max_length=MAX_INSTANCE_NAME_LEN
         )
         commands = get_docker_commands(
             build_authorized_keys(project_ssh_public_key, extra_authorized_keys)

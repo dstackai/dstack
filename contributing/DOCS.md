@@ -174,6 +174,12 @@ toward a dedicated local bundle or custom Swagger UI layout instead of adding mo
 That bundle can still use the single generated `openapi.json` and filter by tag on the client, so
 we should not reintroduce per-tag OpenAPI files unless there is a concrete reason.
 
+#### 5. Unlisted blog posts
+
+A blog post with `unlisted: true` in its frontmatter is built and reachable by its URL, but
+`on_page_context` drops it from the blog index and category pages. It still appears in search
+and `sitemap.xml`.
+
 ### File structure
 
 ```

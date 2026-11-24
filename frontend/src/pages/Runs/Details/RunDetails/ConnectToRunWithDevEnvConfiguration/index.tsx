@@ -1,7 +1,19 @@
 import React, { FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Alert, Box, Button, Code, ExpandableSection, Popover, SpaceBetween, StatusIndicator, Tabs, Wizard } from 'components';
+import {
+    Alert,
+    Box,
+    Button,
+    Code,
+    ExpandableSection,
+    Popover,
+    SpaceBetween,
+    StatusIndicator,
+    Tabs,
+    TokenVisibilityButton,
+    Wizard,
+} from 'components';
 
 import { copyToClipboard } from 'libs';
 
@@ -50,7 +62,9 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
     const openInIDEUrl = run.jobs[0]?.job_connection_info?.attached_ide_url ?? undefined;
     const ideDisplayName = hasIDE ? getIDEDisplayName(configuration.ide!) : undefined;
 
-    const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: run.project_name });
+    const [configCliCommand, copyCliCommand, isTokenVisible, setIsTokenVisible] = useConfigProjectCliCommand({
+        projectName: run.project_name,
+    });
 
     return (
         <ExpandableSection
@@ -187,24 +201,31 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                                                 <Code className={styles.code}>{configCliCommand}</Code>
 
                                                 <div className={styles.copy}>
-                                                    <Popover
-                                                        dismissButton={false}
-                                                        position="top"
-                                                        size="small"
-                                                        triggerType="custom"
-                                                        content={
-                                                            <StatusIndicator type="success">
-                                                                {t('common.copied')}
-                                                            </StatusIndicator>
-                                                        }
-                                                    >
-                                                        <Button
-                                                            formAction="none"
-                                                            iconName="copy"
-                                                            variant="normal"
-                                                            onClick={copyCliCommand}
+                                                    <SpaceBetween direction="horizontal" size="xs">
+                                                        <TokenVisibilityButton
+                                                            visible={isTokenVisible}
+                                                            onChange={setIsTokenVisible}
                                                         />
-                                                    </Popover>
+
+                                                        <Popover
+                                                            dismissButton={false}
+                                                            position="top"
+                                                            size="small"
+                                                            triggerType="custom"
+                                                            content={
+                                                                <StatusIndicator type="success">
+                                                                    {t('common.copied')}
+                                                                </StatusIndicator>
+                                                            }
+                                                        >
+                                                            <Button
+                                                                formAction="none"
+                                                                iconName="copy"
+                                                                variant="normal"
+                                                                onClick={copyCliCommand}
+                                                            />
+                                                        </Popover>
+                                                    </SpaceBetween>
                                                 </div>
                                             </div>
                                         </SpaceBetween>

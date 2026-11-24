@@ -23,10 +23,11 @@ import {
     NavigateLink,
     SpaceBetween,
     Tabs,
+    TokenVisibilityButton,
 } from 'components';
 
 import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
-import { copyToClipboard, riseRouterException } from 'libs';
+import { copyToClipboard, riseRouterException, TOKEN_MASK } from 'libs';
 import { getExtendedModelFromRun } from 'libs/run';
 import { ROUTES } from 'routes';
 import { useGetRunQuery } from 'services/run';
@@ -60,6 +61,7 @@ export const ModelDetails: React.FC = () => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [viewCodeVisible, setViewCodeVisible] = useState<boolean>(false);
     const [codeTab, setCodeTab] = useState<CodeTab>(CodeTab.Python);
+    const [isTokenVisible, setIsTokenVisible] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(false);
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
@@ -89,6 +91,11 @@ export const ModelDetails: React.FC = () => {
             href: ROUTES.MODELS.DETAILS.FORMAT(paramProjectName, paramRunName),
         },
     ]);
+
+    const closeViewCode = () => {
+        setViewCodeVisible(false);
+        setIsTokenVisible(false);
+    };
 
     const scrollChatToBottom = () => {
         if (!chatList.current) return;
@@ -284,16 +291,18 @@ export const ModelDetails: React.FC = () => {
         }
     };
 
-    const pythonCode = getPythonModelCode({ model: modelData, token });
+    const displayedToken = isTokenVisible ? token : TOKEN_MASK;
 
-    const curlCode = getCurlModelCode({ model: modelData, token });
+    const pythonCode = getPythonModelCode({ model: modelData, token: displayedToken });
+
+    const curlCode = getCurlModelCode({ model: modelData, token: displayedToken });
 
     const onCopyCode = () => {
         switch (codeTab) {
             case CodeTab.Python:
-                return copyToClipboard(pythonCode);
+                return copyToClipboard(getPythonModelCode({ model: modelData, token }));
             case CodeTab.Curl:
-                return copyToClipboard(curlCode);
+                return copyToClipboard(getCurlModelCode({ model: modelData, token }));
         }
     };
 
@@ -425,19 +434,22 @@ export const ModelDetails: React.FC = () => {
                         size="large"
                         footer={
                             <Box float="right">
-                                <Button variant="normal" onClick={() => setViewCodeVisible(false)}>
+                                <Button variant="normal" onClick={closeViewCode}>
                                     {t('common.close')}
                                 </Button>
                             </Box>
                         }
-                        onDismiss={() => setViewCodeVisible(false)}
+                        onDismiss={closeViewCode}
                     >
                         <SpaceBetween size="m" direction="vertical">
                             <Box>{t('models.details.view_code_description')}</Box>
 
                             <div className={css.viewCodeControls}>
                                 <div className={css.copyButton}>
-                                    <Button iconName="copy" onClick={onCopyCode}></Button>
+                                    <SpaceBetween direction="horizontal" size="xs">
+                                        <TokenVisibilityButton visible={isTokenVisible} onChange={setIsTokenVisible} />
+                                        <Button iconName="copy" onClick={onCopyCode}></Button>
+                                    </SpaceBetween>
                                 </div>
 
                                 <Tabs

@@ -12,7 +12,12 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.instances import InstanceStatus
-from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
+from dstack._internal.core.models.runs import (
+    JobStatus,
+    JobTerminationReason,
+    RunStatus,
+    RunTerminationReason,
+)
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel
 from dstack._internal.server.background.pipeline_tasks.jobs_terminating import (
@@ -572,6 +577,92 @@ class TestJobTerminatingWorker:
         await session.refresh(job)
         # Advanced, so the next pass does not collect the same logs again
         assert job.runner_timestamp == 3
+
+    @pytest.mark.parametrize(
+        ("stopped_before_abort", "expected_status"),
+        [
+            pytest.param(False, JobStatus.ABORTED, id="aborted"),
+            # The run pipeline leaves jobs that are already terminating alone, so the job keeps
+            # its graceful reason and is already waiting for the runner to hand over its logs
+            pytest.param(True, JobStatus.TERMINATED, id="aborted_after_stop"),
+        ],
+    )
+    async def test_does_not_wait_for_logs_of_aborted_job(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobTerminatingWorker,
+        ssh_tunnel_mock: Mock,
+        runner_client_mock: Mock,
+        stopped_before_abort: bool,
+        expected_status: JobStatus,
+    ):
+        """
+        An aborted job is not asked to stop, so the runner never runs out of logs. What it has
+        buffered is collected, but the container is stopped without waiting for more.
+        """
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.TERMINATING,
+            termination_reason=RunTerminationReason.ABORTED_BY_USER,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=(
+                JobTerminationReason.TERMINATED_BY_USER
+                if stopped_before_abort
+                else JobTerminationReason.ABORTED_BY_USER
+            ),
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            running_at=get_current_datetime() - timedelta(minutes=1),
+        )
+        if stopped_before_abort:
+            job.graceful_termination_attempts = 1
+            job.remove_at = get_current_datetime() + timedelta(seconds=30)
+        job.runner_timestamp = 1
+        _lock_job(job)
+        await session.commit()
+
+        runner_client_mock.pull.return_value = PullResponse(
+            job_states=[],
+            job_logs=[LogEvent(timestamp=2, message=b"the tail")],
+            runner_logs=[],
+            last_updated=2,
+            has_more=True,
+        )
+        with (
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating.logs_services.write_logs"
+            ) as write_logs,
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating._stop_container",
+                new=AsyncMock(return_value=True),
+            ) as stop_container,
+        ):
+            await worker.process(_job_to_pipeline_item(job))
+
+        runner_client_mock.stop.assert_not_called()
+        runner_client_mock.pull.assert_called_once_with(job.id, 1)
+        write_logs.assert_called_once()
+        stop_container.assert_awaited_once()
+
+        await session.refresh(job)
+        assert job.status == expected_status
+        assert job.runner_timestamp == 2
 
     async def test_does_not_wait_for_logs_if_runner_no_longer_runs_job(
         self,

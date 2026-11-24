@@ -38,7 +38,7 @@ class BaseApplyConfigurator(ABC, Generic[ApplyConfigurationT]):
 
         Args:
             conf: The apply configuration.
-            configuration_path: The path to the configuration file.
+            configuration_path: The configuration path as returned by `load_apply_configuration`.
             command_args: The args parsed by `dstack apply`.
             configurator_args: The known args parsed by `cls.get_parser()`.
         """
@@ -56,7 +56,7 @@ class BaseApplyConfigurator(ABC, Generic[ApplyConfigurationT]):
 
         Args:
             conf: The apply configuration.
-            configuration_path: The path to the configuration file.
+            configuration_path: The configuration path as returned by `load_apply_configuration`.
             command_args: The args parsed by `dstack delete`.
         """
         pass

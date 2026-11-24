@@ -1,10 +1,9 @@
 import re
-from typing import Any, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union, overload
 
 from pydantic import BeforeValidator, GetCoreSchemaHandler, GetJsonSchemaHandler
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import CoreSchema, core_schema
-from typing_extensions import Annotated, Literal, overload
 
 
 class Duration(int):

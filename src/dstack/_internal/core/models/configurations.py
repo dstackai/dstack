@@ -3,7 +3,7 @@ import string
 from collections import Counter
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Annotated, Any, Dict, List, Literal, Optional, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Self, Union
 
 from pydantic import (
     BeforeValidator,
@@ -20,7 +20,6 @@ from pydantic import (
     model_validator,
 )
 from pydantic_core import CoreSchema, core_schema
-from typing_extensions import Self
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import (
@@ -1542,10 +1541,6 @@ class ServiceConfigurationParams(CoreModel):
         router_groups = [g for g in groups if g.router is not None]
         if len(router_groups) > 1:
             raise ValueError("At most one replica group may specify `router`.")
-        if router_groups:
-            router_group = router_groups[0]
-            if router_group.replicas.min != 1 or router_group.replicas.max != 1:
-                raise ValueError("For now replica group with `router` must have `replicas: 1`.")
         return self
 
 
@@ -1774,12 +1769,13 @@ class PresetConfiguration(
         ),
     ] = None
     concurrency: Annotated[
-        Optional[PositiveInt],
+        Optional[list[PositiveInt]],
         Field(
+            min_length=1,
             description=(
-                "The number of simultaneous requests used for benchmarks during preset"
+                "List of simultaneous request counts used for benchmarks during preset"
                 " creation. Required for creation"
-            )
+            ),
         ),
     ] = None
     input_tokens: Annotated[
@@ -1944,6 +1940,26 @@ class PresetConfiguration(
             if len(value) > MAX_PROMPT_LENGTH:
                 raise ValueError(f"Prompt must be at most {MAX_PROMPT_LENGTH} characters")
         return value
+
+    @field_validator(
+        "concurrency", mode="before", json_schema_input_type=Union[PositiveInt, list[PositiveInt]]
+    )
+    @classmethod
+    def convert_single_concurrency_to_list(cls, value: Any) -> Any:
+        if isinstance(value, bool):
+            raise ValueError(
+                "`concurrency` must be a positive integer or a list of positive integers"
+            )
+        if isinstance(value, int):
+            return [value]
+        return value
+
+    @field_validator("concurrency")
+    @classmethod
+    def sort_concurrency(cls, value: Optional[list[PositiveInt]]) -> Optional[list[PositiveInt]]:
+        if value is None:
+            return None
+        return sorted(set(value))
 
 
 def _validate_model(value: Any, *, field: str) -> str:

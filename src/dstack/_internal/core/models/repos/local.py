@@ -1,10 +1,9 @@
 import tarfile
 from pathlib import Path
-from typing import BinaryIO, Optional
+from typing import BinaryIO, Literal, Optional
 
 import ignore
 import ignore.overrides
-from typing_extensions import Literal
 
 from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
 from dstack._internal.utils.common import sizeof_fmt

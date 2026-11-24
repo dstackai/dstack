@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
+from rich.markup import escape
 from rich.table import Table
 
 from dstack._internal.cli.services.configurators.base import (
@@ -33,6 +34,9 @@ from dstack._internal.core.models.fleets import (
     FleetPlan,
     FleetSpec,
     InstanceGroupPlacement,
+    SSHHostParams,
+    SSHParams,
+    SSHProxyParams,
 )
 from dstack._internal.core.models.instances import InstanceStatus, SSHKey
 from dstack._internal.core.services.diff import copy_model, diff_models
@@ -378,12 +382,17 @@ def _render_fleet_spec_diff(old_spec: FleetSpec, new_spec: FleetSpec) -> Optiona
         if spec_field == "merged_profile":
             continue
         if spec_field == "configuration":
+            fields = []
+            for field in diff_models(old_spec.configuration, new_spec.configuration):
+                old_ssh = old_spec.configuration.ssh_config
+                new_ssh = new_spec.configuration.ssh_config
+                if field == "ssh_config" and old_ssh is not None and new_ssh is not None:
+                    fields.extend(_ssh_config_diff_fields(old_ssh, new_ssh))
+                else:
+                    fields.append(field)
             item = NestedListItem(
                 "Configuration properties:",
-                children=[
-                    NestedListItem(field)
-                    for field in diff_models(old_spec.configuration, new_spec.configuration)
-                ],
+                children=[NestedListItem(escape(field)) for field in fields],
             )
         elif spec_field == "profile":
             item = NestedListItem(
@@ -402,6 +411,37 @@ def _render_fleet_spec_diff(old_spec: FleetSpec, new_spec: FleetSpec) -> Optiona
     if not nested_list.children:
         return None
     return nested_list.render()
+
+
+def _ssh_config_diff_fields(
+    old: SSHParams | SSHHostParams | SSHProxyParams,
+    new: SSHParams | SSHHostParams | SSHProxyParams,
+    prefix: str = "ssh_config",
+) -> list[str]:
+    fields = []
+    for field in diff_models(old, new):
+        old_value = getattr(old, field)
+        new_value = getattr(new, field)
+        path = f"{prefix}.{field}"
+        if field == "ssh_key":
+            continue
+        elif field == "hosts":
+            old_hosts = {h if isinstance(h, str) else h.hostname: h for h in old_value}
+            new_names = [h if isinstance(h, str) else h.hostname for h in new_value]
+            if list(old_hosts) != new_names:
+                fields.append(path)
+            for index, host in enumerate(new_value):
+                hostname = host if isinstance(host, str) else host.hostname
+                previous = old_hosts.get(hostname)
+                if isinstance(previous, SSHHostParams) and isinstance(host, SSHHostParams):
+                    fields.extend(_ssh_config_diff_fields(previous, host, f"{path}[{index}]"))
+                elif previous is not None and previous != host:
+                    fields.append(f"{path}[{index}]")
+        elif isinstance(old_value, SSHProxyParams) and isinstance(new_value, SSHProxyParams):
+            fields.extend(_ssh_config_diff_fields(old_value, new_value, path))
+        else:
+            fields.append(path)
+    return fields
 
 
 def _print_plan_header(plan: FleetPlan):

@@ -1,10 +1,9 @@
 import datetime
 import uuid
 from enum import Enum
-from typing import Dict, Optional, Union
+from typing import Annotated, Dict, Literal, Optional, Union
 
 from pydantic import Field, RootModel, field_validator
-from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction, CoreModel

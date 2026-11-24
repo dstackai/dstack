@@ -1,5 +1,6 @@
+from typing import Any, Mapping
+
 import oci
-from typing_extensions import Any, Mapping
 
 from dstack._internal.core.backends.oci.exceptions import any_oci_exception
 from dstack._internal.core.backends.oci.models import AnyOCICreds, OCIDefaultCreds

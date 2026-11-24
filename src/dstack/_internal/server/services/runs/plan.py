@@ -42,6 +42,7 @@ from dstack._internal.server.services.fleets import (
     get_fleet_master_instance_provisioning_data,
     get_fleet_requirements,
     get_fleet_spec,
+    new_instances_in_fleet_require_create_instance_support,
 )
 from dstack._internal.server.services.instances import (
     filter_instances,
@@ -312,6 +313,7 @@ async def select_run_candidate_fleet_models_with_filters(
         .where(*fleet_filters)
         .where(*instance_filters)
         .options(contains_eager(FleetModel.instances))
+        .options(contains_eager(FleetModel.project).selectinload(ProjectModel.backends))
         .execution_options(populate_existing=True)
     )
     if lock_instances:
@@ -339,6 +341,7 @@ async def select_run_candidate_fleet_models_with_filters(
             )
         )
         .options(raiseload(FleetModel.instances))
+        .options(contains_eager(FleetModel.project).selectinload(ProjectModel.backends))
         .execution_options(populate_existing=True)
     )
     fleet_models_without_instances = list(res.unique().scalars().all())
@@ -392,6 +395,8 @@ async def find_optimal_fleet_with_offers(
     """
     if run_model is not None and run_model.fleet is not None:
         # Using the fleet that was already chosen by the master job
+        if volumes and run_model.fleet.project_id != project.id:
+            return run_model.fleet, [], []
         instance_offers = get_instance_offers_in_fleet(
             fleet_model=run_model.fleet,
             run_spec=run_spec,
@@ -412,6 +417,8 @@ async def find_optimal_fleet_with_offers(
     # First step: consider instance offers.
     candidates: list[_FleetCandidate] = []
     for fleet_model in fleet_models:
+        if volumes and fleet_model.project_id != project.id:
+            continue
         fleet_spec = get_fleet_spec(fleet_model)
         if (
             is_multinode_job(job)
@@ -637,6 +644,8 @@ async def get_targeted_instance_offers(
         instance_ids=instance_ids,
         lock_instances=lock_instances,
     )
+    if volumes:
+        instances = [i for i in instances if i.project_id == project.id]
     return select_targeted_instance_offers(
         instances=instances,
         run_spec=run_spec,
@@ -731,9 +740,19 @@ def _run_can_fit_into_fleet(
     or more than `nodes.max` instances being provisioned
     and eventually removed by the fleet consolidation logic.
     """
+    nodes_required_num = get_nodes_required_num(run_spec)
+    if fleet_spec.configuration.ssh_config is not None:
+        # SSH fleets cannot provision new instances for the run,
+        # so only idle blocks of existing instances count.
+        # Currently assume that each idle block can run a job.
+        # TODO: Take resources / eligible offers into account.
+        total_idle_blocks = 0
+        for instance in fleet_model.instances:
+            if instance.status.is_available() and instance.total_blocks is not None:
+                total_idle_blocks += instance.total_blocks - instance.busy_blocks
+        return total_idle_blocks >= nodes_required_num
     # No check for cloud fleets with blocks > 1 since we don't know
     # how many jobs such fleets can accommodate.
-    nodes_required_num = get_nodes_required_num(run_spec)
     if (
         fleet_spec.configuration.nodes is not None
         and fleet_spec.configuration.blocks == 1
@@ -742,15 +761,6 @@ def _run_can_fit_into_fleet(
         occupied_instances = _get_occupied_instances(fleet_model.instances)
         fleet_available_capacity = fleet_spec.configuration.nodes.max - len(occupied_instances)
         if fleet_available_capacity < nodes_required_num:
-            return False
-    elif fleet_spec.configuration.ssh_config is not None:
-        # Currently assume that each idle block can run a job.
-        # TODO: Take resources / eligible offers into account.
-        total_idle_blocks = 0
-        for instance in fleet_model.instances:
-            total_blocks = instance.total_blocks or 1
-            total_idle_blocks += total_blocks - instance.busy_blocks
-        if total_idle_blocks < nodes_required_num:
             return False
     return True
 
@@ -793,7 +803,9 @@ async def _get_backend_offers_in_fleet(
         # Handle multinode for old jobs that don't have requirements.multinode set.
         # TODO: Drop multinode param.
         multinode = requirements.multinode or is_multinode_job(job)
-        async with backends_cache.lease_project_backends(project) as backends:
+        # Offers come from the fleet's project backends, which differ from
+        # the run's project backends if the fleet is imported.
+        async with backends_cache.lease_project_backends(fleet_model.project) as backends:
             backends_with_offers = await get_offers_by_requirements(
                 backends=backends,
                 profile=profile,
@@ -803,6 +815,9 @@ async def _get_backend_offers_in_fleet(
                 volumes=volumes,
                 privileged=job.job_spec.privileged,
                 instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+                create_instance_support=new_instances_in_fleet_require_create_instance_support(
+                    fleet_model, job_project_id=project.id
+                ),
                 max_offers=max_offers,
                 full_offers=full_offers,
                 unallocated_resources=unallocated_resources,

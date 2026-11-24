@@ -64,6 +64,8 @@ The in-server proxy opens an SSH connection when it needs to forward the first r
 
 The gateway opens SSH connections when each replica is registered.
 
+When a replica is unregistered, the gateway first reloads Nginx so that new requests stop going to the replica, and only then closes its SSH connection. The connection is closed in the background so that requests already sent through it can finish: after a short grace period for Nginx workers that have not picked up the reload yet, once nothing is connected to the replica's socket (as listed in `/proc/net/unix`), or after 5 minutes at most. The `dstack` server stops the replica's container independently, so it can still cut requests that outlive the container.
+
 ### Communication with the `dstack` server
 
 The in-server proxy is part of the `dstack` server, so no network communication takes place between them.

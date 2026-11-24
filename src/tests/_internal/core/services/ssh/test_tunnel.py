@@ -22,6 +22,33 @@ from dstack._internal.utils.path import FileContent, FilePath
 
 
 class TestSSHTunnel:
+    @pytest.mark.usefixtures("ssh_client_info")
+    def test_update_proxy_identity_keeps_sockets_and_other_keys(self, tmp_path):
+        external_key = tmp_path / "external-key"
+        external_key.write_text("original external key")
+        tunnel = SSHTunnel(
+            destination="ubuntu@host",
+            identity=FileContent("project key"),
+            ssh_proxies=[
+                (
+                    SSHConnectionParams(hostname="jump", username="ubuntu", port=22),
+                    FilePath(external_key),
+                )
+            ],
+        )
+        socket = tunnel.control_sock_path
+        tunnel.update_proxy_identity(0, "replacement")
+        path = Path(tunnel.ssh_proxies[0][1])
+        assert path.read_text() == "replacement"
+        assert path.stat().st_mode & 0o777 == 0o600
+        assert external_key.read_text() == "original external key"
+        assert Path(tunnel.identity_path).read_text() == "project key"
+        assert tunnel.control_sock_path == socket
+        assert str(path) in " ".join(tunnel.open_command())
+        tunnel.update_proxy_identity(0, "next key")
+        assert Path(tunnel.ssh_proxies[0][1]) == path
+        assert path.read_text() == "next key"
+
     @pytest.fixture
     def ssh_client_info(self, monkeypatch: pytest.MonkeyPatch) -> SSHClientInfo:
         ssh_client_info = SSHClientInfo.from_raw_version("OpenSSH_9.7p1", Path("/usr/bin/ssh"))

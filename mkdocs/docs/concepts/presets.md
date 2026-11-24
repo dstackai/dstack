@@ -33,8 +33,8 @@ trials: 5
 min_context_length: 1048576
 max_ttft: 675
 
-# The number of simultaneous requests every benchmark uses
-concurrency: 1
+# A list of simultaneous request counts every benchmark uses.
+concurrency: [4, 8, 16]
 
 # The request shape every benchmark uses (defaults to 1024 and 1024)
 input_tokens: 10000
@@ -55,7 +55,7 @@ To create the preset, pass the configuration to the `dstack apply` command:
 $ dstack apply -f preset.dstack.yml --fleet b200-fleet
 Create the preset dsv4-flash? [y/n]: y
 [2026-08-04 11:38:34] Starting preset creation for deepseek-ai/DeepSeek-V4-Flash. Allowed fleets: b200-fleet.
-[2026-08-04 12:31:19] Trial 3 switched from vLLM to SGLang: 319 tok/s per user, 2.2x the baseline.
+[2026-08-04 12:31:19] Trial 3 switched from vLLM to SGLang: 319/495/570 tok/s per user at concurrency 4/8/16, 2.1x/1.9x/1.7x the baseline.
 [2026-08-04 13:04:52] Final service dsv4-flash-c83375b4-4 verified with context length 1048576.
 [2026-08-04 13:12:07] Benchmark via sglang.bench_serving: 32/32 requests succeeded.
 ```
@@ -255,9 +255,9 @@ A pulled preset works like any other, and is named `<project>/<name>`:
 
 ```shell
 $ dstack preset list -a
- NAME                    ID        BASE                           CONSTRAINTS      BENCHMARK                       STATUS          SUBMITTED
- main/dsv4-flash-b200    8f065dde  deepseek-ai/DeepSeek-V4-Flash  io=10K/1.5K c=1  tps/user=309 ttft=213ms ctx=1M  pulled          2 min ago
- qwen35-pro6000          092c792b  Qwen/Qwen3.5-397B-A17B         io=8K/1K c=64    tps/user=19.6 ttft=3.43s ctx=32K  verified (7)  3 days ago
+ NAME                    ID        BASE                           CONSTRAINTS          BENCHMARK                                   STATUS        SUBMITTED
+ main/dsv4-flash-b200    8f065dde  deepseek-ai/DeepSeek-V4-Flash  io=10K/1.5K c=4..16  tps/user=319..570 ttft=213ms..465ms ctx=1M  pulled        2 min ago
+ qwen35-pro6000          092c792b  Qwen/Qwen3.5-397B-A17B         io=8K/1K c=64        tps/user=19.6 ttft=3.43s ctx=32K            verified (7)  3 days ago
 ```
 
 </div>
@@ -336,8 +336,8 @@ Use `dstack preset` to list presets:
 
 ```shell
 $ dstack preset list
- NAME              ID        BASE                           CONSTRAINTS      BENCHMARK                                STATUS          SUBMITTED
- dsv4-flash-b200   c83375b4  deepseek-ai/DeepSeek-V4-Flash  io=10K/1.5K c=1  tps/user=309 ttft=213ms ctx=1M  ▂▁██▇  trialing (5/5)  2 min ago
+ NAME              ID        BASE                           CONSTRAINTS          BENCHMARK                                          STATUS          SUBMITTED
+ dsv4-flash-b200   c83375b4  deepseek-ai/DeepSeek-V4-Flash  io=10K/1.5K c=4..16  tps/user=319..570 ttft=213ms..465ms ctx=1M  ▂▁██▇  trialing (5/5)  2 min ago
 ```
 
 </div>
@@ -348,20 +348,36 @@ By default, `dstack preset` shows creations that are still running, or the most 
 
 ```shell
 $ dstack preset list -a
- NAME               ID        BASE                            CONSTRAINTS      BENCHMARK                                     STATUS          SUBMITTED
- dsv4-flash-b200    c83375b4  deepseek-ai/DeepSeek-V4-Flash   io=10K/1.5K c=1  tps/user=309 ttft=213ms ctx=1M   ▂▁██▇     trialing (5/5)  2 min ago
- qwen35-pro6000     092c792b  Qwen/Qwen3.5-397B-A17B          io=8K/1K c=64    tps/user=19.6 ttft=3.43s ctx=32K ▁▂▅▇█··   verified (7)    3 days ago
- qwen36-pro4500     9ab0fa65  Qwen/Qwen3.6-27B                io=1K/1K c=8     tps/user=57.1 ttft=499ms ctx=128K ▁▄██▆·█  verified (7)    4 days ago
- qwen3-32b-5090     f91d6b60  Qwen/Qwen3-32B                  io=1K/512 c=8    tps/user=85.8 ttft=368ms ctx=32K ▁▁▅▅▄▅▇▄▇█ verified (10)  2 weeks ago
+ NAME               ID        BASE                            CONSTRAINTS          BENCHMARK                                               STATUS          SUBMITTED
+ dsv4-flash-b200    c83375b4  deepseek-ai/DeepSeek-V4-Flash   io=10K/1.5K c=4..16  tps/user=319..570 ttft=213ms..465ms ctx=1M  ▂▁██▇       trialing (5/5)  2 min ago
+ qwen35-pro6000     092c792b  Qwen/Qwen3.5-397B-A17B          io=8K/1K c=16..64    tps/user=19.6..41.2 ttft=1.21s..3.43s ctx=32K  ▁▂▅▇█··  verified (7)    3 days ago
+ qwen36-pro4500     9ab0fa65  Qwen/Qwen3.6-27B                io=1K/1K c=2..8      tps/user=57.1..94.3 ttft=312ms..499ms ctx=128K ▁▄██▆·█  verified (7)    4 days ago
+ qwen3-32b-5090     f91d6b60  Qwen/Qwen3-32B                  io=1K/512 c=8        tps/user=85.8 ttft=368ms ctx=32K            ▁▁▅▅▄▅▇▄▇█  verified (10)   2 weeks ago
 ```
 
 </div>
 
 The `CONSTRAINTS` column is what the creation was asked for, and `BENCHMARK` is the best trial so far. `tps/user` is the steady decode rate, measured as one second divided by the mean time per output token, so it excludes the time to the first token.
 
-The glyphs after the benchmark are one per trial: height is throughput, a yellow bar is a trial whose benchmark broke a constraint, and a red `·` is one that produced no benchmark at all. The shape shows whether a run converged or wandered.
+When `concurrency` is a list, `CONSTRAINTS` shows it as `c=min..max`, and the `BENCHMARK` metrics become ranges over the concurrencies that met the constraints, e.g. `tps/user=min..max` and `ttft=min..max`.
 
-Pass `-w` to watch in realtime, `-v` for more detail, or `--json` for complete preset objects. Filter with `--base` or `--repo`.
+
+!!! info "Sparkline legend"
+
+    Each bar in the sparklines represents one trial. The bar height is the trial's highest tok/s across concurrency values that met the constraints.
+    
+    | Bar color | Semantics |
+    | --- | --- |
+    | Red | A trial that broke constraints at every concurrency. |
+    | Green | The best trial that met the constraints. |
+    | Gray | A trial that met the constraints but had lower tok/s than the best trial. |
+    | Yellow | The best trial, if it broke constraints at every concurrency. |
+    
+    A red `·` represets a trial that produced no benchmark.
+
+For detailed benchmark data at each concurrency, pass `--json` to `dstack preset get`.
+
+To watch in realtime, use `-w` with `dstack preset`. Filter with `--base` or `--repo`. Also, use `-v` for verbose output.
 
 ### Delete presets
 
@@ -390,7 +406,6 @@ At the same time, it's recommended to create presets using your own agent — ei
 ## Limitations
 
 * Currently, the agent doesn't upload compiled binaries anywhere; patches compile at runtime
-* Doesn't support ranges for `concurrency`
 
 > Report bugs and request features on [GitHub](https://github.com/dstackai/dstack/issues), and ask questions on [Discord](https://discord.gg/u8SmfwPpMd).
 
