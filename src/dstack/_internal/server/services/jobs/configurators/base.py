@@ -228,7 +228,7 @@ class JobConfigurator(ABC):
             retry=self._retry(),
             working_dir=self._working_dir(),
             volumes=self._volumes(job_num),
-            ssh_key=self._ssh_key(jobs_per_replica),
+            ssh_key=await self._ssh_key(jobs_per_replica),
             repo_data=self.run_spec.repo_data,
             repo_code_hash=self.run_spec.repo_code_hash,
             repo_dir=self._repo_dir(),
@@ -484,11 +484,13 @@ class JobConfigurator(ABC):
     def _volumes(self, job_num: int) -> List[MountPoint]:
         return interpolate_job_volumes(self.run_spec.configuration.volumes, job_num)
 
-    def _ssh_key(self, jobs_per_replica: int) -> Optional[JobSSHKey]:
+    async def _ssh_key(self, jobs_per_replica: int) -> Optional[JobSSHKey]:
         if jobs_per_replica < 2:
             return None
         if self._job_ssh_key is None:
-            private, public = crypto.generate_rsa_key_pair_bytes(comment="dstack_job")
+            private, public = await run_async(
+                crypto.generate_rsa_key_pair_bytes, comment="dstack_job"
+            )
             self._job_ssh_key = JobSSHKey(
                 private=private.decode(),
                 public=public.decode(),
