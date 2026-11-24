@@ -4,8 +4,7 @@ import { useParams } from 'react-router-dom';
 
 import { BarChart, Box, Container, Header, Loader, SelectCSD, Tabs } from 'components';
 
-import { BenchmarkChart, formatTokenCount, getBenchmarkCharts, sortResults } from 'libs/presets';
-import { useGetPresetQuery } from 'services/preset';
+import { useBenchmarkCharts } from './useBenchmarkCharts';
 
 export const PresetBenchmark: FC = () => {
     const { t } = useTranslation();
@@ -16,33 +15,18 @@ export const PresetBenchmark: FC = () => {
     // Each tab remembers the metric last picked in it.
     const [metricByGroup, setMetricByGroup] = useState<Record<string, string>>({});
 
-    const { data, isLoading } = useGetPresetQuery({
+    const { isLoading, concurrencies, charts, groups } = useBenchmarkCharts({
         project_name: paramProjectName,
         id: paramPresetId,
     });
 
-    if (isLoading || !data)
+    if (isLoading)
         return (
             <Container>
                 <Loader />
             </Container>
         );
 
-    const results = sortResults(data.spec.preset.result);
-    const concurrencies = results.map(({ concurrency }) => String(concurrency));
-
-    // Context length is not a measured metric, so it gets a tab of its own.
-    const contextLengthChart: BenchmarkChart = {
-        group: t('presets.context_length'),
-        title: t('presets.context_length'),
-        formatValue: formatTokenCount,
-        data: results
-            .filter(({ context_length }) => typeof context_length === 'number')
-            .map(({ concurrency, context_length }) => ({ x: String(concurrency), y: context_length as number })),
-    };
-
-    const charts = [...getBenchmarkCharts(results), contextLengthChart];
-    const groups = Array.from(new Set(charts.map(({ group }) => group)));
     const group = activeGroup ?? groups[0];
     const groupCharts = charts.filter((chart) => chart.group === group);
     const chart = groupCharts.find(({ title }) => title === metricByGroup[group]) ?? groupCharts[0];
