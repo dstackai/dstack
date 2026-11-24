@@ -21,13 +21,18 @@ declare interface IPresetVerificationReplicaGroup {
     replicas: HashMap[];
 }
 
+declare interface IPresetResult {
+    concurrency: number;
+    context_length?: number | null;
+    benchmark?: IPresetBenchmark | null;
+}
+
 declare interface IPresetSpec {
     preset: {
         base: string;
         repo: string;
-        context_length: number;
         service: HashMap;
-        benchmark: IPresetBenchmark;
+        result: IPresetResult[];
         verified_on: IPresetVerificationReplicaGroup[];
     };
     file_archives: { id: string; path: string }[];
