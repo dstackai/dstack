@@ -1,6 +1,9 @@
 from typing import Optional
 
-from dstack._internal.core.compatibility.common import get_profile_excludes
+from dstack._internal.core.compatibility.common import (
+    get_backend_options_excludes,
+    get_profile_excludes,
+)
 from dstack._internal.core.models.common import IncludeExcludeStrDictType
 from dstack._internal.core.models.fleets import ApplyFleetPlanInput, FleetSpec
 
@@ -41,8 +44,16 @@ def get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[IncludeExcludeStr
     """
     spec_excludes: IncludeExcludeStrDictType = {}
     profile_excludes = get_profile_excludes(fleet_spec.profile)
+    configuration_excludes: IncludeExcludeStrDictType = {}
+    backend_options_excludes = get_backend_options_excludes(
+        fleet_spec.configuration.backend_options or []
+    )
+    if backend_options_excludes:
+        configuration_excludes["backend_options"] = backend_options_excludes
 
     spec_excludes["autocreated"] = True
+    if configuration_excludes:
+        spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:
         spec_excludes["profile"] = profile_excludes
     if spec_excludes:

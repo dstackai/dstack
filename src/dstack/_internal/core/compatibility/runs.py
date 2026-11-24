@@ -1,6 +1,9 @@
 from typing import Optional
 
-from dstack._internal.core.compatibility.common import get_profile_excludes
+from dstack._internal.core.compatibility.common import (
+    get_backend_options_excludes,
+    get_profile_excludes,
+)
 from dstack._internal.core.models.common import (
     IncludeExcludeSetType,
     IncludeExcludeStrDictType,
@@ -85,8 +88,7 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeStrDictType:
     spec_excludes: IncludeExcludeStrDictType = {}
     configuration_excludes: IncludeExcludeStrDictType = {}
     profile_excludes = get_profile_excludes(run_spec.profile)
-    for field in get_profile_excludes(run_spec.configuration):
-        configuration_excludes[field] = True
+    configuration_excludes.update(get_profile_excludes(run_spec.configuration))
 
     if isinstance(run_spec.configuration, TaskConfiguration):
         if run_spec.configuration.groups is None:
@@ -119,6 +121,11 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeStrDictType
         spec_excludes["node_group_name"] = True
     if all(s.node_group_job_index == 0 for s in job_specs):
         spec_excludes["node_group_job_index"] = True
+    backend_options_excludes = get_backend_options_excludes(
+        [opt for s in job_specs for opt in s.requirements.backend_options or []]
+    )
+    if backend_options_excludes:
+        spec_excludes["requirements"] = {"backend_options": backend_options_excludes}
     return spec_excludes
 
 

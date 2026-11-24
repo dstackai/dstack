@@ -19,26 +19,31 @@ class TestVastAIProfileOptionsCombine:
             offer_order=VastAIOfferOrder.PRICE,
             min_reliability=0.7,
             min_score=100,
+            min_inet_down=1000,
         )
         b = VastAIProfileOptions(
             offer_order=VastAIOfferOrder.PRICE,
             min_reliability=0.95,
             min_score=300,
+            min_inet_down=8000,
         )
         a_combine_b = a.combine(b)
         assert a_combine_b.offer_order == VastAIOfferOrder.PRICE
         assert a_combine_b.min_reliability == 0.95
         assert a_combine_b.min_score == 300
+        assert a_combine_b.min_inet_down == 8000
         b_combine_a = b.combine(a)
         assert b_combine_a.offer_order == VastAIOfferOrder.PRICE
         assert b_combine_a.min_reliability == 0.95
         assert b_combine_a.min_score == 300
+        assert b_combine_a.min_inet_down == 8000
 
     def test_combine_one_has_all_fields_set(self):
         a = VastAIProfileOptions(
             offer_order=VastAIOfferOrder.PRICE,
             min_reliability=0.7,
             min_score=100,
+            min_inet_down=1000,
         )
         b = VastAIProfileOptions()
         assert a.combine(b) == a

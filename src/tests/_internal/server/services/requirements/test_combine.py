@@ -563,10 +563,11 @@ class TestCombineBackendOptionsOptional:
         assert combine_opts_none is not opts
 
     def test_combines_same_backend_type(self):
-        opts1 = [VastAIProfileOptions(min_score=100, min_reliability=0.7)]
+        opts1 = [VastAIProfileOptions(min_score=100, min_reliability=0.7, min_inet_down=1000)]
         opts2 = [VastAIProfileOptions(min_score=300, min_reliability=0.95)]
         result = _combine_backend_options_optional(opts1, opts2)
         assert result is not None
         assert len(result) == 1
         assert result[0].min_score == 300
         assert result[0].min_reliability == 0.95
+        assert result[0].min_inet_down == 1000
