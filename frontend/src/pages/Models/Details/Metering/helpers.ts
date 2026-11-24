@@ -1,5 +1,5 @@
 import { pick as _pick, sumBy as _sumBy, uniq as _uniq } from 'lodash';
-import { add, format, parseISO, startOfMonth, sub } from 'date-fns';
+import { add, format, parseISO, sub } from 'date-fns';
 
 import type { DateRangePickerProps, PropertyFilterProps } from 'components';
 
@@ -29,11 +29,10 @@ export const relativeOptions: DateRangePickerProps.RelativeOption[] = [
 /**
  * Metering sums tokens by UTC day, so a time range covers whole days:
  * from the start of its first day to the end of its last one. A relative time range ends today.
- * By month, it covers whole months: from the start of the month of its first day to the end of the month of its last one.
+ * By month, the rows sum the same days, so the first and the last month of a time range can be partial.
  */
 const getTimeRangeBounds = (
     timeRange: DateRangePickerProps.Value,
-    period: TMeteringPeriod,
     now: Date,
 ): Pick<TMeteringListRequestParams, 'start' | 'end'> => {
     const today = parseISO(now.toISOString().split('T')[0]);
@@ -43,14 +42,9 @@ const getTimeRangeBounds = (
             ? [sub(today, { [`${timeRange.unit}s`]: timeRange.amount }), today]
             : [parseISO(timeRange.startDate), parseISO(timeRange.endDate)];
 
-    const [start, end] =
-        period === 'month'
-            ? [startOfMonth(firstDay), add(startOfMonth(lastDay), { months: 1 })]
-            : [firstDay, add(lastDay, { days: 1 })];
-
     return {
-        start: `${format(start, DATE_FORMAT)}T00:00:00Z`,
-        end: `${format(end, DATE_FORMAT)}T00:00:00Z`,
+        start: `${format(firstDay, DATE_FORMAT)}T00:00:00Z`,
+        end: `${format(add(lastDay, { days: 1 }), DATE_FORMAT)}T00:00:00Z`,
     };
 };
 
@@ -72,7 +66,7 @@ export const getMeteringRequestParams = ({
     filters,
     now,
 }: TMeteringRequest): TMeteringListRequestParams => ({
-    ...getTimeRangeBounds(timeRange, period, now),
+    ...getTimeRangeBounds(timeRange, now),
     group_by: [period, 'project'],
     model_project_name: model.project_name,
     model_name: model.name,

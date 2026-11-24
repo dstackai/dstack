@@ -56,33 +56,14 @@ describe('Model metering request', () => {
         [{ type: 'relative', amount: 7, unit: 'day' }, '2026-11-11T00:00:00Z', '2026-11-19T00:00:00Z'],
         [{ type: 'absolute', startDate: '2026-11-18', endDate: '2026-11-18' }, '2026-11-18T00:00:00Z', '2026-11-19T00:00:00Z'],
         [{ type: 'absolute', startDate: '2026-10-01', endDate: '2026-10-31' }, '2026-10-01T00:00:00Z', '2026-11-01T00:00:00Z'],
-    ] as const)('by day, the time range %j covers whole days', (timeRange, start, end) => {
-        const params = getMeteringRequestParams({ model, timeRange, period: 'day', filters: {}, now });
+        // The days start and end within a month
+        [{ type: 'absolute', startDate: '2026-09-03', endDate: '2026-10-10' }, '2026-09-03T00:00:00Z', '2026-10-11T00:00:00Z'],
+    ] as const)('the time range %j covers whole days, the same by day and by month', (timeRange, start, end) => {
+        for (const period of ['day', 'month'] as const) {
+            const params = getMeteringRequestParams({ model, timeRange, period, filters: {}, now });
 
-        expect(params).toMatchObject({ start, end, group_by: ['day', 'project'] });
-    });
-
-    test.each([
-        // The running month
-        ['2026-11-18', { type: 'relative', amount: 7, unit: 'day' }, '2026-11-01T00:00:00Z', '2026-12-01T00:00:00Z'],
-        // The seven days cross a month boundary
-        ['2026-12-03', { type: 'relative', amount: 7, unit: 'day' }, '2026-11-01T00:00:00Z', '2027-01-01T00:00:00Z'],
-        [
-            '2026-11-18',
-            { type: 'absolute', startDate: '2026-09-03', endDate: '2026-10-10' },
-            '2026-09-01T00:00:00Z',
-            '2026-11-01T00:00:00Z',
-        ],
-    ] as const)('by month, on %s the time range %j covers whole months', (today, timeRange, start, end) => {
-        const params = getMeteringRequestParams({
-            model,
-            timeRange,
-            period: 'month',
-            filters: {},
-            now: new Date(`${today}T23:30:00Z`),
-        });
-
-        expect(params).toMatchObject({ start, end });
+            expect(params).toMatchObject({ start, end, group_by: [period, 'project'] });
+        }
     });
 });
 
