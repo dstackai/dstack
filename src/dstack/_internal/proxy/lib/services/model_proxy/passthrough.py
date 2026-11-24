@@ -146,6 +146,25 @@ class _Chunk(BaseModel):
     usage: Optional[_Usage] = None
 
 
+class _Choice(BaseModel):
+    index: int = 0
+    finish_reason: Optional[str] = None
+
+
+class _StreamError(BaseModel):
+    message: str
+    code: int
+
+
+class _StreamErrorEvent(BaseModel):
+    """
+    Reports an error to a client that already got `200` and a part of the stream.
+    OpenAI SDKs raise an error on an event with `error`.
+    """
+
+    error: _StreamError
+
+
 class _RequestMeter:
     """
     Meters one request. The counts in `usage` are totals for the request so far,
@@ -204,17 +223,23 @@ async def _stream(
 ) -> AsyncIterator[bytes]:
     """
     Yields the stream as the service sends it, without the `usage` that the client
-    did not ask for in `stream_options`.
+    did not ask for in `stream_options`. If the service's stream breaks or ends before
+    the response is complete, the stream ends with an error event, so that the client
+    can tell it from a complete response.
     """
     keep_last_usage = stream_options.include_usage is True
     keep_all_usage = keep_last_usage and stream_options.continuous_usage_stats is True
     is_event_dropped = False
+    is_done = False
+    # Indexes of the choices by whether the service has sent their `finish_reason`
+    finished_choices: set[int] = set()
+    unfinished_choices: set[int] = set()
     # The last chunk with choices whose `usage` was removed, until the client gets
     # the last `usage` that it asked for
     last_chunk_with_usage: Optional[_Chunk] = None
 
     def process(line: str) -> Optional[str]:
-        nonlocal is_event_dropped, last_chunk_with_usage
+        nonlocal is_event_dropped, last_chunk_with_usage, is_done
         if is_event_dropped and not line:
             # The blank line that ended the dropped event
             is_event_dropped = False
@@ -222,7 +247,10 @@ async def _stream(
         if not line.startswith("data:"):
             return line
         data = line.removeprefix("data:")
-        if data.strip() == "[DONE]" and last_chunk_with_usage is not None:
+        if data.strip() == "[DONE]":
+            is_done = True
+            if last_chunk_with_usage is None:
+                return line
             # Some services, e.g. Dynamo, report the last `usage` in the last chunk
             # with choices and send no chunk only for `usage`. The client still gets one.
             usage_chunk = last_chunk_with_usage.model_copy(update={"choices": []})
@@ -230,6 +258,12 @@ async def _stream(
             return "data: " + usage_chunk.model_dump_json(exclude_unset=True) + "\n\n" + line
         chunk = _parse(_Chunk, data)
         request_meter.update(chunk.usage)
+        for choice in _parse_choices(chunk):
+            if choice.finish_reason is not None:
+                finished_choices.add(choice.index)
+                unfinished_choices.discard(choice.index)
+            elif choice.index not in finished_choices:
+                unfinished_choices.add(choice.index)
         if keep_all_usage or "usage" not in chunk.model_fields_set:
             return line
         if chunk.choices:
@@ -250,13 +284,38 @@ async def _stream(
             processed = [process(line.removesuffix("\r")) for line in lines]
             if data := "".join(line + "\n" for line in processed if line is not None):
                 yield data.encode()
-        if (line := process(rest)) is not None and line:
-            yield line.encode()
+        line = process(rest)
         request_meter.log_if_no_counts()
+        # Not every service ends its stream with `[DONE]`. Without it, the response
+        # is complete if every choice has got its `finish_reason`.
+        if is_done or (finished_choices and not unfinished_choices):
+            if line:
+                yield line.encode()
+        else:
+            # `rest` is then a part of a line, which the client could not parse
+            yield _get_error_event("the service closed the response before it was complete")
     except httpx.RequestError as e:
-        # No standard way to report errors while streaming,
-        # but we'll at least send them as comments
-        yield f": {e!r}\n\n".encode()
+        yield _get_error_event(repr(e))
+
+
+def _get_error_event(detail: str) -> bytes:
+    event = _StreamErrorEvent(
+        error=_StreamError(
+            message=f"Error requesting model: {detail}", code=status.HTTP_502_BAD_GATEWAY
+        )
+    )
+    # The blank line first ends the event that the service may have left unfinished
+    return f"\ndata: {event.model_dump_json()}\n\n".encode()
+
+
+def _parse_choices(chunk: _Chunk) -> list[_Choice]:
+    choices = []
+    for choice in chunk.choices or []:
+        try:
+            choices.append(_Choice.model_validate(choice))
+        except ValidationError:
+            pass
+    return choices
 
 
 def _parse(model: type[ModelT], data: bytes | str) -> ModelT:
