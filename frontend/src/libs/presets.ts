@@ -24,6 +24,13 @@ export const formatTokenCount = (value: number): string => {
     return String(value);
 };
 
+/** As the CLI prints a sweep: one value when they agree, otherwise `min..max`. */
+export const formatTokenRange = (values: number[]): string => {
+    const low = Math.min(...values);
+    const high = Math.max(...values);
+    return low === high ? formatTokenCount(low) : `${formatTokenCount(low)}..${formatTokenCount(high)}`;
+};
+
 const trimZero = (value: string): string => (value.endsWith('.0') ? value.slice(0, -2) : value);
 
 /** As the CLI prints durations: 999.6 reads as 1s rather than 1000ms. */
@@ -45,50 +52,72 @@ const HIDDEN_METRICS = new Set([
 ]);
 
 const METRIC_LABELS: Record<string, string> = {
-    output_tok_per_s: 'TPS',
-    per_user_tok_per_s: 'TPS/user',
+    output_tok_per_s: 'tok/s',
+    per_user_tok_per_s: 'tok/s/user',
     total_input_tokens: 'Input tokens',
     total_output_tokens: 'Output tokens',
     ttft_ms: 'TTFT',
     tpot_ms: 'TPOT',
 };
 
-const TOKEN_COUNT_METRICS = new Set(['total_input_tokens', 'total_output_tokens']);
-
-export type BenchmarkMetric = { label: string; value: string };
-
-const formatMetricValue = (key: string, value: number): string => {
-    if (TOKEN_COUNT_METRICS.has(key)) return formatTokenCount(value);
-    if (key.endsWith('_ms')) return formatDurationMs(value);
-    return round(value);
+/** The tab a metric is shown under. A metric not listed here gets a tab of its own. */
+const METRIC_GROUPS: Record<string, string> = {
+    output_tok_per_s: 'tok/s',
+    per_user_tok_per_s: 'tok/s',
+    ttft_ms: 'TTFT',
+    tpot_ms: 'TPOT',
 };
 
+const TOKEN_COUNT_METRICS = new Set(['total_input_tokens', 'total_output_tokens']);
+
+export type BenchmarkChart = {
+    group: string;
+    title: string;
+    formatValue: (value: number) => string;
+    data: { x: string; y: number }[];
+};
+
+const getMetricFormatter = (key: string): ((value: number) => string) => {
+    if (TOKEN_COUNT_METRICS.has(key)) return formatTokenCount;
+    if (key.endsWith('_ms')) return formatDurationMs;
+    return round;
+};
+
+export const sortResults = (results: IPresetResult[]): IPresetResult[] =>
+    [...results].sort((a, b) => a.concurrency - b.concurrency);
+
 /**
- * The metrics worth showing, flattened: a metric measured as a distribution
- * becomes one entry per statistic.
+ * One chart per metric worth showing, each with a value per concurrency. A
+ * metric measured as a distribution becomes one chart per statistic. A
+ * concurrency without a benchmark has no point.
  */
-export const getBenchmarkMetrics = (metrics: HashMap): BenchmarkMetric[] => {
-    const entries: BenchmarkMetric[] = [];
+export const getBenchmarkCharts = (results: IPresetResult[]): BenchmarkChart[] => {
+    const charts = new Map<string, BenchmarkChart>();
 
-    Object.entries(metrics ?? {}).forEach(([key, value]) => {
-        if (HIDDEN_METRICS.has(key)) return;
-        const label = METRIC_LABELS[key] ?? key;
-
-        if (typeof value === 'number') {
-            entries.push({ label, value: formatMetricValue(key, value) });
-            return;
+    const addPoint = (title: string, key: string, concurrency: number, value: unknown) => {
+        if (typeof value !== 'number') return;
+        if (!charts.has(title)) {
+            const group = METRIC_GROUPS[key] ?? METRIC_LABELS[key] ?? key;
+            charts.set(title, { group, title, formatValue: getMetricFormatter(key), data: [] });
         }
+        charts.get(title)?.data.push({ x: String(concurrency), y: value });
+    };
 
-        if (value && typeof value === 'object') {
-            Object.entries(value as HashMap).forEach(([statistic, statisticValue]) => {
-                if (typeof statisticValue !== 'number') return;
-                entries.push({
-                    label: `${label} ${statistic}`,
-                    value: formatMetricValue(key, statisticValue),
-                });
-            });
-        }
+    sortResults(results).forEach(({ concurrency, benchmark }) => {
+        Object.entries(benchmark?.metrics ?? {}).forEach(([key, value]) => {
+            if (HIDDEN_METRICS.has(key)) return;
+            const label = METRIC_LABELS[key] ?? key;
+
+            if (value && typeof value === 'object') {
+                Object.entries(value as HashMap).forEach(([statistic, statisticValue]) =>
+                    addPoint(`${label} ${statistic}`, key, concurrency, statisticValue),
+                );
+                return;
+            }
+
+            addPoint(label, key, concurrency, value);
+        });
     });
 
-    return entries;
+    return Array.from(charts.values());
 };
