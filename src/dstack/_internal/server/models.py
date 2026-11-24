@@ -470,6 +470,7 @@ class RunModel(PipelineModelMixin, BaseModel):
 
     __table_args__ = (
         Index("ix_submitted_at_id", submitted_at.desc(), id),
+        Index("ix_runs_project_id_submitted_at_id", project_id, submitted_at.desc(), id),
         Index(
             "ix_runs_pipeline_fetch_q",
             last_processed_at.asc(),
