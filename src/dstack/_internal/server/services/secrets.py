@@ -21,6 +21,7 @@ from dstack._internal.server.models import DecryptedString, ProjectModel, Secret
 from dstack._internal.server.services import events
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.projects import get_member, get_member_permissions
+from dstack._internal.utils.common import get_current_datetime
 
 _SECRET_NAME_REGEX = "^[A-Za-z0-9-_]{1,200}$"
 _SECRET_VALUE_MAX_LENGTH = 5000
@@ -229,6 +230,7 @@ async def update_secret(
         secret_model = secret_models[0]
         if secret_model.value.get_plaintext_or_error() != value:
             secret_model.value = DecryptedString(plaintext=value)
+            secret_model.updated_at = get_current_datetime()
             events.emit(
                 session,
                 "Secret updated",
