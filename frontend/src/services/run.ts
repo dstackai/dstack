@@ -133,8 +133,10 @@ export const runApi = createApi({
         }),
 
         getModels: builder.query<IModelExtended[], TModelsRequestParams>({
-            // The runs list can't tell the runs that have a model, so the runs are read page by page:
-            // every active run, or the latest runs
+            // TODO: List models on the server. The runs list can't tell the runs that have a model,
+            // so the browser reads runs page by page and keeps those with a model: every active run,
+            // or the latest `MODELS_LATEST_RUNS_LIMIT` runs. The requests grow with the user's runs, not models,
+            // and a stopped model of an older run is not found. A paged list of models on the server fixes both.
             queryFn: async (params, api, extraOptions, baseQuery) => {
                 const runs: IRun[] = [];
                 let lastRun: IRun | undefined;
