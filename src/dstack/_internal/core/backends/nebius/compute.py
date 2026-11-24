@@ -407,6 +407,21 @@ class NebiusCompute(
         self, provisioning_data, project_ssh_public_key, project_ssh_private_key
     ):
         instance = resources.get_instance(self._sdk, provisioning_data.instance_id)
+        state = instance.status.state
+        if state in [
+            InstanceStatus.InstanceState.STOPPING,
+            InstanceStatus.InstanceState.STOPPED,
+            InstanceStatus.InstanceState.DELETING,
+            InstanceStatus.InstanceState.ERROR,
+        ]:
+            raise ProvisioningError(
+                f"Failed to get instance IP address. Instance state: {state.name}"
+            )
+        # Nebius assigns addresses to an instance that is still starting, and this method
+        # is no longer called once the hostname is set. So the hostname is set only when
+        # the instance is running. Otherwise, a failed start would go unnoticed.
+        if state != InstanceStatus.InstanceState.RUNNING:
+            return
         if not instance.status.network_interfaces:
             return
         interface = instance.status.network_interfaces[0]
