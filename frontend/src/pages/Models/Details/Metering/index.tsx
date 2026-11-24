@@ -15,7 +15,7 @@ import {
     getMeteringRequestParams,
     getMeteringTotal,
     getUserOptionsRequestParams,
-    relativeOptions,
+    RELATIVE_OPTIONS,
     TMeteringPeriod,
 } from './helpers';
 import { useFilteringOptions, useFilters, useTimeRange, useUserFilteringOptions } from './hooks';
@@ -30,7 +30,7 @@ const TOKENS = ['input_tokens', 'cached_input_tokens', 'output_tokens'] as const
 export const ModelMetering: React.FC<{ model: IModelExtended }> = ({ model }) => {
     const { t } = useTranslation();
     const [period, setPeriod] = useState<TMeteringPeriod>(DEFAULT_PERIOD);
-    const { timeRange, onChangeTimeRange, isValidRange } = useTimeRange();
+    const { timeRange, onChangeTimeRange, isValidRange } = useTimeRange(period);
     const { filteringRequestParams, propertyFilterQuery, onChangePropertyFilter, filteringProperties } = useFilters();
 
     const [requestParams, userOptionsRequestParams] = useMemo(() => {
@@ -122,9 +122,13 @@ export const ModelMetering: React.FC<{ model: IModelExtended }> = ({ model }) =>
                     </div>
 
                     <DateRangePicker
+                        // By month, the picker picks months, and its values have another form than by day.
+                        // So each period gets a picker of its own
+                        key={period}
                         value={timeRange}
                         onChange={onChangeTimeRange}
-                        relativeOptions={relativeOptions}
+                        relativeOptions={RELATIVE_OPTIONS[period]}
+                        granularity={period}
                         isValidRange={isValidRange}
                         placeholder={t('events.time_range_placeholder')}
                         dateOnly

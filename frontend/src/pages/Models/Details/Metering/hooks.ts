@@ -7,7 +7,7 @@ import { useLazyGetMeteringQuery } from 'services/metering';
 
 import { useIsValidRange } from 'pages/Events/List/hooks/useTimeRange';
 
-import { DEFAULT_TIME_RANGE, getFilteringOptions, TMeteringFilters } from './helpers';
+import { DEFAULT_TIME_RANGES, getFilteringOptions, TMeteringFilters, TMeteringPeriod } from './helpers';
 
 type RequestParamsKeys = keyof TMeteringFilters;
 
@@ -106,18 +106,23 @@ export const useUserFilteringOptions = (requestParams: TMeteringListRequestParam
     } as const;
 };
 
-export const useTimeRange = () => {
+/**
+ * Each period keeps its own time range: a time range in days has no exact form in months.
+ */
+export const useTimeRange = (period: TMeteringPeriod) => {
     const isValidRange = useIsValidRange();
-    const [timeRange, setTimeRange] = useState<DateRangePickerProps.Value>(DEFAULT_TIME_RANGE);
+    const [timeRanges, setTimeRanges] = useState(DEFAULT_TIME_RANGES);
 
     const onChangeTimeRange: DateRangePickerProps['onChange'] = ({ detail }) => {
-        if (detail.value) {
-            setTimeRange(detail.value);
+        const { value } = detail;
+
+        if (value) {
+            setTimeRanges((timeRanges) => ({ ...timeRanges, [period]: value }));
         }
     };
 
     return {
-        timeRange,
+        timeRange: timeRanges[period],
         onChangeTimeRange,
         isValidRange,
     } as const;
