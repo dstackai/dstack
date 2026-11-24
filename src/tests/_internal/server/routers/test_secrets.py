@@ -1,4 +1,7 @@
+from datetime import datetime, timezone
+
 import pytest
+import time_machine
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -272,17 +275,21 @@ class TestCreateOrUpdateSecret:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        secret = await create_secret(
-            session=session, project=project, name="secret1", value="old_value"
-        )
-        response = await client.post(
-            f"/api/project/{project.name}/secrets/create_or_update",
-            headers=get_auth_headers(user.token),
-            json={"name": "secret1", "value": "new_value"},
-        )
+        with time_machine.travel(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc), tick=False):
+            secret = await create_secret(
+                session=session, project=project, name="secret1", value="old_value"
+            )
+        with time_machine.travel(datetime(2023, 1, 3, 3, 4, tzinfo=timezone.utc), tick=False):
+            response = await client.post(
+                f"/api/project/{project.name}/secrets/create_or_update",
+                headers=get_auth_headers(user.token),
+                json={"name": "secret1", "value": "new_value"},
+            )
         assert response.status_code == 200
         await session.refresh(secret)
         assert secret.value.get_plaintext_or_error() == "new_value"
+        assert secret.created_at == datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        assert secret.updated_at == datetime(2023, 1, 3, 3, 4, tzinfo=timezone.utc)
         events = await list_events(session)
         assert len(events) == 1
         assert events[0].message == "Secret updated"
@@ -297,15 +304,21 @@ class TestCreateOrUpdateSecret:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        await create_secret(session=session, project=project, name="secret1", value="value")
-        response = await client.post(
-            f"/api/project/{project.name}/secrets/create_or_update",
-            headers=get_auth_headers(user.token),
-            json={"name": "secret1", "value": "value"},
-        )
+        with time_machine.travel(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc), tick=False):
+            secret = await create_secret(
+                session=session, project=project, name="secret1", value="value"
+            )
+        with time_machine.travel(datetime(2023, 1, 3, 3, 4, tzinfo=timezone.utc), tick=False):
+            response = await client.post(
+                f"/api/project/{project.name}/secrets/create_or_update",
+                headers=get_auth_headers(user.token),
+                json={"name": "secret1", "value": "value"},
+            )
         assert response.status_code == 200
         events = await list_events(session)
         assert len(events) == 0
+        await session.refresh(secret)
+        assert secret.updated_at == datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
