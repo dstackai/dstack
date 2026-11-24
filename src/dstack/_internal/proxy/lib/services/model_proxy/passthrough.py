@@ -76,7 +76,10 @@ async def forward_chat_completions(
         )
     except httpx.RequestError as e:
         raise ProxyError(f"Error requesting model: {e!r}", status.HTTP_502_BAD_GATEWAY)
-    if body.stream and upstream_response.status_code == status.HTTP_200_OK:
+    # A service that ignores `stream` responds with JSON, which is not a stream
+    content_type = upstream_response.headers.get("content-type", "")
+    is_stream = body.stream and not content_type.startswith("application/json")
+    if is_stream and upstream_response.status_code == status.HTTP_200_OK:
         return _UpstreamStreamingResponse(
             _stream(upstream_response, stream_options, request_meter),
             upstream_response=upstream_response,
@@ -266,7 +269,9 @@ async def _stream(
                 unfinished_choices.add(choice.index)
         if keep_all_usage or "usage" not in chunk.model_fields_set:
             return line
-        if chunk.choices:
+        # A chunk with no choices and `usage: null` does not report `usage`,
+        # e.g. SGLang sends its `sglext` in such a chunk
+        if chunk.choices or chunk.usage is None:
             if keep_last_usage and chunk.usage is not None:
                 last_chunk_with_usage = chunk
             return "data: " + chunk.model_dump_json(exclude={"usage"}, exclude_unset=True)
@@ -277,6 +282,11 @@ async def _stream(
         is_event_dropped = True
         return None
 
+    def is_complete() -> bool:
+        # Not every service ends its stream with `[DONE]`. Without it, the response
+        # is complete if every choice has got its `finish_reason`.
+        return is_done or (bool(finished_choices) and not unfinished_choices)
+
     rest = ""
     try:
         async for text in upstream_response.aiter_text():
@@ -286,16 +296,26 @@ async def _stream(
                 yield data.encode()
         line = process(rest)
         request_meter.log_if_no_counts()
-        # Not every service ends its stream with `[DONE]`. Without it, the response
-        # is complete if every choice has got its `finish_reason`.
-        if is_done or (finished_choices and not unfinished_choices):
+        if is_complete():
             if line:
                 yield line.encode()
         else:
-            # `rest` is then a part of a line, which the client could not parse
-            yield _get_error_event("the service closed the response before it was complete")
+            # `rest` is not sent: it is a line that the service did not finish
+            yield _get_error_event("the response ended before it was complete")
     except httpx.RequestError as e:
-        yield _get_error_event(repr(e))
+        if not is_complete():
+            yield _get_error_event(repr(e))
+
+
+def _parse_choices(chunk: _Chunk) -> list[_Choice]:
+    """Returns the choices of `chunk` that are what dstack-proxy expects from the service."""
+    choices = []
+    for choice in chunk.choices or []:
+        try:
+            choices.append(_Choice.model_validate(choice))
+        except ValidationError:
+            pass
+    return choices
 
 
 def _get_error_event(detail: str) -> bytes:
@@ -306,16 +326,6 @@ def _get_error_event(detail: str) -> bytes:
     )
     # The blank line first ends the event that the service may have left unfinished
     return f"\ndata: {event.model_dump_json()}\n\n".encode()
-
-
-def _parse_choices(chunk: _Chunk) -> list[_Choice]:
-    choices = []
-    for choice in chunk.choices or []:
-        try:
-            choices.append(_Choice.model_validate(choice))
-        except ValidationError:
-            pass
-    return choices
 
 
 def _parse(model: type[ModelT], data: bytes | str) -> ModelT:

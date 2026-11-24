@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from datetime import datetime
 from typing import Any, AsyncIterator, Callable, Generator, Optional
 from unittest.mock import patch
@@ -349,11 +350,15 @@ def parse_sse(content: bytes) -> list[Any]:
     return [json.loads(event.removeprefix("data: ")) for event in events[:-1]]
 
 
-def chunk(content: str, usage: Optional[dict] = None) -> dict:
-    result = {"id": "1", "choices": [{"index": 0, "delta": {"content": content}}]}
+def chunk(content: str, usage: Optional[dict] = None, index: int = 0) -> dict:
+    result = {"id": "1", "choices": [{"index": index, "delta": {"content": content}}]}
     if usage is not None:
         result["usage"] = usage
     return result
+
+
+def finish_chunk(index: int = 0) -> dict:
+    return {"id": "1", "choices": [{"index": index, "delta": {}, "finish_reason": "stop"}]}
 
 
 def usage(prompt_tokens: int, completion_tokens: int, cached_tokens: int = 0) -> dict:
@@ -434,6 +439,24 @@ class TestChatCompletionsPassthrough:
         assert resp.content == error
         assert resp.headers["Retry-After"] == "7"
         assert meter.added == []
+
+    async def test_json_response_to_stream_request_is_not_a_stream(self, mock_service) -> None:
+        # A service that ignores `stream`
+        response_body = json.dumps({"id": "1", "choices": [], "usage": usage(9, 2)}).encode()
+        mock_service(
+            lambda request: httpx.Response(
+                200, content=response_body, headers={"content-type": "application/json"}
+            )
+        )
+        auth = ProxyTestAuthProvider({"test-proj": {"token"}})
+        meter = ProxyTestMeter()
+        client = make_http_client(await make_repo(), auth, meter)
+        request_body = {"model": "test-model", "messages": [], "stream": True}
+        resp = await client.post(CHAT_COMPLETIONS_URL, json=request_body, headers=AUTH_HEADERS)
+
+        assert resp.status_code == 200
+        assert resp.content == response_body
+        assert [(m.input_tokens, m.output_tokens) for m in meter.added] == [(9, 2)]
 
     async def test_does_not_meter_token_counts_that_are_not_real(self, mock_service) -> None:
         response_body = b'{"choices": [], "usage": {"prompt_tokens": 9223372036854775808}}'
@@ -530,52 +553,17 @@ class TestChatCompletionsPassthrough:
         assert [c.get("usage") for c in chunks] == [None, None, usage(9, 2, 4)]
         assert chunks[2]["choices"] == []
 
-    @pytest.mark.parametrize(
-        ("error", "expected_message"),
-        [
-            pytest.param(
-                None,
-                "Error requesting model: the service closed the response before it was complete",
-                id="service-closes-stream",
-            ),
-            pytest.param(
-                httpx.ReadError("broken"),
-                "Error requesting model: ReadError('broken')",
-                id="read-error",
-            ),
-        ],
-    )
-    async def test_stream_ends_with_error_if_response_is_not_complete(
-        self, mock_service, error: Optional[Exception], expected_message: str
-    ) -> None:
-        async def stream() -> AsyncIterator[bytes]:
-            # The second event is cut in the middle
-            yield sse(chunk("Hello", usage(9, 1)), done=False) + b'data: {"id":"1","cho'
-            if error is not None:
-                raise error
-
-        mock_service(lambda request: httpx.Response(200, content=stream()))
-        auth = ProxyTestAuthProvider({"test-proj": {"token"}})
-        meter = ProxyTestMeter()
-        client = make_http_client(await make_repo(), auth, meter)
-        request_body = {"model": "test-model", "messages": [], "stream": True}
-        resp = await client.post(CHAT_COMPLETIONS_URL, json=request_body, headers=AUTH_HEADERS)
-
-        assert resp.status_code == 200
-        events = [event for event in resp.content.decode().split("\n\n") if event.strip()]
-        assert [json.loads(event.strip().removeprefix("data: ")) for event in events] == [
-            chunk("Hello"),
-            {"error": {"message": expected_message, "code": 502}},
-        ]
-        assert [(m.input_tokens, m.output_tokens) for m in meter.added] == [(9, 1)]
-
-    async def test_stream_without_done_is_complete_if_choices_are_finished(
-        self, mock_service
-    ) -> None:
-        last_chunk = {"id": "1", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}
+    async def test_stream_has_chunk_without_choices_and_usage(self, mock_service) -> None:
+        # SGLang sends its `sglext` in such a chunk
+        sglext = {"cached_tokens_details": {"device": 4}}
         mock_service(
             lambda request: httpx.Response(
-                200, content=sse(chunk("Hello"), last_chunk, done=False)
+                200,
+                content=sse(
+                    chunk("Hello", usage(9, 1)),
+                    {"id": "1", "choices": [], "usage": None, "sglext": sglext},
+                    {"id": "1", "choices": [], "usage": usage(9, 1)},
+                ),
             )
         )
         auth = ProxyTestAuthProvider({"test-proj": {"token"}})
@@ -584,7 +572,102 @@ class TestChatCompletionsPassthrough:
         resp = await client.post(CHAT_COMPLETIONS_URL, json=request_body, headers=AUTH_HEADERS)
 
         assert resp.status_code == 200
-        assert resp.content == sse(chunk("Hello"), last_chunk, done=False)
+        assert parse_sse(resp.content) == [
+            chunk("Hello"),
+            {"id": "1", "choices": [], "sglext": sglext},
+        ]
+
+    @pytest.mark.parametrize(
+        ("rest", "error", "expected_rest_chunks", "expected_message"),
+        [
+            pytest.param(
+                b'data: {"id":"1","cho',
+                None,
+                [],
+                "Error requesting model: the response ended before it was complete",
+                id="ends-within-line",
+            ),
+            pytest.param(
+                sse(chunk(" there"), done=False).removesuffix(b"\n"),
+                None,
+                [chunk(" there")],
+                "Error requesting model: the response ended before it was complete",
+                id="ends-within-event",
+            ),
+            pytest.param(
+                sse(chunk("Hi", index=1), finish_chunk(index=0), done=False),
+                None,
+                [chunk("Hi", index=1), finish_chunk(index=0)],
+                "Error requesting model: the response ended before it was complete",
+                id="ends-before-every-choice-is-finished",
+            ),
+            pytest.param(
+                b"",
+                httpx.ReadError("broken"),
+                [],
+                "Error requesting model: ReadError('broken')",
+                id="read-error",
+            ),
+        ],
+    )
+    async def test_stream_ends_with_error_if_response_is_not_complete(
+        self,
+        mock_service,
+        rest: bytes,
+        error: Optional[Exception],
+        expected_rest_chunks: list[dict],
+        expected_message: str,
+    ) -> None:
+        async def stream() -> AsyncIterator[bytes]:
+            yield sse(chunk("Hello", usage(9, 1)), done=False) + rest
+            if error is not None:
+                raise error
+
+        mock_service(lambda request: httpx.Response(200, content=stream()))
+        auth = ProxyTestAuthProvider({"test-proj": {"token"}})
+        meter = ProxyTestMeter()
+        repo = await make_repo()
+        client = make_http_client(repo, auth, meter)
+        request_body = {"model": "test-model", "messages": [], "stream": True}
+        resp = await client.post(CHAT_COMPLETIONS_URL, json=request_body, headers=AUTH_HEADERS)
+
+        assert resp.status_code == 200
+        events = [event for event in resp.content.decode().split("\n\n") if event.strip()]
+        assert [json.loads(event.strip().removeprefix("data: ")) for event in events] == [
+            chunk("Hello"),
+            *expected_rest_chunks,
+            {"error": {"message": expected_message, "code": 502}},
+        ]
+        assert [(m.input_tokens, m.output_tokens) for m in meter.added] == [(9, 1)]
+        # OpenAI SDKs raise an error on the last event
+        completion = await make_openai_client(repo, auth, "test-proj").chat.completions.create(
+            model="test-model", messages=[], stream=True
+        )
+        with pytest.raises(openai.APIError, match=re.escape(expected_message)):
+            async for _ in completion:
+                pass
+
+    @pytest.mark.parametrize(
+        "error", [None, httpx.ReadError("broken")], ids=["service-closes-stream", "read-error"]
+    )
+    async def test_stream_without_done_is_complete_if_choices_are_finished(
+        self, mock_service, error: Optional[Exception]
+    ) -> None:
+        content = sse(chunk("Hello"), finish_chunk(), done=False)
+
+        async def stream() -> AsyncIterator[bytes]:
+            yield content
+            if error is not None:
+                raise error
+
+        mock_service(lambda request: httpx.Response(200, content=stream()))
+        auth = ProxyTestAuthProvider({"test-proj": {"token"}})
+        client = make_http_client(await make_repo(), auth, ProxyTestMeter())
+        request_body = {"model": "test-model", "messages": [], "stream": True}
+        resp = await client.post(CHAT_COMPLETIONS_URL, json=request_body, headers=AUTH_HEADERS)
+
+        assert resp.status_code == 200
+        assert resp.content == content
 
     async def test_meters_stopped_stream_up_to_its_last_chunk(self, mock_service) -> None:
         is_stream_closed = asyncio.Event()
