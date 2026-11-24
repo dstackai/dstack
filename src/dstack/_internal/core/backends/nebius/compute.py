@@ -408,15 +408,16 @@ class NebiusCompute(
     ):
         instance = resources.get_instance(self._sdk, provisioning_data.instance_id)
         state = instance.status.state
-        if state in [
-            InstanceStatus.InstanceState.STOPPING,
-            InstanceStatus.InstanceState.STOPPED,
+        # A new instance is `STOPPED` before it starts, with `reconciling` set. `STOPPED`
+        # is final once Nebius has no operation left to run on the instance.
+        is_stopped = (
+            state == InstanceStatus.InstanceState.STOPPED and not instance.status.reconciling
+        )
+        if is_stopped or state in [
             InstanceStatus.InstanceState.DELETING,
             InstanceStatus.InstanceState.ERROR,
         ]:
-            raise ProvisioningError(
-                f"Failed to get instance IP address. Instance state: {state.name}"
-            )
+            raise ProvisioningError(f"Instance failed to start. Instance state: {state.name}")
         # Nebius assigns addresses to an instance that is still starting, and this method
         # is no longer called once the hostname is set. So the hostname is set only when
         # the instance is running. Otherwise, a failed start would go unnoticed.

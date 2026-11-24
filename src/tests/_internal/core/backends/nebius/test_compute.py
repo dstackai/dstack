@@ -760,8 +760,9 @@ class TestUpdateProvisioningData:
 
     @pytest.fixture
     def mock_instance(self, mocker):
-        def mock(state: InstanceStatus.InstanceState) -> None:
+        def mock(state: InstanceStatus.InstanceState, reconciling: bool = False) -> None:
             instance = make_instance(state=state)
+            instance.status.reconciling = reconciling
             instance.status.network_interfaces = [
                 NetworkInterfaceStatus(
                     ip_address=IPAddressStatus(address="10.0.0.5/32"),
@@ -773,14 +774,18 @@ class TestUpdateProvisioningData:
         return mock
 
     @pytest.mark.parametrize(
-        ("state", "expected_hostname"),
+        ("state", "reconciling", "expected_hostname"),
         [
-            (InstanceStatus.InstanceState.STARTING, None),
-            (InstanceStatus.InstanceState.RUNNING, "203.0.113.5"),
+            # A new instance is stopped before it starts
+            (InstanceStatus.InstanceState.STOPPED, True, None),
+            (InstanceStatus.InstanceState.STARTING, True, None),
+            (InstanceStatus.InstanceState.RUNNING, False, "203.0.113.5"),
         ],
     )
-    def test_sets_hostname_only_when_running(self, mock_instance, state, expected_hostname):
-        mock_instance(state)
+    def test_sets_hostname_only_when_running(
+        self, mock_instance, state, reconciling, expected_hostname
+    ):
+        mock_instance(state, reconciling)
         provisioning_data = make_provisioning_data()
 
         make_compute().update_provisioning_data(provisioning_data, "public-key", "private-key")
@@ -790,7 +795,6 @@ class TestUpdateProvisioningData:
     @pytest.mark.parametrize(
         "state",
         [
-            InstanceStatus.InstanceState.STOPPING,
             InstanceStatus.InstanceState.STOPPED,
             InstanceStatus.InstanceState.DELETING,
             InstanceStatus.InstanceState.ERROR,
