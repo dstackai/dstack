@@ -61,7 +61,8 @@ class VastAIProfileOptions(BackendProfileOptions["VastAIProfileOptions"]):
             description=(
                 "The minimum download speed of the host in Mbit/s, as measured by Vast.ai."
                 " Useful when the workload downloads large files, such as model weights, on start."
-                f" Defaults to `{VASTAI_DEFAULT_MIN_INET_DOWN}`"
+                " If not set, only hosts with download speeds"
+                f" above `{VASTAI_DEFAULT_MIN_INET_DOWN}` are considered"
             ),
             ge=0,
         ),

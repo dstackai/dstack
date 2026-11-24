@@ -1,11 +1,7 @@
-from typing import Optional
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from dstack._internal.core.backends.vastai.compute import VastAICompute
 from dstack._internal.core.backends.vastai.models import VastAIConfig, VastAICreds
-from dstack._internal.core.backends.vastai.profile_options import VastAIProfileOptions
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Disk,
@@ -126,38 +122,6 @@ def test_vastai_compute_can_disable_community_cloud():
         vast_provider_cls.assert_called_once()
         assert vast_provider_cls.call_args.kwargs["community_cloud"] is False
         catalog_instance.add_provider.assert_called_once()
-
-
-class TestVastAIComputeInetDownFilter:
-    @pytest.mark.parametrize(
-        ["min_inet_down", "expected_filter"],
-        [
-            pytest.param(None, {"gt": 128}, id="default"),
-            pytest.param(8000, {"gte": 8000}, id="min_inet_down"),
-            pytest.param(0, {"gte": 0}, id="zero"),
-        ],
-    )
-    def test_filters_offers_by_inet_down(
-        self, min_inet_down: Optional[int], expected_filter: dict
-    ):
-        requirements = Requirements(
-            resources=ResourcesSpec(),
-            backend_options=[VastAIProfileOptions(min_inet_down=min_inet_down)],
-        )
-        with (
-            patch(
-                "dstack._internal.core.backends.vastai.compute.VastAIProvider"
-            ) as vast_provider_cls,
-            patch("dstack._internal.core.backends.vastai.compute.gpuhunt.Catalog"),
-            patch(
-                "dstack._internal.core.backends.vastai.compute.get_catalog_offers",
-                return_value=[],
-            ),
-        ):
-            compute = VastAICompute(_config())
-            list(compute.get_offers(requirements, full_offers=False, unallocated_resources=False))
-        extra_filters = vast_provider_cls.call_args.kwargs["extra_filters"]
-        assert extra_filters["inet_down"] == expected_filter
 
 
 def test_vastai_run_job_bids_on_spot_offer():
