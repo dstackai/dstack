@@ -9,6 +9,8 @@ logger = get_logger(__name__)
 async def preload_offers_catalog():
     """Pre-load the `gpuhunt` offers catalog so the get offer requests do not pay the catalog download cost."""
     logger.debug("Pre-loading offers catalog")
-    catalog = gpuhunt.default_catalog()
+    # The first `default_catalog()` call downloads and parses the catalog, so it must not run
+    # on the event loop. Later calls return the cached catalog, which `load()` refreshes.
+    catalog = await run_async(gpuhunt.default_catalog)
     await run_async(catalog.load)
     logger.debug("Pre-loaded offers catalog")
