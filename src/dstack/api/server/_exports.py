@@ -42,6 +42,7 @@ class ExportsAPIClient(APIClientGroup):
         importer_projects: List[str] = [],
         exported_fleets: List[str] = [],
         exported_gateways: List[str] = [],
+        exported_models: List[str] = [],
     ) -> Export:
         body = CreateExportRequest(
             name=name,
@@ -49,6 +50,7 @@ class ExportsAPIClient(APIClientGroup):
             importer_projects=importer_projects,
             exported_fleets=exported_fleets,
             exported_gateways=exported_gateways,
+            exported_models=exported_models,
         )
         resp = self._request(
             f"/api/project/{project_name}/exports/create",
@@ -69,6 +71,8 @@ class ExportsAPIClient(APIClientGroup):
         remove_exported_fleets: List[str] = [],
         add_exported_gateways: List[str] = [],
         remove_exported_gateways: List[str] = [],
+        add_exported_models: List[str] = [],
+        remove_exported_models: List[str] = [],
     ) -> Export:
         body = UpdateExportRequest(
             name=name,
@@ -80,6 +84,8 @@ class ExportsAPIClient(APIClientGroup):
             remove_exported_fleets=remove_exported_fleets,
             add_exported_gateways=add_exported_gateways,
             remove_exported_gateways=remove_exported_gateways,
+            add_exported_models=add_exported_models,
+            remove_exported_models=remove_exported_models,
         )
         resp = self._request(
             f"/api/project/{project_name}/exports/update",

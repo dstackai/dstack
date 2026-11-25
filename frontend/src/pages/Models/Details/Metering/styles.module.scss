@@ -1,0 +1,22 @@
+.selectFilters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+
+    .propertyFilter {
+        max-width: 640px;
+        flex-grow: 1;
+        min-width: 0;
+    }
+}
+
+// The text of a table's column header. Cloudscape keeps this colour among its internal tokens,
+// so its two values are repeated here
+.total {
+    font-weight: 700;
+    color: #424650;
+
+    :global(.awsui-dark-mode) & {
+        color: #b4b4bb;
+    }
+}

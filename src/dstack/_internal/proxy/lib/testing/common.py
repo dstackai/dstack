@@ -3,21 +3,32 @@ from typing import AsyncGenerator, Optional
 
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
 from dstack._internal.proxy.lib.deps import ProxyDependencyInjector
+from dstack._internal.proxy.lib.metering import BaseProxyMeter
 from dstack._internal.proxy.lib.models import Project, Replica, Service
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
+from dstack._internal.proxy.lib.testing.metering import ProxyTestMeter
 
 
 class ProxyTestDependencyInjector(ProxyDependencyInjector):
-    def __init__(self, repo: BaseProxyRepo, auth: BaseProxyAuthProvider) -> None:
+    def __init__(
+        self,
+        repo: BaseProxyRepo,
+        auth: BaseProxyAuthProvider,
+        meter: Optional[BaseProxyMeter] = None,
+    ) -> None:
         super().__init__()
         self._repo = repo
         self._auth = auth
+        self._meter = meter or ProxyTestMeter()
 
     async def get_repo(self) -> AsyncGenerator[BaseProxyRepo, None]:
         yield self._repo
 
     async def get_auth_provider(self) -> AsyncGenerator[BaseProxyAuthProvider, None]:
         yield self._auth
+
+    def get_meter(self) -> BaseProxyMeter:
+        return self._meter
 
 
 def make_project(name: str) -> Project:

@@ -1,25 +1,36 @@
 from typing import Annotated, AsyncIterator, Optional
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
 
-from dstack._internal.proxy.lib.deps import ProxyAuth, get_proxy_repo, get_service_connection_pool
+from dstack._internal.proxy.lib.auth import ProxyCaller
+from dstack._internal.proxy.lib.deps import (
+    get_proxy_caller,
+    get_proxy_meter,
+    get_proxy_repo,
+    get_service_connection_pool,
+)
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
+from dstack._internal.proxy.lib.metering import BaseProxyMeter
+from dstack._internal.proxy.lib.models import OpenAIChatModelFormat
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
 from dstack._internal.proxy.lib.schemas.model_proxy import (
     ChatCompletionsChunk,
+    ChatCompletionsPassthroughRequest,
     ChatCompletionsRequest,
-    ChatCompletionsResponse,
     Model,
     ModelsResponse,
 )
 from dstack._internal.proxy.lib.services.model_proxy.model_proxy import get_chat_client
+from dstack._internal.proxy.lib.services.model_proxy.passthrough import forward_chat_completions
 from dstack._internal.proxy.lib.services.service_connection import (
     ServiceConnectionPool,
     get_service_replica_client,
 )
 
-router = APIRouter(dependencies=[Depends(ProxyAuth(auto_enforce=True))])
+router = APIRouter(dependencies=[Depends(get_proxy_caller)])
 
 
 @router.get("/{project_name}/models")
@@ -34,31 +45,51 @@ async def get_models(
     return ModelsResponse(data=data)
 
 
-@router.post("/{project_name}/chat/completions", response_model=ChatCompletionsResponse)
+@router.post("/{project_name}/chat/completions")
 async def post_chat_completions(
     project_name: str,
-    body: ChatCompletionsRequest,
+    body: ChatCompletionsPassthroughRequest,
+    request: Request,
+    caller: Annotated[ProxyCaller, Depends(get_proxy_caller)],
     repo: Annotated[BaseProxyRepo, Depends(get_proxy_repo)],
     service_conn_pool: Annotated[ServiceConnectionPool, Depends(get_service_connection_pool)],
+    meter: Annotated[BaseProxyMeter, Depends(get_proxy_meter)],
 ):
     model = await repo.get_model(project_name, body.model)
     if model is None:
         raise ProxyError(
             f"Model {body.model} not found in project {project_name}", status.HTTP_404_NOT_FOUND
         )
-    service = await repo.get_service(project_name, model.run_name)
+    service = await repo.get_service(model.project_name, model.run_name)
     if service is None or not service.replicas:
         raise UnexpectedProxyError(
             f"Model {model.name} in project {project_name} references run {model.run_name}"
             " that does not exist or has no replicas"
         )
+    if isinstance(model.format_spec, OpenAIChatModelFormat):
+        return await forward_chat_completions(
+            request=request,
+            body=body,
+            prefix=model.format_spec.prefix,
+            service=service,
+            export_id=model.export_id,
+            caller=caller,
+            repo=repo,
+            service_conn_pool=service_conn_pool,
+            meter=meter,
+        )
+    # Models with other formats are converted to and from typed schemas and are not metered.
+    try:
+        typed_body = ChatCompletionsRequest.model_validate(body.model_dump(exclude_unset=True))
+    except ValidationError as e:
+        raise RequestValidationError(e.errors())
     http_client = await get_service_replica_client(service, repo, service_conn_pool)
     client = get_chat_client(model, http_client)
-    if not body.stream:
-        return await client.generate(body)
+    if not typed_body.stream:
+        return await client.generate(typed_body)
     else:
         return StreamingResponse(
-            await StreamingAdaptor(client.stream(body)).get_stream(),
+            await StreamingAdaptor(client.stream(typed_body)).get_stream(),
             media_type="text/event-stream",
             headers={"X-Accel-Buffering": "no"},
         )

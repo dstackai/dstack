@@ -126,6 +126,10 @@ export const API = {
         GPUS_LIST: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/gpus/list`,
         // GPUS
         TEMPLATES_LIST: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/templates/list`,
+        // IMPORTS
+        IMPORTS_LIST: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/imports/list`,
+        // EXPORTS
+        EXPORTS_LIST: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/exports/list`,
     },
 
     BACKENDS: {
@@ -194,6 +198,11 @@ export const API = {
     PRESET: {
         BASE: () => `${API.BASE()}/presets`,
         LIST: () => `${API.PRESET.BASE()}/list`,
+    },
+
+    METERING: {
+        BASE: () => `${API.BASE()}/metering`,
+        LIST: () => `${API.METERING.BASE()}/list`,
     },
 
     USER_PUBLIC_KEYS: {

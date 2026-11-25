@@ -3,6 +3,7 @@ from typing import Annotated, AsyncGenerator
 from fastapi import Depends, FastAPI, Request
 
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.services.metering import GatewayProxyMeter
 from dstack._internal.proxy.gateway.services.nginx import Nginx
 from dstack._internal.proxy.gateway.services.stats import StatsCollector
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
@@ -22,12 +23,14 @@ class GatewayDependencyInjector(ProxyDependencyInjector):
         auth: BaseProxyAuthProvider,
         nginx: Nginx,
         stats_collector: StatsCollector,
+        meter: GatewayProxyMeter,
     ) -> None:
         super().__init__()
         self._repo = repo
         self._auth = auth
         self._nginx = nginx
         self._stats_collector = stats_collector
+        self._meter = meter
 
     async def get_repo(self) -> AsyncGenerator[BaseProxyRepo, None]:
         yield self._repo
@@ -40,6 +43,9 @@ class GatewayDependencyInjector(ProxyDependencyInjector):
 
     def get_stats_collector(self) -> StatsCollector:
         return self._stats_collector
+
+    def get_meter(self) -> GatewayProxyMeter:
+        return self._meter
 
 
 def get_gateway_injector_from_app(app: FastAPI) -> GatewayDependencyInjector:
@@ -71,3 +77,9 @@ async def get_stats_collector(
     injector: Annotated[GatewayDependencyInjector, Depends(get_gateway_injector)],
 ) -> StatsCollector:
     return injector.get_stats_collector()
+
+
+async def get_gateway_proxy_meter(
+    injector: Annotated[GatewayDependencyInjector, Depends(get_gateway_injector)],
+) -> GatewayProxyMeter:
+    return injector.get_meter()

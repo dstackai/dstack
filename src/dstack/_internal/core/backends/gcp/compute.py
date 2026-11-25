@@ -72,7 +72,6 @@ from dstack._internal.core.models.backends.orphans import (
 )
 from dstack._internal.core.models.common import (
     CoreModel,
-    validate_extra_ignore,
     validate_json_extra_ignore,
 )
 from dstack._internal.core.models.gateways import (
@@ -112,10 +111,6 @@ RESERVATION_PATTERN = re.compile(
 RESOURCE_NAME_PATTERN = re.compile(r"[a-z0-9-]+")
 TPU_VERSIONS = [tpu.name for tpu in KNOWN_TPUS]
 DEFAULT_GATEWAY_INSTANCE_TYPE = "e2-medium"
-
-
-class GCPOfferBackendData(CoreModel):
-    is_dws_calendar_mode: bool = False
 
 
 class GCPVolumeDiskBackendData(CoreModel):
@@ -276,11 +271,11 @@ class GCPCompute(
 
             def reserved_offers_filter(offer: InstanceOfferWithAvailability) -> bool:
                 """Remove reserved-only offers"""
-                if validate_extra_ignore(
-                    GCPOfferBackendData, offer.backend_data
-                ).is_dws_calendar_mode:
-                    return False
-                return True
+                # The filter runs for every offer that matches the requirements, often tens
+                # of thousands per query, so it reads the flag from `backend_data` (gpuhunt's
+                # `provider_data`) directly. Validating `backend_data` into a model is ~20x
+                # slower per offer.
+                return not offer.backend_data.get("is_dws_calendar_mode", False)
 
             return reserved_offers_filter
 

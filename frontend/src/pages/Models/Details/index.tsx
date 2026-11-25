@@ -1,77 +1,68 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
-import reactStringReplace from 'react-string-replace';
-import OpenAI from 'openai';
+import { Navigate, useParams, useSearchParams } from 'react-router-dom';
+import { product } from 'product';
 
 import {
-    Avatar,
+    Alert,
     Box,
     Button,
-    ChatBubble,
     Code,
-    ColumnLayout,
     Container,
     ContentLayout,
     DetailsHeader,
-    FormTextarea,
-    Header,
-    ListEmptyMessage,
     Loader,
     Modal,
-    NavigateLink,
+    SelectCSD,
     SpaceBetween,
     Tabs,
     TokenVisibilityButton,
 } from 'components';
 
-import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
-import { copyToClipboard, riseRouterException, TOKEN_MASK } from 'libs';
-import { getExtendedModelFromRun } from 'libs/run';
+import { useAppSelector, useBreadcrumbs } from 'hooks';
+import { copyToClipboard, getServerError, riseRouterException, TOKEN_MASK } from 'libs';
 import { ROUTES } from 'routes';
-import { useGetRunQuery } from 'services/run';
 
 import { selectAuthToken } from 'App/slice';
-import { runIsStopped } from 'pages/Runs/utils';
 
-import { getModelGateway } from '../helpers';
-import { getCurlModelCode, getPythonModelCode } from './helpers';
+import { ModelExports } from './Exports';
+import { getCurlModelCode, getModelUrl, getPythonModelCode } from './helpers';
+import { useModel } from './hooks';
+import { ModelMetering } from './Metering';
+import { ModelDetails } from './ModelDetails';
 
-import { IModelExtended } from '../List/types';
-import { FormValues, Message, Role } from './types';
+import styles from './styles.module.scss';
 
-import css from './styles.module.scss';
-
-const MESSAGE_ROLE_MAP: Record<Role, string> = {
-    tool: 'Tool',
-    system: 'System',
-    user: 'User',
-    assistant: 'Assistant',
-};
+enum ModelTab {
+    Details = 'details',
+    Exports = 'exports',
+    Metering = 'metering',
+}
 
 enum CodeTab {
     Python = 'python',
     Curl = 'curl',
 }
 
-export const ModelDetails: React.FC = () => {
+export const ModelDetailsPage: React.FC = () => {
     const { t } = useTranslation();
     const token = useAppSelector(selectAuthToken);
-    const [messages, setMessages] = useState<Message[]>([]);
     const [viewCodeVisible, setViewCodeVisible] = useState<boolean>(false);
     const [codeTab, setCodeTab] = useState<CodeTab>(CodeTab.Python);
     const [isTokenVisible, setIsTokenVisible] = useState<boolean>(false);
-    const [loading, setLoading] = useState<boolean>(false);
+    const [codeProjectName, setCodeProjectName] = useState<IProject['project_name']>();
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
-    const paramRunName = params.runName ?? '';
-    const openai = useRef<OpenAI>();
-    const textAreaRef = useRef<HTMLDivElement>(null);
-    const chatList = useRef<HTMLElement>();
-    const [pushNotification] = useNotifications();
+    const paramModelName = params['*'] ?? '';
+    const [searchParams] = useSearchParams();
+    const isMeteringTab = searchParams.get('tab') === ROUTES.MODELS.DETAILS.METERING.TAB;
+    // Exports exist only where the server enables them
+    const isExportsTab = product.hasExports && searchParams.get('tab') === ROUTES.MODELS.DETAILS.EXPORTS.TAB;
 
-    const messageForShowing = useMemo<Message[]>(() => messages.filter((m) => m.role !== 'system'), [messages]);
+    const { model, isLoading, error, isNotFound, hasMetering, projects, projectsImports } = useModel(
+        paramProjectName,
+        paramModelName,
+    );
 
     useBreadcrumbs([
         {
@@ -87,392 +78,166 @@ export const ModelDetails: React.FC = () => {
             href: ROUTES.MODELS.LIST,
         },
         {
-            text: paramRunName,
-            href: ROUTES.MODELS.DETAILS.FORMAT(paramProjectName, paramRunName),
+            text: paramModelName,
+            href: ROUTES.MODELS.DETAILS.FORMAT(paramProjectName, paramModelName),
         },
     ]);
+
+    useEffect(() => {
+        if (isNotFound) {
+            riseRouterException();
+        }
+    }, [isNotFound]);
 
     const closeViewCode = () => {
         setViewCodeVisible(false);
         setIsTokenVisible(false);
     };
 
-    const scrollChatToBottom = () => {
-        if (!chatList.current) return;
-
-        const { clientHeight, scrollHeight } = chatList.current;
-        chatList.current.scrollTo(0, scrollHeight - clientHeight);
-    };
-
-    const { data: runData, isLoading: isLoadingRun } = useGetRunQuery({
-        project_name: paramProjectName,
-        run_name: paramRunName,
-    });
-
-    useEffect(() => {
-        if (runData && runIsStopped(runData.status)) {
-            riseRouterException();
-        }
-    }, [runData]);
-
-    const modelData = useMemo<IModelExtended | undefined | null>(() => {
-        if (!runData) {
-            return;
-        }
-
-        return getExtendedModelFromRun(runData);
-    }, [runData]);
-
-    useEffect(() => {
-        if (!modelData) {
-            return;
-        }
-
-        openai.current = new OpenAI({
-            baseURL: getModelGateway(modelData.base_url),
-            apiKey: token,
-            dangerouslyAllowBrowser: true,
-        });
-    }, [modelData, token]);
-
-    useEffect(() => {
-        scrollChatToBottom();
-    }, [messageForShowing]);
-
-    const { handleSubmit, control, setValue, watch } = useForm<FormValues>();
-
-    const messageText = watch('message');
-
-    const sendRequest = async (messages: Message[]) => {
-        if (!openai.current) return Promise.reject('Model not found');
-
-        return openai.current.chat.completions.create({
-            model: modelData?.name ?? '',
-            messages,
-            stream: true,
-            max_tokens: 512,
-        });
-    };
-
-    const onSubmit = async (data: FormValues) => {
-        if (!data.message) {
-            return;
-        }
-
-        let newMessages: Message[];
-
-        const newMessage: Message = { role: 'user', content: data.message };
-        const messagesWithoutSystemMessage = messages.filter((m) => m.role !== 'system');
-
-        if (data.instructions?.length) {
-            newMessages = [{ role: 'system', content: data.instructions }, ...messagesWithoutSystemMessage, newMessage];
-        } else {
-            newMessages = [...messagesWithoutSystemMessage, newMessage];
-        }
-
-        setMessages(newMessages);
-        setLoading(true);
-
-        try {
-            const stream = await sendRequest(newMessages);
-
-            setMessages((oldMessages) => [
-                ...oldMessages,
-                {
-                    role: 'assistant',
-                    content: '',
-                },
-            ]);
-
-            setValue('message', '');
-            setTimeout(onChangeMessage, 0);
-
-            for await (const chunk of stream) {
-                setMessages((oldMessages) => {
-                    const newMessages = [...oldMessages];
-
-                    const lastMessage = newMessages.pop();
-
-                    if (!lastMessage) {
-                        return oldMessages;
-                    }
-
-                    return [
-                        ...newMessages,
-                        {
-                            role: chunk.choices[0]?.delta?.role ?? lastMessage?.role,
-                            content: (lastMessage?.content ?? '') + (chunk.choices[0]?.delta?.content ?? ''),
-                        },
-                    ];
-                });
-            }
-        } catch (e) {
-            pushNotification({
-                type: 'error',
-                content: t('common.server_error', { error: e }),
-            });
-
-            clearChat();
-        }
-
-        setLoading(false);
-
-        setTimeout(() => {
-            textAreaRef.current?.querySelector('textarea')?.focus();
-        }, 10);
-    };
-
-    const clearChat = () => {
-        setValue('message', '');
-        setValue('instructions', '');
-
-        setMessages([]);
-        setTimeout(onChangeMessage, 10);
-    };
-
-    const renderMessageBody = (content: Message['content']) => {
-        const LANGUAGE_PATTERN = /^(```[A-Za-z]*)/m;
-        const PATTERN = /^([A-Za-z \t]*)```([A-Za-z]*)?\n([\s\S]*?)```([A-Za-z \t]*)*$/gm;
-        const languages: string[] = [];
-
-        const matches = content.match(LANGUAGE_PATTERN);
-
-        if (matches) {
-            [...matches].forEach((l) => l && languages.push(l.replace(/^```/, '')));
-        }
-
-        const replacedStrings = reactStringReplace(content, PATTERN, (match) => {
-            if (!match) {
-                return '';
-            }
-
-            return <Code>{match}</Code>;
-        });
-
-        return (
-            <Box variant="p">
-                {replacedStrings.filter((line, index) => {
-                    if (
-                        languages.includes(line as string) &&
-                        typeof replacedStrings[index + 1] !== 'string' &&
-                        typeof replacedStrings[index + 1] !== 'undefined'
-                    ) {
-                        return false;
-                    }
-
-                    return true;
-                })}
-            </Box>
-        );
-    };
-
-    const onChangeMessage = () => {
-        if (!textAreaRef.current) return;
-
-        const textAreaElement = textAreaRef.current.querySelector('textarea');
-
-        if (!textAreaElement) return;
-
-        textAreaElement.style.height = 'auto';
-        textAreaElement.style.height = textAreaElement.scrollHeight + 'px';
-    };
-
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
-    const onKeyDown = (event) => {
-        const isCtrlOrShiftKey = event?.detail?.ctrlKey || event?.detail?.shiftKey;
-
-        if (event?.detail?.keyCode === 13 && !isCtrlOrShiftKey) {
-            handleSubmit(onSubmit)();
-        } else if (event?.detail?.keyCode === 13 && isCtrlOrShiftKey) {
-            event.preventDefault();
-            setValue('message', messageText + '\n');
-            setTimeout(onChangeMessage, 0);
-        }
-    };
-
     const displayedToken = isTokenVisible ? token : TOKEN_MASK;
 
-    const pythonCode = getPythonModelCode({ model: modelData, token: displayedToken });
+    // The user's projects through which the model can be accessed now. The code is for the chosen one, else for the first
+    const codeProjectOptions = (model?.endpoints ?? [])
+        .filter(({ base_url }) => base_url)
+        .map(({ project_name }) => ({ label: project_name, value: project_name }));
 
-    const curlCode = getCurlModelCode({ model: modelData, token: displayedToken });
+    const codeProjectOption = codeProjectOptions.find(({ value }) => value === codeProjectName) ?? codeProjectOptions[0];
+    const codeParams = { model, projectName: codeProjectOption?.value };
+
+    const pythonCode = getPythonModelCode({ ...codeParams, token: displayedToken });
+
+    const curlCode = getCurlModelCode({ ...codeParams, token: displayedToken });
 
     const onCopyCode = () => {
         switch (codeTab) {
             case CodeTab.Python:
-                return copyToClipboard(getPythonModelCode({ model: modelData, token }));
+                return copyToClipboard(getPythonModelCode({ ...codeParams, token }));
             case CodeTab.Curl:
-                return copyToClipboard(getCurlModelCode({ model: modelData, token }));
+                return copyToClipboard(getCurlModelCode({ ...codeParams, token }));
         }
     };
 
-    console.log({ modelData });
+    const tabs = [
+        {
+            label: t('models.details.title'),
+            id: ModelTab.Details,
+            href: ROUTES.MODELS.DETAILS.FORMAT(paramProjectName, paramModelName),
+        },
+        product.hasExports && {
+            label: t('models.exports.title'),
+            id: ModelTab.Exports,
+            href: ROUTES.MODELS.DETAILS.EXPORTS.FORMAT(paramProjectName, paramModelName),
+        },
+        hasMetering && {
+            label: t('models.metering.title'),
+            id: ModelTab.Metering,
+            href: ROUTES.MODELS.DETAILS.METERING.FORMAT(paramProjectName, paramModelName),
+        },
+    ].filter(Boolean) as {
+        label: string;
+        id: ModelTab;
+        href: string;
+    }[];
+
+    const activeTabId = isMeteringTab ? ModelTab.Metering : isExportsTab ? ModelTab.Exports : ModelTab.Details;
+    const modelKey = `${paramProjectName}/${paramModelName}`;
+
+    // A user who doesn't get the Metering tab doesn't get its page either
+    if (model && isMeteringTab && !hasMetering) {
+        return <Navigate to={ROUTES.MODELS.DETAILS.FORMAT(paramProjectName, paramModelName)} replace />;
+    }
 
     return (
-        <ContentLayout
-            header={
-                <DetailsHeader
-                    title={
-                        <NavigateLink href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRunName)}>
-                            <Box variant="h1">{paramRunName}</Box>
-                        </NavigateLink>
-                    }
-                    actionButtons={
-                        <Button disabled={loading} onClick={() => setViewCodeVisible(true)}>
-                            {t('models.code')}
+        <div className={styles.page}>
+            <ContentLayout
+                header={
+                    <DetailsHeader
+                        title={paramModelName}
+                        actionButtons={
+                            <Button disabled={!getModelUrl(model)} onClick={() => setViewCodeVisible(true)}>
+                                {t('models.endpoint')}
+                            </Button>
+                        }
+                    />
+                }
+            >
+                {isLoading && (
+                    <Container>
+                        <Loader />
+                    </Container>
+                )}
+
+                {error && <Alert type="error">{t('common.server_error', { error: getServerError(error) })}</Alert>}
+
+                {model && (
+                    <>
+                        <Tabs withNavigation tabs={tabs} activeTabId={activeTabId} />
+
+                        {/* Remount tabs on model change so the chat and the filters of one model don't show for another */}
+                        {activeTabId === ModelTab.Details && <ModelDetails key={modelKey} model={model} />}
+                        {activeTabId === ModelTab.Exports && (
+                            <ModelExports key={modelKey} model={model} projects={projects} projectsImports={projectsImports} />
+                        )}
+                        {activeTabId === ModelTab.Metering && <ModelMetering key={modelKey} model={model} />}
+                    </>
+                )}
+            </ContentLayout>
+
+            <Modal
+                visible={viewCodeVisible}
+                header={t('models.endpoint')}
+                size="large"
+                footer={
+                    <Box float="right">
+                        <Button variant="normal" onClick={closeViewCode}>
+                            {t('common.close')}
                         </Button>
-                    }
-                />
-            }
-        >
-            {isLoadingRun && (
-                <Container>
-                    <Loader />
-                </Container>
-            )}
+                    </Box>
+                }
+                onDismiss={closeViewCode}
+            >
+                <SpaceBetween size="m" direction="vertical">
+                    <Box>{t('models.details.view_code_description')}</Box>
 
-            {modelData && (
-                <>
-                    <div className={css.modelDetailsLayout}>
-                        <div className={css.general}>
-                            <Container header={<Header variant="h2">{t('common.general')}</Header>}>
-                                <ColumnLayout columns={4} variant="text-grid">
-                                    <div>
-                                        <Box variant="awsui-key-label">{t('models.details.run_name')}</Box>
-
-                                        <div>
-                                            <NavigateLink
-                                                href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(
-                                                    modelData.project_name,
-                                                    modelData.run_name ?? 'No run name',
-                                                )}
-                                            >
-                                                {modelData.run_name}
-                                            </NavigateLink>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <Box variant="awsui-key-label">{t('models.model_name')}</Box>
-                                        <div>{modelData.name}</div>
-                                    </div>
-
-                                    <div>
-                                        <Box variant="awsui-key-label">{t('models.type')}</Box>
-                                        <div>{modelData.type}</div>
-                                    </div>
-                                </ColumnLayout>
-                            </Container>
+                    <div className={styles.viewCodeControls}>
+                        <div className={styles.copyButton}>
+                            <SpaceBetween direction="horizontal" size="xs">
+                                <TokenVisibilityButton visible={isTokenVisible} onChange={setIsTokenVisible} />
+                                <Button iconName="copy" onClick={onCopyCode}></Button>
+                            </SpaceBetween>
                         </div>
 
-                        <form className={css.modelForm} onSubmit={handleSubmit(onSubmit)}>
-                            <div className={css.buttons}>
-                                <Button iconName="remove" disabled={loading || !messages.length} onClick={clearChat} />
-                            </div>
-
-                            <aside className={css.side}>
-                                <FormTextarea
-                                    rows={4}
-                                    disabled={loading}
-                                    label={t('models.details.instructions')}
-                                    constraintText={t('models.details.instructions_description')}
-                                    control={control}
-                                    name="instructions"
-                                />
-                            </aside>
-
-                            <div className={css.chat} ref={chatList}>
-                                {!messageForShowing.length && (
-                                    <ListEmptyMessage
-                                        title={t('models.details.chat_empty_title')}
-                                        message={t('models.details.chat_empty_message')}
-                                    />
-                                )}
-
-                                {messageForShowing.map((message, index) => (
-                                    <div key={index} className={css.message}>
-                                        <ChatBubble
-                                            ariaLabel=""
-                                            type={message.role === 'user' ? 'outgoing' : 'incoming'}
-                                            avatar={
-                                                <Avatar
-                                                    ariaLabel={MESSAGE_ROLE_MAP[message.role as keyof typeof MESSAGE_ROLE_MAP]}
-                                                    color={message.role === 'user' ? 'default' : 'gen-ai'}
-                                                    iconName={message.role === 'user' ? 'user-profile' : 'gen-ai'}
-                                                />
-                                            }
-                                        >
-                                            {renderMessageBody(message.content || '...')}
-                                        </ChatBubble>
+                        <Tabs
+                            onChange={({ detail }) => setCodeTab(detail.activeTabId as CodeTab)}
+                            activeTabId={codeTab}
+                            actions={
+                                codeProjectOptions.length > 1 && (
+                                    <div className={styles.codeProject}>
+                                        <SelectCSD
+                                            inlineLabelText={t('models.project')}
+                                            selectedOption={codeProjectOption}
+                                            options={codeProjectOptions}
+                                            onChange={({ detail }) => setCodeProjectName(detail.selectedOption.value)}
+                                        />
                                     </div>
-                                ))}
-                            </div>
-
-                            <div ref={textAreaRef} className={css.messageForm}>
-                                <FormTextarea
-                                    stretch
-                                    placeholder={t('models.details.message_placeholder')}
-                                    control={control}
-                                    disabled={loading}
-                                    name="message"
-                                    onKeyDown={onKeyDown}
-                                    onChange={onChangeMessage}
-                                />
-
-                                <div className={css.buttons}>
-                                    <Button variant="primary" disabled={loading}>
-                                        {t('common.send')}
-                                    </Button>
-                                </div>
-                            </div>
-                        </form>
+                                )
+                            }
+                            tabs={[
+                                {
+                                    label: 'python',
+                                    id: CodeTab.Python,
+                                    content: <Code>{pythonCode}</Code>,
+                                },
+                                {
+                                    label: 'curl',
+                                    id: CodeTab.Curl,
+                                    content: <Code>{curlCode}</Code>,
+                                },
+                            ]}
+                        />
                     </div>
-
-                    <Modal
-                        visible={viewCodeVisible}
-                        header={t('models.details.view_code')}
-                        size="large"
-                        footer={
-                            <Box float="right">
-                                <Button variant="normal" onClick={closeViewCode}>
-                                    {t('common.close')}
-                                </Button>
-                            </Box>
-                        }
-                        onDismiss={closeViewCode}
-                    >
-                        <SpaceBetween size="m" direction="vertical">
-                            <Box>{t('models.details.view_code_description')}</Box>
-
-                            <div className={css.viewCodeControls}>
-                                <div className={css.copyButton}>
-                                    <SpaceBetween direction="horizontal" size="xs">
-                                        <TokenVisibilityButton visible={isTokenVisible} onChange={setIsTokenVisible} />
-                                        <Button iconName="copy" onClick={onCopyCode}></Button>
-                                    </SpaceBetween>
-                                </div>
-
-                                <Tabs
-                                    onChange={({ detail }) => setCodeTab(detail.activeTabId as CodeTab)}
-                                    activeTabId={codeTab}
-                                    tabs={[
-                                        {
-                                            label: 'python',
-                                            id: CodeTab.Python,
-                                            content: <Code>{pythonCode}</Code>,
-                                        },
-                                        {
-                                            label: 'curl',
-                                            id: CodeTab.Curl,
-                                            content: <Code>{curlCode}</Code>,
-                                        },
-                                    ]}
-                                />
-                            </div>
-                        </SpaceBetween>
-                    </Modal>
-                </>
-            )}
-        </ContentLayout>
+                </SpaceBetween>
+            </Modal>
+        </div>
     );
 };

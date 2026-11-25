@@ -574,6 +574,11 @@ class JobModel(PipelineModelMixin, BaseModel):
     over its last logs. `None` until the job starts terminating, and only set for jobs that are
     given time to finish -- the rest are stopped on their first terminating pass.
     """
+    unregister_deadline: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    """`unregister_deadline` is when a terminating service replica stops waiting to be
+    unregistered from gateway replicas and is terminated anyway. `None` until the replica is
+    found still registered on a terminating pass.
+    """
     volumes_detached_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     instance_assigned: Mapped[bool] = mapped_column(Boolean, default=False)
     """`instance_assigned` shows whether instance assignment has already been attempted.
@@ -1371,6 +1376,10 @@ class ExportModel(BaseModel):
         back_populates="export",
         cascade=CASCADE_DEFAULT_WITH_DELETE_ORPHAN,
     )
+    exported_models: Mapped[List["ExportedModelModel"]] = relationship(
+        back_populates="export",
+        cascade=CASCADE_DEFAULT_WITH_DELETE_ORPHAN,
+    )
 
 
 class ImportModel(BaseModel):
@@ -1435,6 +1444,26 @@ class ExportedGatewayModel(BaseModel):
         ForeignKey("gateways.id", ondelete="CASCADE"), index=True
     )
     gateway: Mapped["GatewayModel"] = relationship()
+
+
+class ExportedModelModel(BaseModel):
+    __tablename__ = "exported_models"
+    __table_args__ = (
+        UniqueConstraint("export_id", "name", name="uq_exported_models_export_id_name"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    export_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("exports.id", ondelete="CASCADE"), index=True
+    )
+    export: Mapped["ExportModel"] = relationship()
+    name: Mapped[str] = mapped_column(Text)
+    """`name` is the name of the model in the export's project. The export holds the model
+    by its name and not by the service that declares it, so the model stays exported
+    when the service is stopped and applied again or replaced by another service.
+    """
 
 
 class UserPublicKeyModel(BaseModel):

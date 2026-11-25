@@ -86,7 +86,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](
 RESOURCE_ADVICE_CACHE_TTL = 600
 """Seconds to cache tenant advice across offer refreshes; matches AWS's quota cache."""
 WAIT_FOR_DISK_TIMEOUT = 20
-WAIT_FOR_PRICING_POLICY_TIMEOUT = 10
+WAIT_FOR_PRICING_POLICY_TIMEOUT = 30
 WAIT_FOR_INSTANCE_TIMEOUT = 30
 WAIT_FOR_INSTANCE_UPDATE_INTERVAL = 2.5
 DELETE_INSTANCE_TIMEOUT = 25
@@ -106,9 +106,11 @@ SUPPORTED_PLATFORMS = [
     "gpu-h200-sxm",
     "gpu-b200-sxm",
     "gpu-b200-sxm-a",
+    "gpu-b300-sxm",
     "gpu-l40s-a",
     "gpu-l40s-d",
     "gpu-rtx6000",
+    "gpu-rtx6000-a",
     "cpu-d3",
     "cpu-e2",
 ]
@@ -407,6 +409,22 @@ class NebiusCompute(
         self, provisioning_data, project_ssh_public_key, project_ssh_private_key
     ):
         instance = resources.get_instance(self._sdk, provisioning_data.instance_id)
+        state = instance.status.state
+        # A new instance is `STOPPED` before it starts, with `reconciling` set. `STOPPED`
+        # is final once Nebius has no operation left to run on the instance.
+        is_stopped = (
+            state == InstanceStatus.InstanceState.STOPPED and not instance.status.reconciling
+        )
+        if is_stopped or state in [
+            InstanceStatus.InstanceState.DELETING,
+            InstanceStatus.InstanceState.ERROR,
+        ]:
+            raise ProvisioningError(f"Instance failed to start. Instance state: {state.name}")
+        # Nebius assigns addresses to an instance that is still starting, and this method
+        # is no longer called once the hostname is set. So the hostname is set only when
+        # the instance is running. Otherwise, a failed start would go unnoticed.
+        if state != InstanceStatus.InstanceState.RUNNING:
+            return
         if not instance.status.network_interfaces:
             return
         interface = instance.status.network_interfaces[0]

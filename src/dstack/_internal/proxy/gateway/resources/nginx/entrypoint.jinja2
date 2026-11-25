@@ -1,7 +1,7 @@
 server {
     server_name {{ domain }};
     location / {
-        proxy_pass http://localhost:{{ proxy_port }}/api/models/{{ project_name }}/;
+        proxy_pass http://localhost:{{ proxy_port }}/api/models/;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header Host $host;
         # Don't let public clients control the gateway app's tracing

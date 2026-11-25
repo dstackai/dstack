@@ -17,6 +17,10 @@ class ExportedGateway(CoreModel):
     name: str
 
 
+class ExportedModel(CoreModel):
+    name: str
+
+
 class Export(CoreModel):
     id: uuid.UUID
     name: str
@@ -24,6 +28,7 @@ class Export(CoreModel):
     imports: list[ExportImport]
     exported_fleets: list[ExportedFleet]
     exported_gateways: list[ExportedGateway] = []
+    exported_models: list[ExportedModel] = []
 
 
 class ListExportsResponse(CoreModel):

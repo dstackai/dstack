@@ -1,11 +1,13 @@
 import asyncio
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 
 import pytest
-from sqlalchemy import select
+from httpx import HTTPStatusError, Request, Response
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.backends.base.compute import ComputeWithGatewaySupport
@@ -24,8 +26,11 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.runs import JobStatus, RunStatus, ServiceSpec
+from dstack._internal.core.models.services import OpenAIChatModel
+from dstack._internal.proxy.gateway.schemas.registry import ImportListItem
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListReplicaItem
 from dstack._internal.server import settings
+from dstack._internal.server.background.pipeline_tasks import gateway_replicas
 from dstack._internal.server.background.pipeline_tasks.gateway_replicas import (
     GatewayReplicaFetcher,
     GatewayReplicaPipeline,
@@ -33,14 +38,22 @@ from dstack._internal.server.background.pipeline_tasks.gateway_replicas import (
     GatewayReplicaWorker,
 )
 from dstack._internal.server.models import (
+    ExportedModelModel,
+    GatewayModel,
     GatewayReplicaModel,
+    ImportModel,
+    ProjectModel,
+    RunModel,
     ServiceRegistrationModel,
     ServiceReplicaRegistrationModel,
+    UserModel,
 )
+from dstack._internal.server.services import exports as exports_service
 from dstack._internal.server.testing.common import (
     AsyncContextManager,
     ComputeMockSpec,
     create_backend,
+    create_export,
     create_fleet,
     create_gateway,
     create_gateway_replica,
@@ -49,6 +62,7 @@ from dstack._internal.server.testing.common import (
     create_project,
     create_repo,
     create_run,
+    create_service_run,
     create_user,
     get_gateway_replica_configuration,
     get_job_provisioning_data,
@@ -754,6 +768,46 @@ class TestGatewayReplicaWorkerRunning:
         assert replica.status == GatewayReplicaStatus.TERMINATING
         assert replica.active is False
         assert replica.status_message == "Scaled in"
+
+    async def test_calls_hooks_and_processes_replica_if_hook_fails(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        mock_gateway_connection: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        replica = await create_gateway_replica(
+            session=session,
+            gateway_id=gateway.id,
+            backend=backend,
+            status=GatewayReplicaStatus.RUNNING,
+        )
+        _lock_replica(replica)
+        await session.commit()
+        _get_client_mock(mock_gateway_connection).list_services.return_value = []
+        failing_hook = AsyncMock(side_effect=RuntimeError("hook failed"))
+        hook = AsyncMock()
+        monkeypatch.setattr(
+            gateway_replicas, "_PROCESS_RUNNING_GATEWAY_REPLICA_HOOKS", [failing_hook, hook]
+        )
+
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        connection = mock_gateway_connection.return_value
+        failing_hook.assert_awaited_once_with(replica.id, connection)
+        hook.assert_awaited_once_with(replica.id, connection)
+        await session.refresh(replica)
+        assert replica.status == GatewayReplicaStatus.RUNNING
+        assert replica.lock_token is None
 
 
 def _get_client_mock(mock_gateway_connection: AsyncMock) -> AsyncMock:
@@ -2240,6 +2294,357 @@ class TestGatewayReplicaWorkerRunningStateSync:
 
         events_after_second_tick = await list_events(session)
         assert [e.message for e in events_after_second_tick].count(error_message) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestGatewayReplicaWorkerRunningImportsSync:
+    """
+    Covers `_process_running_item`'s sync of imports: registering/unregistering imports
+    so the gateway has one for each exported model that its services serve
+    and each importer project.
+    """
+
+    @pytest.fixture(autouse=True)
+    def enable_exports(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(exports_service, "_EXPORTS_ENABLED", True)
+
+    async def _create_gateway_and_replica(
+        self, session: AsyncSession, project: ProjectModel, domain: str = "example.com"
+    ) -> tuple[GatewayModel, GatewayReplicaModel]:
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            wildcard_domain=domain,
+            status=GatewayStatus.RUNNING,
+        )
+        replica = await create_gateway_replica(
+            session=session,
+            gateway_id=gateway.id,
+            backend=backend,
+            status=GatewayReplicaStatus.RUNNING,
+        )
+        _lock_replica(replica)
+        await session.commit()
+        return gateway, replica
+
+    async def _create_service_run(
+        self,
+        session: AsyncSession,
+        project: ProjectModel,
+        user: UserModel,
+        gateway: GatewayModel,
+        run_name: str,
+        model_name: str,
+    ) -> RunModel:
+        repo = await create_repo(session=session, project_id=project.id, repo_name=run_name)
+        return await create_service_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            gateway=gateway,
+            run_name=run_name,
+            model=OpenAIChatModel(name=model_name, format="openai"),
+        )
+
+    async def test_registers_imports_of_exported_models_that_services_serve(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        mock_gateway_connection: AsyncMock,
+    ):
+        user = await create_user(session=session)
+        exporter_project = await create_project(session=session, owner=user, name="Exporter")
+        importer_projects = [
+            await create_project(session=session, owner=user, name=name)
+            for name in ("Importer-1", "Importer-2")
+        ]
+        deleted_importer_project = await create_project(
+            session=session, owner=user, name="Deleted-Importer", deleted=True
+        )
+        other_project = await create_project(session=session, owner=user, name="Other")
+        gateway, replica = await self._create_gateway_and_replica(session, exporter_project)
+        await self._create_service_run(
+            session, exporter_project, user, gateway, "exported-service", "exported-model"
+        )
+        await self._create_service_run(
+            session, exporter_project, user, gateway, "other-service", "not-exported-model"
+        )
+        # The export holds this model, but only another project serves a model with this name.
+        await self._create_service_run(
+            session, other_project, user, gateway, "other-project-service", "not-served-model"
+        )
+        export = await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[*importer_projects, deleted_importer_project],
+            exported_fleets=[],
+            exported_models=["exported-model", "not-served-model"],
+        )
+        client_mock = _get_client_mock(mock_gateway_connection)
+        client_mock.list_services.return_value = []
+        client_mock.list_imports.return_value = []
+
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        for importer_project_name in ("importer-1", "importer-2"):
+            client_mock.register_import.assert_any_call(
+                importer_project=importer_project_name,
+                export_id=export.id,
+                exporter_project="exporter",
+                name="exported-model",
+            )
+        assert client_mock.register_import.call_count == 2
+        client_mock.unregister_import.assert_not_called()
+
+    @pytest.mark.parametrize("change", [None, "export", "importer_project", "model", "run"])
+    async def test_unregisters_import_when_export_importer_project_model_or_run_changes(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        mock_gateway_connection: AsyncMock,
+        change: Optional[str],
+    ):
+        user = await create_user(session=session)
+        exporter_project = await create_project(session=session, owner=user, name="exporter")
+        importer_project = await create_project(session=session, owner=user, name="importer")
+        gateway, replica = await self._create_gateway_and_replica(session, exporter_project)
+        run = await self._create_service_run(
+            session, exporter_project, user, gateway, "test-service", "test-model"
+        )
+        export = await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_models=["test-model"],
+        )
+        client_mock = _get_client_mock(mock_gateway_connection)
+        client_mock.list_services.return_value = []
+        client_mock.list_imports.return_value = [
+            ImportListItem(
+                importer_project="importer",
+                export_id=export.id.hex,
+                exporter_project="exporter",
+                name="test-model",
+            )
+        ]
+        if change == "export":
+            await session.delete(export)
+        elif change == "importer_project":
+            await session.execute(delete(ImportModel).where(ImportModel.export_id == export.id))
+        elif change == "model":
+            await session.execute(
+                delete(ExportedModelModel).where(ExportedModelModel.export_id == export.id)
+            )
+        elif change == "run":
+            run.status = RunStatus.TERMINATING
+        await session.commit()
+
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        client_mock.register_import.assert_not_called()
+        if change is None:
+            client_mock.unregister_import.assert_not_called()
+        else:
+            client_mock.unregister_import.assert_called_once_with(
+                importer_project="importer", export_id=export.id, name="test-model"
+            )
+
+    async def test_registers_import_from_older_export_and_moves_it_once_export_is_deleted(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        mock_gateway_connection: AsyncMock,
+    ):
+        user = await create_user(session=session)
+        exporter_project = await create_project(session=session, owner=user, name="exporter")
+        importer_project = await create_project(session=session, owner=user, name="importer")
+        gateway, replica = await self._create_gateway_and_replica(session, exporter_project)
+        await self._create_service_run(
+            session, exporter_project, user, gateway, "test-service", "test-model"
+        )
+        newer_export, older_export = [
+            await create_export(
+                session=session,
+                exporter_project=exporter_project,
+                importer_projects=[importer_project],
+                exported_fleets=[],
+                exported_models=["test-model"],
+                name=name,
+            )
+            for name in ("newer-export", "older-export")
+        ]
+        newer_export.created_at = datetime(2026, 2, 1, tzinfo=timezone.utc)
+        older_export.created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        await session.commit()
+        newer_export_id, older_export_id = newer_export.id, older_export.id
+        client_mock = _get_client_mock(mock_gateway_connection)
+        client_mock.list_services.return_value = []
+        client_mock.list_imports.return_value = []
+
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        client_mock.register_import.assert_called_once_with(
+            importer_project="importer",
+            export_id=older_export_id,
+            exporter_project="exporter",
+            name="test-model",
+        )
+        client_mock.unregister_import.assert_not_called()
+
+        # Second tick: the older export is deleted, so the import moves to the newer one.
+        client_mock.reset_mock()
+        client_mock.list_imports.return_value = [
+            ImportListItem(
+                importer_project="importer",
+                export_id=older_export_id.hex,
+                exporter_project="exporter",
+                name="test-model",
+            )
+        ]
+        await session.delete(older_export)
+        await session.refresh(replica)
+        _lock_replica(replica)
+        await session.commit()
+
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        client_mock.register_import.assert_called_once_with(
+            importer_project="importer",
+            export_id=newer_export_id,
+            exporter_project="exporter",
+            name="test-model",
+        )
+        client_mock.unregister_import.assert_called_once_with(
+            importer_project="importer", export_id=older_export_id, name="test-model"
+        )
+        # Registering replaces the import on the gateway, and unregistering the previous one
+        # then changes nothing, so the model stays imported.
+        called = [c[0] for c in client_mock.method_calls]
+        assert called.index("register_import") < called.index("unregister_import")
+
+    async def test_unregisters_imports_on_gateway_with_project_name_in_domain(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        mock_gateway_connection: AsyncMock,
+    ):
+        user = await create_user(session=session)
+        exporter_project = await create_project(session=session, owner=user, name="exporter")
+        importer_project = await create_project(session=session, owner=user, name="importer")
+        gateway, replica = await self._create_gateway_and_replica(
+            session, exporter_project, domain="${{ run.project_name }}.example.com"
+        )
+        await self._create_service_run(
+            session, exporter_project, user, gateway, "test-service", "test-model"
+        )
+        export = await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_models=["test-model"],
+        )
+        client_mock = _get_client_mock(mock_gateway_connection)
+        client_mock.list_services.return_value = []
+        # Registered while the gateway had a fixed domain.
+        client_mock.list_imports.return_value = [
+            ImportListItem(
+                importer_project="importer",
+                export_id=export.id.hex,
+                exporter_project="exporter",
+                name="test-model",
+            )
+        ]
+
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        client_mock.register_import.assert_not_called()
+        client_mock.unregister_import.assert_called_once_with(
+            importer_project="importer", export_id=export.id, name="test-model"
+        )
+
+    async def test_syncs_services_but_not_imports_if_gateway_has_no_import_routes(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        mock_gateway_connection: AsyncMock,
+        caplog: pytest.LogCaptureFixture,
+    ):
+        caplog.set_level(logging.WARNING)
+        user = await create_user(session=session)
+        exporter_project = await create_project(session=session, owner=user, name="exporter")
+        importer_project = await create_project(session=session, owner=user, name="importer")
+        gateway, replica = await self._create_gateway_and_replica(session, exporter_project)
+        await self._create_service_run(
+            session, exporter_project, user, gateway, "test-service", "test-model"
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_models=["test-model"],
+        )
+        client_mock = _get_client_mock(mock_gateway_connection)
+        client_mock.list_services.return_value = []
+        request = Request("GET", "http://gateway/api/registry/imports/list")
+        client_mock.list_imports.side_effect = HTTPStatusError(
+            "Not Found", request=request, response=Response(404, request=request)
+        )
+
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        client_mock.register_service.assert_called_once()
+        client_mock.register_import.assert_not_called()
+        client_mock.unregister_import.assert_not_called()
+        # The gateway is not updated yet, which is not worth a warning on every sync.
+        assert "imports" not in caplog.text
+        await session.refresh(replica)
+        assert replica.status == GatewayReplicaStatus.RUNNING
+        assert replica.lock_token is None
+
+    async def test_does_not_sync_imports_if_exports_are_disabled(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        mock_gateway_connection: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setattr(exports_service, "_EXPORTS_ENABLED", False)
+        user = await create_user(session=session)
+        exporter_project = await create_project(session=session, owner=user, name="exporter")
+        importer_project = await create_project(session=session, owner=user, name="importer")
+        gateway, replica = await self._create_gateway_and_replica(session, exporter_project)
+        await self._create_service_run(
+            session, exporter_project, user, gateway, "test-service", "test-model"
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_models=["test-model"],
+        )
+        client_mock = _get_client_mock(mock_gateway_connection)
+        client_mock.list_services.return_value = []
+
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        client_mock.register_service.assert_called_once()
+        client_mock.list_imports.assert_not_called()
+        client_mock.register_import.assert_not_called()
+        client_mock.unregister_import.assert_not_called()
 
 
 @pytest.mark.asyncio

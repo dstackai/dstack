@@ -32,7 +32,7 @@ dependencies = [
     "python-multipart>=0.0.31",
     "filelock",
     "psutil",
-    "gpuhunt==0.1.35",
+    "gpuhunt==0.1.36",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "apscheduler<4",
@@ -220,7 +220,8 @@ gateway = [
     "aiorwlock",
     "aiocache",
     "httpx>=0.28.0",
-    # Gateway authorization needs the pool cancellation and recovery fixes in httpx2 (#4338).
+    # Gateway authorization and requests to services need the pool cancellation and recovery
+    # fixes in httpx2 (#4338).
     "httpx2>=2.13.1",
     "jinja2",
     # Always installed so that OpenTelemetry can be enabled without reinstalling the gateway.
@@ -238,6 +239,8 @@ server = [
     "aiorwlock",
     "aiocache",
     "httpx>=0.28.0",
+    # Requests to services need the pool cancellation and recovery fixes in httpx2 (#4338).
+    "httpx2>=2.13.1",
     "jinja2",
     "watchfiles",
     "sqlalchemy[asyncio]>=2.0.0",

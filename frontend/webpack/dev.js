@@ -16,7 +16,9 @@ module.exports = {
         port,
         open: true,
         hot: true, // enable HMR on the server
-        historyApiFallback: true, // fixes error 404-ish errors when using react router :see this SO question: https://stackoverflow.com/questions/43209666/react-router-v4-cannot-get-url
+        // fixes error 404-ish errors when using react router :see this SO question: https://stackoverflow.com/questions/43209666/react-router-v4-cannot-get-url
+        // A model's page has the model's name in its path, and model names have dots
+        historyApiFallback: { disableDotRule: true },
         headers: {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',

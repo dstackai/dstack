@@ -57,6 +57,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import events, services
 from dstack._internal.server.services import projects as projects_services
 from dstack._internal.server.services import repos as repos_services
+from dstack._internal.server.services.exported_models import check_can_update_service
 from dstack._internal.server.services.gateways import get_gateway_replica_models
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
@@ -641,11 +642,19 @@ async def apply_plan(
         and current_resource.run_spec.configuration.type == "service"
         and run_spec.configuration.gateway != current_resource.run_spec.configuration.gateway
     ):
+        # Load the gateway to compare where the service runs before and after the update
+        await session.refresh(current_resource_model, attribute_names=["gateway"])
+        previous_gateway = current_resource_model.gateway
         await services.assign_service(
             session=session,
             run_model=current_resource_model,
             run_spec=run_spec,
             is_new_service_submission=False,
+        )
+        await check_can_update_service(
+            session=session,
+            run_model=current_resource_model,
+            previous_gateway=previous_gateway,
         )
     new_deployment_num = current_resource.deployment_num + 1
     # FIXME: potentially long write transaction

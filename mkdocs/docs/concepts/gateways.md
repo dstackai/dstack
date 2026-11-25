@@ -289,6 +289,17 @@ Telemetry is reported with `service.name` set to `dstack-gateway` and resource a
 Gateways can be exported to other projects, allowing those projects to use the exported gateways
 for running services. See [Exports](exports.md) for more details.
 
+## Meter tokens
+
+Gateways meter the input, cached input, and output tokens of requests to the project's
+[model endpoint](services.md#model), per user and model. Requests to
+[imported models](exports.md#imported-models) are metered under the importer project.
+Project admins can view the tokens on the `Metering` tab of the model's page.
+
+To meter cached input tokens, make sure the model reports them, e.g. by passing `--enable-cache-report` to SGLang or `--enable-prompt-tokens-details` to vLLM.
+
+> Token metering is only supported in [dstack Sky](https://dstack.ai/products/sky/) and [dstack Factory](https://dstack.ai/products/factory/).
+
 ## Manage gateways
 
 ### List gateways

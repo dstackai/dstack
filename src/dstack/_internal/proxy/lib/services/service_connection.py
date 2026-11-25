@@ -5,8 +5,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Dict, Optional
 
-import httpx
-from httpx import AsyncHTTPTransport
+import httpx2 as httpx
+from httpx2 import AsyncHTTPTransport
 
 from dstack._internal.core.services.ssh.tunnel import (
     SSH_DEFAULT_OPTIONS,
@@ -37,6 +37,11 @@ REPLICA_DRAIN_TIMEOUT = 300
 
 
 class ServiceClient(httpx.AsyncClient):
+    """
+    The client that the requests to a service share. An httpx2 client, since a request is
+    cancelled when its client disconnects, and httpx then leaves some connections unreleased.
+    """
+
     def build_request(self, *args, **kwargs) -> httpx.Request:
         self.cookies.clear()  # the client is shared by all users, don't leak cookies
         return super().build_request(*args, **kwargs)
@@ -211,6 +216,9 @@ class ServiceConnectionPool:
         self.connections: Dict[str, ServiceConnection] = {}
         self._draining: set[asyncio.Task] = set()
         self._reconnect_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TUNNEL_RECONNECTS)
+        self._nginx_clients: Dict[str, ServiceClient] = {}
+        """Clients that forward requests to services via Nginx, by service domain.
+        Only used on gateways."""
 
     async def get(self, replica_id: str) -> Optional[ServiceConnection]:
         return self.connections.get(replica_id)
@@ -280,6 +288,30 @@ class ServiceConnectionPool:
                 logger.error(
                     "Error removing connection to service replica %s: %s", replica_ids[i], exc
                 )
+        for domain in list(self._nginx_clients):
+            await self.remove_nginx_client(domain)
+
+    def get_nginx_client(self, service: Service) -> ServiceClient:
+        """
+        Returns the client that forwards requests to the service via Nginx.
+        All requests to the service share the client, so that their connections are reused.
+        """
+        domain = service.domain_safe
+        client = self._nginx_clients.get(domain)
+        if client is None:
+            client = self._nginx_clients[domain] = ServiceClient(
+                base_url="http://127.0.0.1",
+                headers={"Host": domain},
+                timeout=service.read_timeout,
+                # Each request in flight holds a connection, and their number is not limited.
+                limits=httpx.Limits(max_connections=None, max_keepalive_connections=20),
+            )
+        return client
+
+    async def remove_nginx_client(self, domain: str) -> None:
+        client = self._nginx_clients.pop(domain, None)
+        if client is not None:
+            await client.aclose()
 
 
 async def get_service_replica_client(
@@ -290,11 +322,7 @@ async def get_service_replica_client(
     """
     if service.domain is not None:
         # Forward to Nginx so that requests are visible to StatsCollector in the access log
-        return httpx.AsyncClient(
-            base_url="http://127.0.0.1",
-            headers={"Host": service.domain},
-            timeout=service.read_timeout,
-        )
+        return service_conn_pool.get_nginx_client(service)
     # Nginx not available, forward directly to the tunnel
     replica = random.choice(service.replicas)
     connection = await service_conn_pool.get(replica.id)

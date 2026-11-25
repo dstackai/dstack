@@ -19,17 +19,16 @@ export const Preferences: React.FC = () => {
                 title: t('common.select_visible_columns'),
                 options: [
                     { id: 'model_name', label: t('models.model_name'), alwaysVisible: true },
-                    { id: 'type', label: `${t('models.type')}` },
-
+                    { id: 'status', label: `${t('models.status')}` },
+                    { id: 'project', label: `${t('models.project')}` },
                     { id: 'run', label: `${t('models.run')}` },
-                    { id: 'resources', label: `${t('models.resources')}` },
-                    { id: 'price', label: `${t('models.price')}` },
                     { id: 'submitted_at', label: `${t('models.submitted_at')}` },
                     { id: 'user', label: `${t('models.user')}` },
+                    // hidden by default
+                    { id: 'resources', label: `${t('models.resources')}` },
+                    { id: 'price', label: `${t('models.price')}` },
                     { id: 'repository', label: `${t('models.repository')}` },
                     { id: 'backend', label: `${t('models.backend')}` },
-                    // hidden by default
-                    { id: 'url', label: `${t('models.url')}` },
                 ],
             }}
         />

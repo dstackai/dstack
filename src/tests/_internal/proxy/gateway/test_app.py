@@ -1,3 +1,4 @@
+import uuid
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -7,8 +8,10 @@ from dstack._internal.proxy.gateway import app as app_module
 from dstack._internal.proxy.gateway.app import lifespan, make_app
 from dstack._internal.proxy.gateway.models import GlobalProxyConfig, ModelEntrypoint
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.services.metering import GatewayProxyMeter
 from dstack._internal.proxy.gateway.services.nginx import Nginx
 from dstack._internal.proxy.gateway.testing.common import Mocks, make_otel_settings
+from dstack._internal.proxy.lib.auth import ProxyCaller
 from dstack._internal.proxy.lib.testing.common import make_project, make_service
 
 
@@ -50,3 +53,23 @@ async def test_lifespan_applies_saved_otel_settings(
 
     async with lifespan(app):
         apply_settings.assert_called_once_with(otel_settings)
+
+
+@pytest.mark.asyncio
+async def test_lifespan_writes_metered_tokens_on_shutdown(
+    tmp_path: Path, system_mocks: Mocks
+) -> None:
+    nginx_dir = tmp_path / "nginx"
+    (nginx_dir / "sites-enabled").mkdir(parents=True)
+    meter = GatewayProxyMeter(tmp_path / "metering")
+    app = make_app(repo=GatewayProxyRepo(), nginx=Nginx(nginx_dir=nginx_dir), meter=meter)
+    async with lifespan(app):
+        meter.add(
+            ProxyCaller(project_id=uuid.uuid4(), user_id=uuid.uuid4()),
+            make_service("test-proj", "test-run"),
+            None,
+            input_tokens=9,
+            cached_input_tokens=0,
+            output_tokens=1,
+        )
+    assert (tmp_path / "metering" / "1.json").exists()

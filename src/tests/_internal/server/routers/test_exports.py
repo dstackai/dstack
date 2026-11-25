@@ -5,6 +5,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.services import AnyModel, OpenAIChatModel, TGIChatModel
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import ExportModel, ImportModel
 from dstack._internal.server.services import exports as exports_service
@@ -19,6 +20,8 @@ from dstack._internal.server.testing.common import (
     create_fleet,
     create_gateway,
     create_project,
+    create_repo,
+    create_service_run,
     create_user,
     get_auth_headers,
     get_fleet_spec,
@@ -169,6 +172,123 @@ class TestCreateExport:
         res = await session.execute(select(ExportModel).where(ExportModel.name == "empty-export"))
         assert res.scalar() is not None
 
+    async def test_creates_export_with_models(self, session: AsyncSession, client: AsyncClient):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            wildcard_domain="example.com",
+        )
+        # It is enough that one of the services that declare the model can serve it
+        # to importer projects.
+        for run_name, run_gateway in [("service-on-gateway", gateway), ("service", None)]:
+            await create_service_run(
+                session=session,
+                project=project,
+                user=user,
+                repo=repo,
+                gateway=run_gateway,
+                model=OpenAIChatModel(name="running-model", format="openai"),
+                run_name=run_name,
+            )
+
+        response = await client.post(
+            f"/api/project/{project.name}/exports/create",
+            headers=get_auth_headers(user.token),
+            json={
+                "name": "test-export",
+                # A model can be exported before any service declares it.
+                "exported_models": ["running-model", "not-running-model"],
+            },
+        )
+        assert response.status_code == 200
+        assert sorted(m["name"] for m in response.json()["exported_models"]) == [
+            "not-running-model",
+            "running-model",
+        ]
+
+        res = await session.execute(select(ExportModel).where(ExportModel.name == "test-export"))
+        export = res.scalar_one()
+        await session.refresh(export, ["exported_models"])
+        assert sorted(m.name for m in export.exported_models) == [
+            "not-running-model",
+            "running-model",
+        ]
+
+    @pytest.mark.parametrize(
+        ("model", "gateway_domain", "error"),
+        [
+            pytest.param(
+                TGIChatModel(
+                    name="test-model", format="tgi", chat_template="test", eos_token="</s>"
+                ),
+                "example.com",
+                "'test-service' declares it with format tgi, not openai",
+                id="tgi-format",
+            ),
+            pytest.param(
+                OpenAIChatModel(name="test-model", format="openai"),
+                "${{ run.project_name }}.example.com",
+                "'test-service' runs on 'test-gateway',"
+                " which has ${{ run.project_name }} in its domain",
+                id="project-name-in-gateway-domain",
+            ),
+            pytest.param(
+                OpenAIChatModel(name="test-model", format="openai"),
+                None,
+                "'test-service' runs without a gateway",
+                id="no-gateway",
+            ),
+        ],
+    )
+    async def test_rejects_model_if_no_running_service_can_serve_it(
+        self,
+        session: AsyncSession,
+        client: AsyncClient,
+        model: AnyModel,
+        gateway_domain: Optional[str],
+        error: str,
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        gateway = None
+        if gateway_domain is not None:
+            backend = await create_backend(session=session, project_id=project.id)
+            gateway = await create_gateway(
+                session=session,
+                project_id=project.id,
+                backend_id=backend.id,
+                name="test-gateway",
+                wildcard_domain=gateway_domain,
+            )
+        await create_service_run(
+            session=session, project=project, user=user, repo=repo, gateway=gateway, model=model
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/exports/create",
+            headers=get_auth_headers(user.token),
+            json={"name": "test-export", "exported_models": ["test-model"]},
+        )
+        assert response.status_code == 400
+        assert (
+            response.json()["detail"][0]["msg"]
+            == f"Cannot add 'test-model' to 'test-export': {error}"
+        )
+        res = await session.execute(select(func.count()).select_from(ExportModel))
+        assert res.scalar_one() == 0
+
     async def test_creates_global_export(self, session: AsyncSession, client: AsyncClient):
         admin = await create_user(session=session, global_role=GlobalRole.ADMIN)
         exporter_project = await create_project(
@@ -265,6 +385,14 @@ class TestCreateExport:
                 },
                 "Project 'ExporterProject' cannot import from itself",
                 id="self-import",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
+                    "exported_models": ["test-model", " "],
+                },
+                "Model names cannot be empty",
+                id="empty-model-name",
             ),
             pytest.param(
                 {
@@ -876,6 +1004,24 @@ class TestUpdateExport:
                 "Cannot change global status and add/remove importers at the same time",
                 id="unset-global-with-importer-changes",
             ),
+            pytest.param(
+                {
+                    "name": "test-export",
+                    "set_global": True,
+                    "remove_exported_models": ["test-model"],
+                },
+                "Cannot change global status and add/remove models at the same time",
+                id="set-global-with-model-changes",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
+                    "unset_global": True,
+                    "add_exported_models": ["test-model"],
+                },
+                "Cannot change global status and add/remove models at the same time",
+                id="unset-global-with-model-changes",
+            ),
         ],
     )
     async def test_rejects_invalid_update(
@@ -1159,12 +1305,109 @@ class TestUpdateExport:
         assert response.status_code == 400
         assert "The export is already global" in response.json()["detail"][0]["msg"]
 
+    async def test_adds_and_removes_models(self, session: AsyncSession, client: AsyncClient):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[],
+            exported_models=["model1", "model2"],
+            name="test-export",
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/exports/update",
+            headers=get_auth_headers(user.token),
+            json={
+                "name": "test-export",
+                "add_exported_models": ["model3"],
+                "remove_exported_models": ["model2"],
+            },
+        )
+        assert response.status_code == 200
+        assert sorted(m["name"] for m in response.json()["exported_models"]) == [
+            "model1",
+            "model3",
+        ]
+
+        response = await client.post(
+            f"/api/project/{project.name}/exports/list", headers=get_auth_headers(user.token)
+        )
+        assert response.status_code == 200
+        assert sorted(m["name"] for m in response.json()["exports"][0]["exported_models"]) == [
+            "model1",
+            "model3",
+        ]
+
+    async def test_cannot_add_model_to_global_export(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[],
+            name="my-export",
+            is_global=True,
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/exports/update",
+            headers=get_auth_headers(user.token),
+            json={"name": "my-export", "add_exported_models": ["test-model"]},
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"][0]["msg"] == (
+            "Cannot add 'test-model' to 'my-export': the export is global,"
+            " and models cannot be exported to all projects yet."
+            " Add the model to an export that names its importer projects instead."
+        )
+
+    async def test_cannot_set_global_export_with_models(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        admin = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        project = await create_project(session=session, owner=admin)
+        export = await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[],
+            exported_models=["test-model"],
+            name="my-export",
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/exports/update",
+            headers=get_auth_headers(admin.token),
+            json={"name": "my-export", "set_global": True},
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"][0]["msg"] == (
+            "Cannot make 'my-export' global: it exports models ('test-model'),"
+            " and models cannot be exported to all projects yet."
+            " Name its importer projects instead."
+        )
+        await session.refresh(export)
+        assert not export.is_global
+
     @pytest.mark.parametrize(
         "body",
         [
             pytest.param({"add_importer_projects": ["ImporterProject"]}, id="add-importer"),
             pytest.param({"add_exported_fleets": ["fleet"]}, id="add-fleet"),
             pytest.param({"add_exported_gateways": ["gateway"]}, id="add-gateway"),
+            pytest.param({"add_exported_models": ["model"]}, id="add-model"),
         ],
     )
     async def test_rejects_additions_when_disabled(
