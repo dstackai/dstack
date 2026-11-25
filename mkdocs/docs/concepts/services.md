@@ -302,6 +302,38 @@ Below are examples for running `Qwen/Qwen3.8-Flash-Next` with SMG and `zai-org/G
 
     </div>
 
+??? info "No CPU-node fleets"
+    When your fleet does not have a dedicated CPU-only node to host a standalone router, you can co-locate the router with
+    a worker in a GPU replica group. If you are using the SMG router and the router and a worker are in the same replica
+    group, that worker must be registered with the router manually using `--worker-urls`. To register the worker manually,
+    pass its URL when launching the router:
+
+    ```yaml
+    groups:
+      - replicas: 1
+        commands:
+          - pip install smg
+          # Worker
+          - |
+            python -m sglang.launch_server \
+              --model-path $MODEL_ID \
+              --host 0.0.0.0 \
+              --port 30000 &
+          # Router
+          - |
+            smg launch \
+              --worker-urls http://localhost:30000 \
+              --host 0.0.0.0 \
+              --port 8000
+        router:
+          type: smg
+
+      - replicas: 2
+        # ...
+
+    port: 8000
+    ```
+
 [`groups`](../reference/dstack.yml/service.md#groups) and top-level [`replicas`](../reference/dstack.yml/service.md#replicas) are mutually exclusive. If `groups` is set, top-level `resources` is ignored. Set `resources` in each group.
 
 > Properties such as `regions`, `port`, `env` and some other cannot be configured per replica group. This support is coming soon.
