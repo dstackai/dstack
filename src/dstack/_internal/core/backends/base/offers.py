@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from dataclasses import asdict
-from typing import Callable, Generic, List, Literal, Optional, TypeVar
+from typing import Callable, Generic, List, Literal, Optional, TypeVar, Union
 from uuid import UUID
 
 import gpuhunt
@@ -36,9 +36,10 @@ SUPPORTED_GPUHUNT_FLAGS = [
 
 # NvidiaGPUInfo.name in KNOWN_NVIDIA_GPUS is not unique -- there are multiple variants
 # with the same name but different amount of memory, but Compute Capability of the variants
-# is always the same, so it's safe to use 1:1 mapping
+# is always the same, so it's safe to use 1:1 mapping.
+# Keys are lowercase GPU names.
 NVIDIA_GPU_NAME_TO_COMPUTE_CAPABILITY_MAP = {
-    gpu_info.name: gpu_info.compute_capability for gpu_info in gpuhunt.KNOWN_NVIDIA_GPUS
+    gpu_info.name.lower(): gpu_info.compute_capability for gpu_info in gpuhunt.KNOWN_NVIDIA_GPUS
 }
 
 
@@ -214,13 +215,71 @@ class OfferMatcher:
     Matches offers against `requirements`.
 
     Create one per `requirements` and reuse it for all offers.
+
+    GPU constraints are checked against the offer's first GPU. If `requirements` allow zero
+    GPUs, offers without GPUs match regardless of other GPU constraints. Otherwise, an offer
+    without GPUs is treated as having no GPU vendor, name, or compute capability, and 0 GPU
+    memory. The disk is not checked if the offer's disk size is unknown (`size_mib == 0`).
     """
 
     def __init__(self, requirements: Requirements, *, check_disk: bool = True) -> None:
-        self._query_filter = requirements_to_query_filter(requirements, ignore_disk=not check_disk)
+        resources = requirements.resources
+        self._max_price = requirements.max_price
+        self._spot = requirements.spot
+        self._cpu_arch = resources.cpu.arch
+        self._min_cpus = resources.cpu.count.min
+        self._max_cpus = resources.cpu.count.max
+        self._min_memory_mib, self._max_memory_mib = _get_mib_bounds(resources.memory)
+        self._gpu_spec = resources.gpu
+        self._min_total_gpu_memory_mib: Optional[float] = None
+        self._max_total_gpu_memory_mib: Optional[float] = None
+        self._matches_no_gpus = True
+        if self._gpu_spec is not None:
+            self._min_total_gpu_memory_mib, self._max_total_gpu_memory_mib = _get_mib_bounds(
+                self._gpu_spec.total_memory
+            )
+            self._matches_no_gpus = _gpu_spec_matches_no_gpus(self._gpu_spec)
+        self._disk_mib_bounds: Optional[tuple[Optional[float], Optional[float]]] = None
+        if check_disk and resources.disk is not None:
+            self._disk_mib_bounds = _get_mib_bounds(resources.disk.size)
 
     def matches(self, offer: InstanceOffer) -> bool:
-        return gpuhunt.matches(offer_to_catalog_item(offer), q=self._query_filter)
+        resources = offer.instance.resources
+        if self._max_price is not None and offer.price > self._max_price:
+            return False
+        if self._spot is not None and resources.spot != self._spot:
+            return False
+        if self._cpu_arch is not None:
+            cpu_arch = resources.cpu_arch or gpuhunt.CPUArchitecture.X86
+            if cpu_arch != self._cpu_arch:
+                return False
+        if not _is_within(resources.cpus, self._min_cpus, self._max_cpus):
+            return False
+        if not _is_within(resources.memory_mib, self._min_memory_mib, self._max_memory_mib):
+            return False
+        if not self._matches_gpus(resources.gpus):
+            return False
+        if self._disk_mib_bounds is not None and not _disk_size_fits(
+            resources.disk.size_mib, *self._disk_mib_bounds
+        ):
+            return False
+        return True
+
+    def _matches_gpus(self, gpus: list[Gpu]) -> bool:
+        gpu_spec = self._gpu_spec
+        if gpu_spec is None:
+            return True
+        if not gpus:
+            return self._matches_no_gpus
+        if not _is_within(len(gpus), gpu_spec.count.min, gpu_spec.count.max):
+            return False
+        if not gpu_matches_gpu_spec(gpus[0], gpu_spec):
+            return False
+        return _is_within(
+            len(gpus) * gpus[0].memory_mib,
+            self._min_total_gpu_memory_mib,
+            self._max_total_gpu_memory_mib,
+        )
 
 
 InstanceOfferT = TypeVar("InstanceOfferT", InstanceOffer, InstanceOfferWithAvailability)
@@ -235,6 +294,48 @@ def filter_offers_by_requirements(
     for offer in offers:
         if matcher.matches(offer):
             yield offer
+
+
+def _gpu_spec_matches_no_gpus(gpu_spec: GPUSpec) -> bool:
+    if gpu_spec.count.min == 0:
+        return True
+    return (
+        _is_within(0, gpu_spec.count.min, gpu_spec.count.max)
+        and gpu_spec.vendor is None
+        and gpu_spec.name is None
+        and gpu_spec.compute_capability is None
+        and _is_within(0, *_get_mib_bounds(gpu_spec.memory))
+        and _is_within(0, *_get_mib_bounds(gpu_spec.total_memory))
+    )
+
+
+def _get_mib_bounds(
+    memory_range: Optional[Range[Memory]],
+) -> tuple[Optional[float], Optional[float]]:
+    if memory_range is None:
+        return None, None
+    min_mib = memory_range.min * 1024 if memory_range.min is not None else None
+    max_mib = memory_range.max * 1024 if memory_range.max is not None else None
+    return min_mib, max_mib
+
+
+def _disk_size_fits(
+    disk_size_mib: int, min_mib: Optional[float], max_mib: Optional[float]
+) -> bool:
+    if disk_size_mib == 0:
+        # Unknown disk size
+        return True
+    return _is_within(disk_size_mib, min_mib, max_mib)
+
+
+def _is_within(
+    value: Union[int, float], min_value: Optional[float], max_value: Optional[float]
+) -> bool:
+    if min_value is not None and value < min_value:
+        return False
+    if max_value is not None and value > max_value:
+        return False
+    return True
 
 
 def choose_disk_size_mib(
@@ -267,8 +368,10 @@ class OfferDiskFitter:
 
     def __init__(self, requirements: Requirements) -> None:
         disk_spec = requirements.resources.disk
-        # The range fixed disks are checked against, `None` if fixed disks are not checked.
-        self._fixed_disk_range = disk_spec.size if disk_spec is not None else None
+        # The bounds fixed disks are checked against, `None` if fixed disks are not checked.
+        self._fixed_disk_mib_bounds = (
+            _get_mib_bounds(disk_spec.size) if disk_spec is not None else None
+        )
         # The range configurable disks are fitted to.
         self._target_disk_range = disk_spec.size if disk_spec is not None else DEFAULT_DISK.size
         self._disk_by_range: dict[tuple[Optional[float], Optional[float]], Optional[Disk]] = {}
@@ -282,7 +385,7 @@ class OfferDiskFitter:
         Returns the offer with the fitted disk, or `None` if the offer doesn't fit.
 
         If `configurable_disk_size` is `None`, the offer's disk is fixed and is only checked
-        against `requirements`, the same way `filter_offers_by_requirements()` checks it.
+        against `requirements`, the same way `OfferMatcher` checks it.
         Otherwise, the disk is set to the smallest size within both `configurable_disk_size`
         and the required range (`DEFAULT_DISK` if `requirements` don't specify disk).
 
@@ -304,14 +407,9 @@ class OfferDiskFitter:
         return offer.model_copy(update={"instance": instance})
 
     def _fixed_disk_fits(self, disk_size_mib: int) -> bool:
-        if self._fixed_disk_range is None or disk_size_mib == 0:
+        if self._fixed_disk_mib_bounds is None:
             return True
-        disk_size = disk_size_mib / 1024
-        if self._fixed_disk_range.min is not None and disk_size < self._fixed_disk_range.min:
-            return False
-        if self._fixed_disk_range.max is not None and disk_size > self._fixed_disk_range.max:
-            return False
-        return True
+        return _disk_size_fits(disk_size_mib, *self._fixed_disk_mib_bounds)
 
     def _get_disk(self, configurable_disk_size: Range[Memory]) -> Optional[Disk]:
         key = (configurable_disk_size.min, configurable_disk_size.max)
@@ -339,7 +437,7 @@ def gpu_matches_gpu_spec(gpu: Gpu, gpu_spec: GPUSpec) -> bool:
     if gpu_spec.compute_capability is not None:
         if gpu.vendor != gpuhunt.AcceleratorVendor.NVIDIA:
             return False
-        compute_capability = NVIDIA_GPU_NAME_TO_COMPUTE_CAPABILITY_MAP.get(gpu.name)
+        compute_capability = NVIDIA_GPU_NAME_TO_COMPUTE_CAPABILITY_MAP.get(gpu.name.lower())
         if compute_capability is None:
             return False
         if compute_capability < gpu_spec.compute_capability:

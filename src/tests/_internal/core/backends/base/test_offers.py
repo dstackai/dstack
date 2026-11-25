@@ -114,6 +114,11 @@ class TestGpuMatchesGpuSpec:
             make_gpu(name="A100"), GPUSpec.model_validate({"compute_capability": "9.0"})
         )
 
+    def test_compute_capability_lookup_is_case_insensitive(self):
+        assert gpu_matches_gpu_spec(
+            make_gpu(name="a100"), GPUSpec.model_validate({"compute_capability": "8.0"})
+        )
+
     def test_compute_capability_non_nvidia_never_matches(self):
         assert not gpu_matches_gpu_spec(
             make_gpu(name="MI300X", vendor=AMD),
