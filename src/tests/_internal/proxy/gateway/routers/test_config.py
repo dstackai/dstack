@@ -38,11 +38,14 @@ class TestUpdateGlobalConfig:
         }
 
         async with make_client(repo) as client:
-            resp = await client.post("/api/config", json={"otel_settings": otel_settings})
+            resp = await client.post(
+                "/api/config", json={"otel_settings": otel_settings, "config_hash": "hash"}
+            )
 
         assert resp.status_code == 200
         expected = OTelSettings(**otel_settings)
         assert (await repo.get_config()).otel_settings == expected
+        assert (await repo.get_config()).config_hash == "hash"
         apply_settings.assert_called_once_with(expected)
         if restart_required:
             kill.assert_called_once()

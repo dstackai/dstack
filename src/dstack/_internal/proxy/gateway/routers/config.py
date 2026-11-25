@@ -28,6 +28,7 @@ async def update_global_config(
                 eab_hmac_key=body.acme_eab_hmac_key,
             ),
             otel_settings=body.otel_settings,
+            config_hash=body.config_hash,
         ),
     )
     if otel.apply_settings(body.otel_settings):

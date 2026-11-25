@@ -10,8 +10,10 @@ from dstack._internal.proxy.gateway.services.services import list_services
 router = APIRouter()
 
 
-@router.get("/list")
+@router.get("/list", deprecated=True)
 async def list_all_services(
     repo: Annotated[GatewayProxyRepo, Depends(get_gateway_proxy_repo)],
 ) -> ServiceListResponse:
+    """Deprecated in favor of `/api/state/get_summary`."""
+    # TODO: drop when most users upgrade to 0.22.9+
     return await list_services(repo)

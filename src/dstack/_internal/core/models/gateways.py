@@ -214,7 +214,12 @@ class GatewayConfiguration(CoreModel):
     ] = None
     otel: Annotated[
         Optional[GatewayOTelConfig],
-        Field(description=("The OpenTelemetry export configuration of the gateway app")),
+        Field(
+            description=(
+                "The OpenTelemetry export configuration of the gateway app."
+                " Can be updated in-place"
+            )
+        ),
     ] = None
 
     _validate_tags = field_validator("tags", mode="before")(tags_validator)

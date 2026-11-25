@@ -26,6 +26,7 @@ from dstack._internal.proxy.gateway.routers.config import router as config_route
 from dstack._internal.proxy.gateway.routers.metering import router as metering_router
 from dstack._internal.proxy.gateway.routers.registry import router as registry_router
 from dstack._internal.proxy.gateway.routers.services import router as services_router
+from dstack._internal.proxy.gateway.routers.state import router as state_router
 from dstack._internal.proxy.gateway.routers.stats import router as stats_router
 from dstack._internal.proxy.gateway.services.metering import FLUSH_INTERVAL, GatewayProxyMeter
 from dstack._internal.proxy.gateway.services.nginx import Nginx
@@ -117,6 +118,7 @@ def make_app(
     app.include_router(model_proxy_router, prefix="/api/models")
     app.include_router(registry_router, prefix="/api/registry")
     app.include_router(services_router, prefix="/api/services")
+    app.include_router(state_router, prefix="/api/state")
     app.include_router(stats_router, prefix="/api/stats")
 
     @app.get("/")

@@ -11,7 +11,7 @@ from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.configurations import RateLimit, ServiceConfiguration
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import JobSpec, JobSubmission, get_service_port
-from dstack._internal.proxy.gateway.models import OTelSettings
+from dstack._internal.proxy.gateway.schemas.config import ConfigRequest
 from dstack._internal.proxy.gateway.schemas.metering import (
     CollectMeteringRequest,
     CollectMeteringResponse,
@@ -26,8 +26,8 @@ from dstack._internal.proxy.gateway.schemas.registry import (
     UpdateReplicaProxyJumpKeysResponse,
 )
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListResponse
+from dstack._internal.proxy.gateway.schemas.state import StateSummaryResponse
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
-from dstack._internal.server import settings
 
 
 class GatewayClient:
@@ -38,7 +38,7 @@ class GatewayClient:
             raise ValueError("Either uds or port should be specified, not both")
 
         # Shows that the gateway's HTTP server has started. Should become True
-        # in submit_gateway_config during gateway setup. If setup fails, it
+        # in info() during gateway setup. If setup fails, it
         # should become True after any other successful request.
         self.is_server_ready = False
 
@@ -239,6 +239,8 @@ class GatewayClient:
         return validate_json_extra_ignore(ImportListResponse, resp.content).imports
 
     async def list_services(self) -> list[ServiceListItem]:
+        """Deprecated in favor of `get_state_summary`."""
+        # TODO: drop when most users upgrade to 0.22.9+
         resp = await self._client.get(self._url("/api/services/list"))
         if resp.status_code == 400:
             raise gateway_error(resp.json())
@@ -247,17 +249,22 @@ class GatewayClient:
         self.is_server_ready = True
         return resp_parsed.services
 
-    async def submit_gateway_config(self, otel_settings: Optional[OTelSettings]) -> None:
+    async def get_state_summary(self) -> Optional[StateSummaryResponse]:
+        resp = await self._client.get(self._url("/api/state/get_summary"))
+        if resp.status_code == 404:
+            # An older gateway not yet updated to 0.22.9+
+            # TODO: drop when most users upgrade to 0.22.9+
+            return None
+        if resp.status_code == 400:
+            raise gateway_error(resp.json())
+        resp.raise_for_status()
+        resp_parsed = validate_json_extra_ignore(StateSummaryResponse, resp.content)
+        self.is_server_ready = True
+        return resp_parsed
+
+    async def submit_gateway_config(self, config: ConfigRequest) -> None:
         resp = await self._client.post(
-            self._url("/api/config"),
-            json={
-                "acme_server": settings.ACME_SERVER,
-                "acme_eab_kid": settings.ACME_EAB_KID,
-                "acme_eab_hmac_key": settings.ACME_EAB_HMAC_KEY,
-                "otel_settings": (
-                    otel_settings.model_dump(mode="json") if otel_settings is not None else None
-                ),
-            },
+            self._url("/api/config"), json=config.model_dump(mode="json")
         )
         if resp.status_code == 400:
             raise gateway_error(resp.json())
