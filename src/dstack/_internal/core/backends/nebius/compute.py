@@ -109,6 +109,7 @@ SUPPORTED_PLATFORMS = [
     "gpu-l40s-a",
     "gpu-l40s-d",
     "gpu-rtx6000",
+    "gpu-rtx6000-a",
     "cpu-d3",
     "cpu-e2",
 ]
