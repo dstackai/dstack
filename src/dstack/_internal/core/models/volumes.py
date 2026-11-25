@@ -4,15 +4,7 @@ from enum import Enum
 from pathlib import PurePosixPath
 from typing import Annotated, Any, Dict, List, Literal, Optional, Self, Tuple, Union
 
-from pydantic import (
-    ConfigDict,
-    Discriminator,
-    Field,
-    RootModel,
-    Tag,
-    ValidationError,
-    field_validator,
-)
+from pydantic import ConfigDict, Field, RootModel, ValidationError, field_validator
 from typing_extensions import TypeAliasType
 
 from dstack._internal.core.errors import ConfigurationError
@@ -164,25 +156,11 @@ class RunpodGlobalVolumeConfiguration(VolumeConfigurationWithVolumeID):
     ]
 
 
-def _get_runpod_volume_configuration_tag(value: Any) -> str:
-    # Existing regional configurations omit `global`. A callable discriminator preserves
-    # that input contract while keeping region and size out of the global configuration.
-    if isinstance(value, dict):
-        return "global" if value.get("global", value.get("global_", False)) else "network"
-    return "global" if isinstance(value, RunpodGlobalVolumeConfiguration) else "network"
-
-
 # A named alias gives the nested union a schema reference, as required by OpenAPI's
 # backend discriminator mapping.
 AnyRunpodVolumeConfiguration = TypeAliasType(
     "AnyRunpodVolumeConfiguration",
-    Annotated[
-        Union[
-            Annotated[RunpodVolumeConfiguration, Tag("network")],
-            Annotated[RunpodGlobalVolumeConfiguration, Tag("global")],
-        ],
-        Discriminator(_get_runpod_volume_configuration_tag),
-    ],
+    Union[RunpodVolumeConfiguration, RunpodGlobalVolumeConfiguration],
 )
 
 
