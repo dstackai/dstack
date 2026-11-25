@@ -22,6 +22,9 @@ from nebius.api.nebius.compute.v1 import (
     Instance,
     InstanceSpec,
     InstanceStatus,
+    IPAddressStatus,
+    NetworkInterfaceStatus,
+    PublicIPAddressStatus,
     ResourcesSpec,
 )
 
@@ -33,7 +36,7 @@ from dstack._internal.core.backends.nebius.models import (
     NebiusOfferBackendData,
     NebiusServiceAccountCreds,
 )
-from dstack._internal.core.errors import NoCapacityError, NotYetTerminated
+from dstack._internal.core.errors import NoCapacityError, NotYetTerminated, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
 from dstack._internal.core.models.instances import (
@@ -49,6 +52,7 @@ from dstack._internal.core.models.placement import (
     PlacementGroupProvisioningData,
     PlacementStrategy,
 )
+from dstack._internal.core.models.runs import JobProvisioningData
 
 CapacityAvailability = ResourceAdviceStatus.Availability
 CAPACITY_LEVELS = CapacityAvailability.AvailabilityLevel
@@ -733,6 +737,76 @@ def make_resource_group(
             }
         ),
     )
+
+
+def make_provisioning_data() -> JobProvisioningData:
+    return JobProvisioningData(
+        backend=BackendType.NEBIUS,
+        instance_type=make_offer(1, spot=False, is_preemptible_flat_rate=False).instance,
+        instance_id="instance-1",
+        hostname=None,
+        region="eu-north1",
+        price=1,
+        username="ubuntu",
+        ssh_port=22,
+        dockerized=True,
+    )
+
+
+class TestUpdateProvisioningData:
+    @pytest.fixture(autouse=True)
+    def _mock_sdk(self, mocker):
+        mocker.patch.object(NebiusCompute, "_sdk", Mock())
+
+    @pytest.fixture
+    def mock_instance(self, mocker):
+        def mock(state: InstanceStatus.InstanceState, reconciling: bool = False) -> None:
+            instance = make_instance(state=state)
+            instance.status.reconciling = reconciling
+            instance.status.network_interfaces = [
+                NetworkInterfaceStatus(
+                    ip_address=IPAddressStatus(address="10.0.0.5/32"),
+                    public_ip_address=PublicIPAddressStatus(address="203.0.113.5/32"),
+                )
+            ]
+            mocker.patch.object(compute_module.resources, "get_instance", return_value=instance)
+
+        return mock
+
+    @pytest.mark.parametrize(
+        ("state", "reconciling", "expected_hostname"),
+        [
+            # A new instance is stopped before it starts
+            (InstanceStatus.InstanceState.STOPPED, True, None),
+            (InstanceStatus.InstanceState.STARTING, True, None),
+            (InstanceStatus.InstanceState.RUNNING, False, "203.0.113.5"),
+        ],
+    )
+    def test_sets_hostname_only_when_running(
+        self, mock_instance, state, reconciling, expected_hostname
+    ):
+        mock_instance(state, reconciling)
+        provisioning_data = make_provisioning_data()
+
+        make_compute().update_provisioning_data(provisioning_data, "public-key", "private-key")
+
+        assert provisioning_data.hostname == expected_hostname
+
+    @pytest.mark.parametrize(
+        "state",
+        [
+            InstanceStatus.InstanceState.STOPPED,
+            InstanceStatus.InstanceState.DELETING,
+            InstanceStatus.InstanceState.ERROR,
+        ],
+    )
+    def test_raises_if_instance_will_not_run(self, mock_instance, state):
+        mock_instance(state)
+
+        with pytest.raises(ProvisioningError, match=state.name):
+            make_compute().update_provisioning_data(
+                make_provisioning_data(), "public-key", "private-key"
+            )
 
 
 class TestListResourceGroups:
