@@ -9,10 +9,12 @@ from dstack._internal.core.backends.verda.compute import (
     VerdaInstanceBackendData,
     _create_ssh_key,
     _create_startup_script,
+    _get_vm_image_id,
 )
 from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
+    Gpu,
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOffer,
@@ -46,6 +48,12 @@ def _instance_offer() -> InstanceOfferWithAvailability:
         price=0.0279,
         availability=InstanceAvailability.AVAILABLE,
     )
+
+
+def _gpu_instance_offer(gpu_name: str) -> InstanceOfferWithAvailability:
+    offer = _instance_offer()
+    offer.instance.resources.gpus = [Gpu(name=gpu_name, memory_mib=16384)]
+    return offer
 
 
 def _instance_config(public_keys: list[str]) -> InstanceConfiguration:
@@ -119,6 +127,17 @@ class TestCreateStartupScript:
                 name="dstack-test-script.sh",
                 script="echo bye",
             )
+
+
+class TestGetVMImageId:
+    def test_v100_uses_separate_image(self):
+        assert _get_vm_image_id(_gpu_instance_offer("V100")) != _get_vm_image_id(_instance_offer())
+
+    @pytest.mark.parametrize("gpu_name", ["A6000", "H100"])
+    def test_other_gpus_use_default_image(self, gpu_name):
+        assert _get_vm_image_id(_gpu_instance_offer(gpu_name)) == _get_vm_image_id(
+            _instance_offer()
+        )
 
 
 class TestCreateInstance:

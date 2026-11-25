@@ -14,6 +14,7 @@ class VastAIOfferOrder(str, Enum):
 
 VASTAI_DEFAULT_OFFER_ORDER = VastAIOfferOrder.SCORE
 VASTAI_DEFAULT_MIN_RELIABILITY = 0.9
+VASTAI_DEFAULT_MIN_INET_DOWN = 128
 
 
 class VastAIProfileOptions(BackendProfileOptions["VastAIProfileOptions"]):
@@ -54,10 +55,23 @@ class VastAIProfileOptions(BackendProfileOptions["VastAIProfileOptions"]):
             ge=0,
         ),
     ] = None
+    min_inet_down: Annotated[
+        Optional[int],
+        Field(
+            description=(
+                "The minimum download speed of the host in Mbit/s, as measured by Vast.ai."
+                " Useful when the workload downloads large files, such as model weights, on start."
+                " If not set, only hosts with download speeds"
+                f" above `{VASTAI_DEFAULT_MIN_INET_DOWN}` are considered"
+            ),
+            ge=0,
+        ),
+    ] = None
 
     def combine(self, other: "VastAIProfileOptions") -> "VastAIProfileOptions":
         return VastAIProfileOptions(
             offer_order=get_single_value_optional(self.offer_order, other.offer_order),
             min_reliability=get_max_optional(self.min_reliability, other.min_reliability),
             min_score=get_max_optional(self.min_score, other.min_score),
+            min_inet_down=get_max_optional(self.min_inet_down, other.min_inet_down),
         )

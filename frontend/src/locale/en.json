@@ -911,6 +911,8 @@
         "no_cli_description": "To use dstack, install the CLI on your local machine.",
         "constraints": "Constraints",
         "concurrency": "Concurrency",
+        "metric": "Metric",
+        "no_benchmark_data": "No data",
         "dataset": "Dataset",
         "input_tokens": "Input tokens",
         "output_tokens": "Output tokens",

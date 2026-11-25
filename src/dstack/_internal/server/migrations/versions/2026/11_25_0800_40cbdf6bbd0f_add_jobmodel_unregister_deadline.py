@@ -1,8 +1,8 @@
 """Add JobModel.unregister_deadline
 
 Revision ID: 40cbdf6bbd0f
-Revises: 2d2692d5b3c2
-Create Date: 2026-11-20 12:41:35.026269+00:00
+Revises: bb3f3be7c111
+Create Date: 2026-11-25 08:00:00.000000+00:00
 
 """
 
@@ -13,7 +13,7 @@ import dstack._internal.server.models
 
 # revision identifiers, used by Alembic.
 revision = "40cbdf6bbd0f"
-down_revision = "2d2692d5b3c2"
+down_revision = "bb3f3be7c111"
 branch_labels = None
 depends_on = None
 
