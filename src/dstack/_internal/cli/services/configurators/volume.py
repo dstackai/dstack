@@ -16,7 +16,6 @@ from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.volumes import (
     AnyVolumeConfiguration,
-    RunpodGlobalVolumeConfiguration,
     Volume,
     VolumeConfigurationWithRegion,
     VolumeConfigurationWithSize,
@@ -212,8 +211,6 @@ def _print_plan_header(plan: VolumePlan):
 
     configuration_table.add_row(th("Volume type"), volume_type)
     configuration_table.add_row(th("Backend"), plan.spec.configuration.backend.value)
-    if isinstance(plan.spec.configuration, RunpodGlobalVolumeConfiguration):
-        configuration_table.add_row(th("Global"), "true")
     if isinstance(plan.spec.configuration, VolumeConfigurationWithRegion):
         configuration_table.add_row(th("Region"), plan.spec.configuration.region)
     if isinstance(plan.spec.configuration, VolumeConfigurationWithSize):
