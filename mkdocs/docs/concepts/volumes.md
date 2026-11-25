@@ -43,10 +43,8 @@ size: 100GB
 If you use this configuration, `dstack` will create a new volume based on the specified options.
 
 ??? info "Runpod"
-    By default, Runpod volumes belong to one region and require `size` when created.
-    To share model weights or datasets across regions, opt into a
-    [global volume](https://docs.runpod.io/storage/globalvolume/overview) with `global: true`.
-    Omit `size` and `region`:
+    Runpod volumes are regional by default. For global volumes, set `global: true`
+    and omit `size` and `region`.
 
     ```yaml
     type: volume
@@ -55,16 +53,9 @@ If you use this configuration, `dstack` will create a new volume based on the sp
     global: true
     ```
 
-    To register an existing global volume, also set `volume_id`.
-    Mount it using the same `volumes` configuration as other network volumes.
-    Each run can mount one Runpod volume. Global volumes are supported on Secure Cloud
-    CPU and GPU Pods; Community Cloud and Instant Clusters are not supported.
+    Each run can mount one volume. Global volumes require Secure Cloud and do not support Instant Clusters.
 
-    Global volumes grow with usage. Runpod bills for storage and operations;
-    these charges are not included in `dstack`'s volume cost estimates.
-    Global volumes have eventual consistency and do not support cross-Pod file locking,
-    atomic rename, hard links, or Unix permissions. Use them primarily for read-heavy data.
-    See Runpod's [limitations](https://docs.runpod.io/storage/globalvolume/overview#limitations).
+    > Global volume usage is not included in `dstack` cost estimates. See [storage limitations](https://docs.runpod.io/storage/globalvolume/overview#limitations).
 
 ??? info "Daytona"
     Daytona volumes use [S3-backed FUSE storage](https://www.daytona.io/docs/en/volumes/).
