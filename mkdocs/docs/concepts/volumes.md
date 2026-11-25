@@ -54,8 +54,11 @@ If you use this configuration, `dstack` will create a new volume based on the sp
     ```
 
     Each run can mount one volume. Global volumes require Secure Cloud and do not support Instant Clusters.
+    See Runpod's [storage limitations](https://docs.runpod.io/storage/globalvolume/overview#limitations).
 
-    > Global volume usage is not included in `dstack` cost estimates. See [storage limitations](https://docs.runpod.io/storage/globalvolume/overview#limitations).
+    > Global volume charges are not included in the costs shown by `dstack`.
+
+    > Do not configure `auto_cleanup_duration` for Runpod volumes: it may request deletion while a run is still using the volume.
 
 ??? info "Daytona"
     Daytona volumes use [S3-backed FUSE storage](https://www.daytona.io/docs/en/volumes/).
