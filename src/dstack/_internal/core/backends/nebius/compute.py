@@ -106,6 +106,7 @@ SUPPORTED_PLATFORMS = [
     "gpu-h200-sxm",
     "gpu-b200-sxm",
     "gpu-b200-sxm-a",
+    "gpu-b300-sxm",
     "gpu-l40s-a",
     "gpu-l40s-d",
     "gpu-rtx6000",
