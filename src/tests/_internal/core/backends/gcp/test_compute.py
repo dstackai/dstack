@@ -14,6 +14,9 @@ from dstack._internal.core.backends.gcp.models import GCPConfig, GCPDefaultCreds
 from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
+from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.runs import Requirements
+from dstack._internal.server.testing.common import get_instance_offer_with_availability
 
 PROJECT_ID = "test-project"
 PROVIDER_REF = "abc123def456"
@@ -77,6 +80,29 @@ class TestGetAllOffersWithAvailability:
         if tpu_config.get("tpu"):
             expected_names.append("v5litepod-8")
         assert [offer.instance.name for offer in offers] == expected_names
+
+
+class TestGetOffersPostFilter:
+    def test_removes_reserved_only_offers_without_reservation(self, mocker):
+        compute = _get_compute(mocker, regions=["us-central1"])
+        offer = get_instance_offer_with_availability(backend=BackendType.GCP)
+        reserved_only_offer = offer.model_copy(
+            update={"backend_data": {"is_dws_calendar_mode": True}}
+        )
+        regular_offer = offer.model_copy(update={"backend_data": {"is_dws_calendar_mode": False}})
+
+        post_filter = compute.get_offers_post_filter(Requirements(resources=ResourcesSpec()))
+
+        assert post_filter is not None
+        assert not post_filter(reserved_only_offer)
+        assert post_filter(regular_offer)
+        assert post_filter(offer)
+
+    def test_keeps_all_offers_with_reservation(self, mocker):
+        compute = _get_compute(mocker, regions=["us-central1"])
+        requirements = Requirements(resources=ResourcesSpec(), reservation="test-reservation")
+
+        assert compute.get_offers_post_filter(requirements) is None
 
 
 def _get_vm(

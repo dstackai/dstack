@@ -4,15 +4,11 @@ from collections.abc import Container, Iterable
 from datetime import datetime
 from typing import Dict, List, Literal, Optional, Sequence, Union
 
-import gpuhunt
 from sqlalchemy import and_, exists, false, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, joinedload, load_only
 
-from dstack._internal.core.backends.base.offers import (
-    offer_to_catalog_item,
-    requirements_to_query_filter,
-)
+from dstack._internal.core.backends.base.offers import OfferMatcher
 from dstack._internal.core.backends.features import BACKENDS_WITH_MULTINODE_SUPPORT
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
@@ -567,7 +563,7 @@ def instance_matches_constraints(
     regions: Optional[List[str]] = None,
     instance_types: Optional[List[str]] = None,
     zones: Optional[List[str]] = None,
-    requirements: Optional[Requirements] = None,
+    offer_matcher: Optional[OfferMatcher] = None,
 ) -> bool:
     """Check if an instance matches the given provisioning constraints."""
     jpd = get_instance_provisioning_data(instance)
@@ -587,12 +583,11 @@ def instance_matches_constraints(
         ):
             return False
 
-    if requirements is not None:
+    if offer_matcher is not None:
         if instance.offer is None:
             return False
         offer = validate_json_extra_ignore(InstanceOffer, instance.offer)
-        catalog_item = offer_to_catalog_item(offer)
-        if not gpuhunt.matches(catalog_item, q=requirements_to_query_filter(requirements)):
+        if not offer_matcher.matches(offer):
             return False
 
     return True
@@ -650,6 +645,7 @@ def filter_instances(
         regions = [r for r in regions if r == master_job_provisioning_data.region]
 
     instance_types = profile.instance_types
+    offer_matcher = OfferMatcher(requirements) if requirements is not None else None
 
     filtered_instances: List[InstanceModel] = []
     for instance in instances:
@@ -670,7 +666,7 @@ def filter_instances(
             regions=regions,
             instance_types=instance_types,
             zones=zones,
-            requirements=requirements,
+            offer_matcher=offer_matcher,
         ):
             continue
         if volumes_locations is not None:
@@ -703,7 +699,7 @@ def get_shared_instances_with_offers(
     volumes: Optional[List[List[Volume]]] = None,
 ) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
     instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]] = []
-    query_filter = requirements_to_query_filter(requirements)
+    offer_matcher = OfferMatcher(requirements)
     filtered_instances = filter_instances(
         instances=instances,
         profile=profile,
@@ -724,8 +720,7 @@ def get_shared_instances_with_offers(
         min_blocks = total_blocks if multinode else 1
         for blocks in range(min_blocks, total_blocks + 1):
             shared_offer = generate_shared_offer(offer, blocks, total_blocks)
-            catalog_item = offer_to_catalog_item(shared_offer)
-            if gpuhunt.matches(catalog_item, query_filter):
+            if offer_matcher.matches(shared_offer):
                 if blocks <= idle_blocks:
                     shared_offer.availability = InstanceAvailability.IDLE
                 else:

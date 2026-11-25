@@ -8,6 +8,7 @@ from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
+from dstack._internal.core.backends.base.offers import OfferMatcher
 from dstack._internal.core.models.fleets import (
     FleetSpec,
     FleetStatus,
@@ -627,10 +628,11 @@ def _terminate_instances_not_matching_fleet_spec(
     fleet_spec: FleetSpec,
 ) -> dict[uuid.UUID, _InstanceUpdateMap]:
     updates: dict[uuid.UUID, _InstanceUpdateMap] = {}
+    offer_matcher = OfferMatcher(get_fleet_requirements(fleet_spec))
     for instance in instances:
         if not _can_terminate_spec_mismatched_instance(instance):
             continue
-        if not _instance_matches_fleet_spec(instance, fleet_spec):
+        if not _instance_matches_fleet_spec(instance, fleet_spec, offer_matcher):
             updates[instance.id] = {
                 "status": InstanceStatus.TERMINATING,
                 "termination_reason": InstanceTerminationReason.FLEET_SPEC_MISMATCH,
@@ -647,19 +649,20 @@ def _can_terminate_spec_mismatched_instance(instance: InstanceModel) -> bool:
     return instance.status in (InstanceStatus.IDLE, InstanceStatus.PROVISIONING)
 
 
-def _instance_matches_fleet_spec(instance: InstanceModel, fleet_spec: FleetSpec) -> bool:
+def _instance_matches_fleet_spec(
+    instance: InstanceModel, fleet_spec: FleetSpec, offer_matcher: OfferMatcher
+) -> bool:
     if instance.offer is None:
         # Not yet provisioned — will be provisioned using the current (updated) spec.
         return True
     profile = fleet_spec.merged_profile
-    requirements = get_fleet_requirements(fleet_spec)
     return instance_matches_constraints(
         instance,
         backend_types=profile.backends,
         regions=profile.regions,
         instance_types=profile.instance_types,
         zones=profile.availability_zones,
-        requirements=requirements,
+        offer_matcher=offer_matcher,
     )
 
 
