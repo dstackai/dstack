@@ -152,9 +152,8 @@ def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFi
         q.min_memory = res.memory.min
         q.max_memory = res.memory.max
     if res.disk:
-        # `QueryFilter` disk size bounds are typed as `int` until the next gpuhunt release
-        q.min_disk_size = res.disk.size.min  # pyright: ignore[reportAttributeAccessIssue]
-        q.max_disk_size = res.disk.size.max  # pyright: ignore[reportAttributeAccessIssue]
+        q.min_disk_size = res.disk.size.min
+        q.max_disk_size = res.disk.size.max
 
     if res.gpu:
         q.gpu_vendor = res.gpu.vendor
