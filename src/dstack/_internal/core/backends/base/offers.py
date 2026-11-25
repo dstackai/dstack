@@ -209,18 +209,31 @@ def requirements_to_query_filter(
     return q
 
 
+class OfferMatcher:
+    """
+    Matches offers against `requirements`.
+
+    Create one per `requirements` and reuse it for all offers.
+    """
+
+    def __init__(self, requirements: Requirements, *, check_disk: bool = True) -> None:
+        self._query_filter = requirements_to_query_filter(requirements, ignore_disk=not check_disk)
+
+    def matches(self, offer: InstanceOffer) -> bool:
+        return gpuhunt.matches(offer_to_catalog_item(offer), q=self._query_filter)
+
+
 InstanceOfferT = TypeVar("InstanceOfferT", InstanceOffer, InstanceOfferWithAvailability)
 
 
 def filter_offers_by_requirements(
     offers: Iterable[InstanceOfferT],
-    requirements: Optional[Requirements],
+    requirements: Requirements,
     ignore_disk: bool = False,
 ) -> Iterator[InstanceOfferT]:
-    query_filter = requirements_to_query_filter(requirements, ignore_disk=ignore_disk)
+    matcher = OfferMatcher(requirements, check_disk=not ignore_disk)
     for offer in offers:
-        catalog_item = offer_to_catalog_item(offer)
-        if gpuhunt.matches(catalog_item, q=query_filter):
+        if matcher.matches(offer):
             yield offer
 
 

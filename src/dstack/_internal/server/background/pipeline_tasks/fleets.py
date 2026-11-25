@@ -8,6 +8,7 @@ from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
+from dstack._internal.core.backends.base.offers import OfferMatcher
 from dstack._internal.core.models.fleets import (
     FleetSpec,
     FleetStatus,
@@ -659,7 +660,7 @@ def _instance_matches_fleet_spec(instance: InstanceModel, fleet_spec: FleetSpec)
         regions=profile.regions,
         instance_types=profile.instance_types,
         zones=profile.availability_zones,
-        requirements=requirements,
+        offer_matcher=OfferMatcher(requirements),
     )
 
 
