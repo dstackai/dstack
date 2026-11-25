@@ -36,8 +36,7 @@ SUPPORTED_GPUHUNT_FLAGS = [
 NVIDIA_GPU_NAME_TO_COMPUTE_CAPABILITY_MAP = {
     gpu_info.name.lower(): gpu_info.compute_capability for gpu_info in gpuhunt.KNOWN_NVIDIA_GPUS
 }
-"""Keys are lowercase GPU names.
-
+"""
 `NvidiaGPUInfo.name` in `KNOWN_NVIDIA_GPUS` is not unique -- there are multiple variants with
 the same name but different amount of memory, but Compute Capability of the variants is always
 the same, so it's safe to use 1:1 mapping.
@@ -242,6 +241,29 @@ class OfferMatcher:
         return _is_within(len(gpus) * gpus[0].memory_mib, *self._total_gpu_memory_mib_bounds)
 
 
+def gpu_matches_gpu_spec(gpu: Gpu, gpu_spec: GPUSpec) -> bool:
+    if gpu_spec.vendor is not None and gpu.vendor != gpu_spec.vendor:
+        return False
+    if gpu_spec.name is not None and gpu.name.lower() not in map(str.lower, gpu_spec.name):
+        return False
+    if gpu_spec.memory is not None:
+        min_memory_gib = gpu_spec.memory.min
+        if min_memory_gib is not None and gpu.memory_mib < min_memory_gib * 1024:
+            return False
+        max_memory_gib = gpu_spec.memory.max
+        if max_memory_gib is not None and gpu.memory_mib > max_memory_gib * 1024:
+            return False
+    if gpu_spec.compute_capability is not None:
+        if gpu.vendor != gpuhunt.AcceleratorVendor.NVIDIA:
+            return False
+        compute_capability = NVIDIA_GPU_NAME_TO_COMPUTE_CAPABILITY_MAP.get(gpu.name.lower())
+        if compute_capability is None:
+            return False
+        if compute_capability < gpu_spec.compute_capability:
+            return False
+    return True
+
+
 def _gpu_spec_matches_no_gpus(gpu_spec: GPUSpec) -> bool:
     if gpu_spec.count.min == 0:
         return True
@@ -362,29 +384,6 @@ class OfferDiskFitter:
                 disk = Disk(size_mib=round(get_or_error(disk_size_range.min) * 1024))
             self._disk_by_range[key] = disk
         return self._disk_by_range[key]
-
-
-def gpu_matches_gpu_spec(gpu: Gpu, gpu_spec: GPUSpec) -> bool:
-    if gpu_spec.vendor is not None and gpu.vendor != gpu_spec.vendor:
-        return False
-    if gpu_spec.name is not None and gpu.name.lower() not in map(str.lower, gpu_spec.name):
-        return False
-    if gpu_spec.memory is not None:
-        min_memory_gib = gpu_spec.memory.min
-        if min_memory_gib is not None and gpu.memory_mib < min_memory_gib * 1024:
-            return False
-        max_memory_gib = gpu_spec.memory.max
-        if max_memory_gib is not None and gpu.memory_mib > max_memory_gib * 1024:
-            return False
-    if gpu_spec.compute_capability is not None:
-        if gpu.vendor != gpuhunt.AcceleratorVendor.NVIDIA:
-            return False
-        compute_capability = NVIDIA_GPU_NAME_TO_COMPUTE_CAPABILITY_MAP.get(gpu.name.lower())
-        if compute_capability is None:
-            return False
-        if compute_capability < gpu_spec.compute_capability:
-            return False
-    return True
 
 
 OfferKeyT = TypeVar("OfferKeyT")
