@@ -6,7 +6,6 @@ import pytest
 from dstack._internal.core.backends.base.offers import (
     OfferDiskFitter,
     OfferMatcher,
-    filter_offers_by_requirements,
     gpu_matches_gpu_spec,
 )
 from dstack._internal.core.models.backends.base import BackendType
@@ -504,24 +503,6 @@ class TestOfferMatcher:
         )
 
         assert matches(offer, requirements)
-
-
-class TestFilterOffersByRequirements:
-    def test_yields_matching_offers_in_order(self):
-        offers = [make_offer(cpus=16), make_offer(cpus=1), make_offer(cpus=8)]
-
-        result = list(filter_offers_by_requirements(offers, make_requirements()))
-
-        assert result == [offers[0], offers[2]]
-
-    def test_ignore_disk_skips_disk_requirement(self):
-        offer = make_offer(disk_gib=50)
-        requirements = make_requirements({"disk": "100GB.."})
-
-        assert list(filter_offers_by_requirements([offer], requirements)) == []
-        assert list(filter_offers_by_requirements([offer], requirements, ignore_disk=True)) == [
-            offer
-        ]
 
 
 class TestOfferDiskFitter:

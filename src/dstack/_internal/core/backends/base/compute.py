@@ -23,8 +23,8 @@ from dstack._internal import settings
 from dstack._internal.core.backends.base.models import JobConfiguration
 from dstack._internal.core.backends.base.offers import (
     OfferDiskFitter,
+    OfferMatcher,
     OfferModifier,
-    filter_offers_by_requirements,
 )
 from dstack._internal.core.consts import (
     DSTACK_RUNNER_HTTP_PORT,
@@ -296,7 +296,8 @@ class ComputeWithAllOffersCached(ABC):
         offers = self.__apply_modifiers(
             cached_offers, self.get_offers_modifiers(requirements, full_offers)
         )
-        offers = filter_offers_by_requirements(offers, requirements, ignore_disk=True)
+        matcher = OfferMatcher(requirements, check_disk=False)
+        offers = (o for o in offers if matcher.matches(o))
         offers = self.__fit_disk_size(offers, requirements)
         post_filter = self.get_offers_post_filter(requirements)
         if post_filter is not None:

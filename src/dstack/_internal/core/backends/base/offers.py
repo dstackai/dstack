@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Iterator
 from dataclasses import asdict
 from typing import Callable, Generic, List, Literal, Optional, TypeVar, Union
 from uuid import UUID
@@ -245,20 +244,6 @@ class OfferMatcher:
             self._min_total_gpu_memory_mib,
             self._max_total_gpu_memory_mib,
         )
-
-
-InstanceOfferT = TypeVar("InstanceOfferT", InstanceOffer, InstanceOfferWithAvailability)
-
-
-def filter_offers_by_requirements(
-    offers: Iterable[InstanceOfferT],
-    requirements: Requirements,
-    ignore_disk: bool = False,
-) -> Iterator[InstanceOfferT]:
-    matcher = OfferMatcher(requirements, check_disk=not ignore_disk)
-    for offer in offers:
-        if matcher.matches(offer):
-            yield offer
 
 
 def _gpu_spec_matches_no_gpus(gpu_spec: GPUSpec) -> bool:
