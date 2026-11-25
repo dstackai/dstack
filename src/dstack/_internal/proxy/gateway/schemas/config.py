@@ -10,3 +10,4 @@ class ConfigRequest(BaseModel):
     acme_eab_kid: Optional[str] = None
     acme_eab_hmac_key: Optional[str] = None
     otel_settings: Optional[OTelSettings] = None
+    config_hash: Optional[str] = None

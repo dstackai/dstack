@@ -51,3 +51,5 @@ class OTelSettings(ImmutableModel):
 class GlobalProxyConfig(ImmutableModel):
     acme_settings: ACMESettings = ACMESettings()
     otel_settings: Optional[OTelSettings] = None
+    config_hash: Optional[str] = None
+    """Computed by the server. Reported back to detect outdated config"""

@@ -15,6 +15,7 @@ from dstack._internal.core.errors import BackendError, GatewayError
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.gateways import (
     ACMGatewayCertificate,
+    GatewayOTelConfig,
     GatewayReplicaProvisioningData,
     GatewayReplicaStatus,
     GatewayStatus,
@@ -29,6 +30,7 @@ from dstack._internal.core.models.runs import JobStatus, RunStatus, ServiceSpec
 from dstack._internal.core.models.services import OpenAIChatModel
 from dstack._internal.proxy.gateway.schemas.registry import ImportListItem
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListReplicaItem
+from dstack._internal.proxy.gateway.schemas.state import StateSummaryResponse
 from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks import gateway_replicas
 from dstack._internal.server.background.pipeline_tasks.gateway_replicas import (
@@ -49,6 +51,10 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services import exports as exports_service
+from dstack._internal.server.services.gateways import (
+    build_gateway_config,
+    get_gateway_configuration,
+)
 from dstack._internal.server.testing.common import (
     AsyncContextManager,
     ComputeMockSpec,
@@ -62,6 +68,7 @@ from dstack._internal.server.testing.common import (
     create_project,
     create_repo,
     create_run,
+    create_secret,
     create_service_run,
     create_user,
     get_gateway_replica_configuration,
@@ -793,7 +800,9 @@ class TestGatewayReplicaWorkerRunning:
         )
         _lock_replica(replica)
         await session.commit()
-        _get_client_mock(mock_gateway_connection).list_services.return_value = []
+        _get_client_mock(
+            mock_gateway_connection
+        ).get_state_summary.return_value = _get_state_summary(replica, [])
         failing_hook = AsyncMock(side_effect=RuntimeError("hook failed"))
         hook = AsyncMock()
         monkeypatch.setattr(
@@ -812,6 +821,15 @@ class TestGatewayReplicaWorkerRunning:
 
 def _get_client_mock(mock_gateway_connection: AsyncMock) -> AsyncMock:
     return mock_gateway_connection.return_value.client.return_value.__aenter__.return_value
+
+
+def _get_state_summary(
+    replica: GatewayReplicaModel, services: list[ServiceListItem], config_synced: bool = True
+) -> StateSummaryResponse:
+    config_hash = None
+    if config_synced:
+        config_hash = build_gateway_config(None, hash_key=replica.ssh_private_key).config_hash
+    return StateSummaryResponse(services=services, config_hash=config_hash)
 
 
 @pytest.mark.asyncio
@@ -884,7 +902,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
             replicas=list(reported.values()),
         )
         client = _get_client_mock(mock_gateway_connection)
-        client.list_services.return_value = [service]
+        client.get_state_summary.return_value = _get_state_summary(replica, [service])
 
         async def update(updates):
             if failure == "update":
@@ -1009,7 +1027,9 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = []
+        client_mock.get_state_summary.return_value = _get_state_summary(
+            replica, [], config_synced=False
+        )
 
         await worker.process(_replica_to_pipeline_item(replica))
 
@@ -1106,7 +1126,9 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = []
+        client_mock.get_state_summary.return_value = _get_state_summary(
+            replica, [], config_synced=False
+        )
         client_mock.submit_gateway_config.side_effect = RuntimeError("gateway unavailable")
 
         await worker.process(_replica_to_pipeline_item(replica))
@@ -1118,6 +1140,151 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.refresh(replica)
         assert replica.status == GatewayReplicaStatus.RUNNING
         assert replica.lock_token is None
+
+    async def test_resubmits_outdated_config_and_postpones_sync(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        mock_gateway_connection: AsyncMock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        replica = await create_gateway_replica(
+            session=session,
+            gateway_id=gateway.id,
+            backend=backend,
+            status=GatewayReplicaStatus.RUNNING,
+        )
+        await self._create_service_run_and_job(
+            session, project, repo, user, gateway, run_name="test-service"
+        )
+        _lock_replica(replica)
+        await session.commit()
+
+        client_mock = _get_client_mock(mock_gateway_connection)
+        client_mock.get_state_summary.return_value = StateSummaryResponse(
+            services=[], config_hash="outdated"
+        )
+
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        client_mock.submit_gateway_config.assert_awaited_once()
+        config = client_mock.submit_gateway_config.await_args.args[0]
+        assert config.config_hash == _get_state_summary(replica, []).config_hash
+        # The gateway may be restarting to apply the config
+        client_mock.register_service.assert_not_called()
+        await session.refresh(replica)
+        assert replica.lock_token is None
+
+    async def test_submits_otel_settings(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        mock_gateway_connection: AsyncMock,
+    ):
+        project = await create_project(session=session, name="main")
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="my-gateway",
+            status=GatewayStatus.RUNNING,
+        )
+        configuration = get_gateway_configuration(gateway)
+        configuration.otel = GatewayOTelConfig(
+            endpoint="https://otlp",
+            headers={"Authorization": "Bearer ${{ secrets.token }}"},
+            traces=True,
+        )
+        gateway.configuration = configuration.model_dump_json()
+        await create_secret(session=session, project=project, name="token", value="s3cret")
+        replica = await create_gateway_replica(
+            session=session,
+            gateway_id=gateway.id,
+            backend=backend,
+            status=GatewayReplicaStatus.RUNNING,
+            replica_num=1,
+        )
+        _lock_replica(replica)
+        await session.commit()
+
+        client_mock = _get_client_mock(mock_gateway_connection)
+        client_mock.get_state_summary.return_value = _get_state_summary(
+            replica, [], config_synced=False
+        )
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        client_mock.submit_gateway_config.assert_awaited_once()
+        config = client_mock.submit_gateway_config.await_args.args[0]
+        otel_settings = config.otel_settings
+        assert otel_settings.traces_enabled
+        assert otel_settings.headers == {"Authorization": "Bearer s3cret"}
+        attributes = otel_settings.resource_attributes
+        assert attributes["service.instance.id"] == str(replica.id)
+        assert attributes["dstack.project.name"] == "main"
+        assert attributes["dstack.gateway.name"] == "my-gateway"
+        assert attributes["dstack.backend"] == backend.type.value
+
+        client_mock.reset_mock()
+        client_mock.get_state_summary.return_value = StateSummaryResponse(
+            services=[], config_hash=config.config_hash
+        )
+        await session.refresh(replica)
+        _lock_replica(replica)
+        await session.commit()
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        client_mock.submit_gateway_config.assert_not_called()
+
+    async def test_skips_config_sync_for_older_gateways(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        mock_gateway_connection: AsyncMock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        replica = await create_gateway_replica(
+            session=session,
+            gateway_id=gateway.id,
+            backend=backend,
+            status=GatewayReplicaStatus.RUNNING,
+        )
+        run, _ = await self._create_service_run_and_job(
+            session, project, repo, user, gateway, run_name="test-service"
+        )
+        _lock_replica(replica)
+        await session.commit()
+
+        client_mock = _get_client_mock(mock_gateway_connection)
+        client_mock.get_state_summary.return_value = None
+        client_mock.list_services.return_value = []
+
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        client_mock.list_services.assert_awaited_once()
+        client_mock.submit_gateway_config.assert_not_called()
+        assert client_mock.register_service.call_args.kwargs["run_id"] == run.id
 
     async def test_unregisters_dangling_service_and_stale_replica(
         self,
@@ -1170,23 +1337,26 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = [
-            ServiceListItem(
-                id=run1.id.hex,
-                project_name=project.name,
-                run_name="live-service",
-                replicas=[
-                    ServiceListReplicaItem(id=job1.id.hex),
-                    ServiceListReplicaItem(id=stale_job.id.hex),
-                ],
-            ),
-            ServiceListItem(
-                id=run2.id.hex,
-                project_name=project.name,
-                run_name="dangling-service",
-                replicas=[],
-            ),
-        ]
+        client_mock.get_state_summary.return_value = _get_state_summary(
+            replica,
+            [
+                ServiceListItem(
+                    id=run1.id.hex,
+                    project_name=project.name,
+                    run_name="live-service",
+                    replicas=[
+                        ServiceListReplicaItem(id=job1.id.hex),
+                        ServiceListReplicaItem(id=stale_job.id.hex),
+                    ],
+                ),
+                ServiceListItem(
+                    id=run2.id.hex,
+                    project_name=project.name,
+                    run_name="dangling-service",
+                    replicas=[],
+                ),
+            ],
+        )
 
         await worker.process(_replica_to_pipeline_item(replica))
 
@@ -1306,23 +1476,26 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = [
-            ServiceListItem(
-                id=run1.id.hex,
-                project_name=project.name,
-                run_name="live-service",
-                replicas=[
-                    ServiceListReplicaItem(id=job1.id.hex),
-                    ServiceListReplicaItem(id=stale_job.id.hex),
-                ],
-            ),
-            ServiceListItem(
-                id=run2.id.hex,
-                project_name=project.name,
-                run_name="dangling-service",
-                replicas=[],
-            ),
-        ]
+        client_mock.get_state_summary.return_value = _get_state_summary(
+            replica,
+            [
+                ServiceListItem(
+                    id=run1.id.hex,
+                    project_name=project.name,
+                    run_name="live-service",
+                    replicas=[
+                        ServiceListReplicaItem(id=job1.id.hex),
+                        ServiceListReplicaItem(id=stale_job.id.hex),
+                    ],
+                ),
+                ServiceListItem(
+                    id=run2.id.hex,
+                    project_name=project.name,
+                    run_name="dangling-service",
+                    replicas=[],
+                ),
+            ],
+        )
 
         await worker.process(_replica_to_pipeline_item(replica))
 
@@ -1426,14 +1599,17 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = [
-            ServiceListItem(
-                id=run.id.hex,
-                project_name=project.name,
-                run_name="dangling-service",
-                replicas=[ServiceListReplicaItem(id=job.id.hex)],
-            ),
-        ]
+        client_mock.get_state_summary.return_value = _get_state_summary(
+            replica,
+            [
+                ServiceListItem(
+                    id=run.id.hex,
+                    project_name=project.name,
+                    run_name="dangling-service",
+                    replicas=[ServiceListReplicaItem(id=job.id.hex)],
+                ),
+            ],
+        )
 
         await worker.process(_replica_to_pipeline_item(replica))
 
@@ -1498,14 +1674,17 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = [
-            ServiceListItem(
-                id=run.id.hex,
-                project_name=project.name,
-                run_name="synced-service",
-                replicas=[ServiceListReplicaItem(id=job.id.hex)],
-            ),
-        ]
+        client_mock.get_state_summary.return_value = _get_state_summary(
+            replica,
+            [
+                ServiceListItem(
+                    id=run.id.hex,
+                    project_name=project.name,
+                    run_name="synced-service",
+                    replicas=[ServiceListReplicaItem(id=job.id.hex)],
+                ),
+            ],
+        )
 
         await worker.process(_replica_to_pipeline_item(replica))
 
@@ -1570,15 +1749,18 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = [
-            # Pre-0.21.0 gateways report services without an id.
-            ServiceListItem(
-                id=None,
-                project_name=project.name,
-                run_name="legacy-service",
-                replicas=[ServiceListReplicaItem(id=job.id.hex)],
-            ),
-        ]
+        client_mock.get_state_summary.return_value = _get_state_summary(
+            replica,
+            [
+                # Pre-0.21.0 gateways report services without an id.
+                ServiceListItem(
+                    id=None,
+                    project_name=project.name,
+                    run_name="legacy-service",
+                    replicas=[ServiceListReplicaItem(id=job.id.hex)],
+                ),
+            ],
+        )
 
         await worker.process(_replica_to_pipeline_item(replica))
 
@@ -1620,17 +1802,20 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = [
-            # A legacy entry with no ID and no replicas: there's nothing to match
-            # it against, so it cannot be told apart from genuine garbage and must
-            # be unregistered. The real, still-expected run gets registered fresh.
-            ServiceListItem(
-                id=None,
-                project_name=project.name,
-                run_name="legacy-service",
-                replicas=[],
-            ),
-        ]
+        client_mock.get_state_summary.return_value = _get_state_summary(
+            replica,
+            [
+                # A legacy entry with no ID and no replicas: there's nothing to match
+                # it against, so it cannot be told apart from genuine garbage and must
+                # be unregistered. The real, still-expected run gets registered fresh.
+                ServiceListItem(
+                    id=None,
+                    project_name=project.name,
+                    run_name="legacy-service",
+                    replicas=[],
+                ),
+            ],
+        )
 
         await worker.process(_replica_to_pipeline_item(replica))
 
@@ -1734,14 +1919,17 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = [
-            ServiceListItem(
-                id=run.id.hex,
-                project_name=project.name,
-                run_name="synced-service",
-                replicas=[ServiceListReplicaItem(id=job.id.hex)],
-            ),
-        ]
+        client_mock.get_state_summary.return_value = _get_state_summary(
+            replica,
+            [
+                ServiceListItem(
+                    id=run.id.hex,
+                    project_name=project.name,
+                    run_name="synced-service",
+                    replicas=[ServiceListReplicaItem(id=job.id.hex)],
+                ),
+            ],
+        )
 
         await worker.process(_replica_to_pipeline_item(replica))
 
@@ -1833,14 +2021,17 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = [
-            ServiceListItem(
-                id=run.id.hex,
-                project_name=project.name,
-                run_name="drifted-service",
-                replicas=[ServiceListReplicaItem(id=job.id.hex)],
-            ),
-        ]
+        client_mock.get_state_summary.return_value = _get_state_summary(
+            replica,
+            [
+                ServiceListItem(
+                    id=run.id.hex,
+                    project_name=project.name,
+                    run_name="drifted-service",
+                    replicas=[ServiceListReplicaItem(id=job.id.hex)],
+                ),
+            ],
+        )
 
         await worker.process(_replica_to_pipeline_item(replica))
 
@@ -1930,7 +2121,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = []
+        client_mock.get_state_summary.return_value = _get_state_summary(replica, [])
 
         async def register_service_side_effect(**kwargs):
             if kwargs["run_name"] == "service-fails":
@@ -2045,7 +2236,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
         )
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = []
+        client_mock.get_state_summary.return_value = _get_state_summary(replica, [])
         client_mock.register_replica.side_effect = GatewayError("boom replica")
 
         # First tick: the replica registration fails, recording the error and
@@ -2155,23 +2346,26 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = [
-            ServiceListItem(
-                id=run.id.hex,
-                project_name=project.name,
-                run_name="live-service",
-                replicas=[
-                    ServiceListReplicaItem(id=job.id.hex),
-                    ServiceListReplicaItem(id=stale_job.id.hex),
-                ],
-            ),
-            ServiceListItem(
-                id=dangling_run.id.hex,
-                project_name=project.name,
-                run_name="dangling-service",
-                replicas=[],
-            ),
-        ]
+        client_mock.get_state_summary.return_value = _get_state_summary(
+            replica,
+            [
+                ServiceListItem(
+                    id=run.id.hex,
+                    project_name=project.name,
+                    run_name="live-service",
+                    replicas=[
+                        ServiceListReplicaItem(id=job.id.hex),
+                        ServiceListReplicaItem(id=stale_job.id.hex),
+                    ],
+                ),
+                ServiceListItem(
+                    id=dangling_run.id.hex,
+                    project_name=project.name,
+                    run_name="dangling-service",
+                    replicas=[],
+                ),
+            ],
+        )
         client_mock.unregister_service.side_effect = make_error("boom service")
         client_mock.unregister_replica.side_effect = make_error("boom replica")
 
@@ -2248,17 +2442,20 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
 
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = [
-            ServiceListItem(
-                id=run.id.hex,
-                project_name=project.name,
-                run_name="live-service",
-                replicas=[
-                    ServiceListReplicaItem(id=job.id.hex),
-                    ServiceListReplicaItem(id=stale_job.id.hex),
-                ],
-            ),
-        ]
+        client_mock.get_state_summary.return_value = _get_state_summary(
+            replica,
+            [
+                ServiceListItem(
+                    id=run.id.hex,
+                    project_name=project.name,
+                    run_name="live-service",
+                    replicas=[
+                        ServiceListReplicaItem(id=job.id.hex),
+                        ServiceListReplicaItem(id=stale_job.id.hex),
+                    ],
+                ),
+            ],
+        )
         client_mock.unregister_replica.side_effect = GatewayError("boom replica")
 
         # First tick: unregistering the stale replica fails, recording the error
@@ -2386,7 +2583,7 @@ class TestGatewayReplicaWorkerRunningImportsSync:
             exported_models=["exported-model", "not-served-model"],
         )
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = []
+        client_mock.get_state_summary.return_value = _get_state_summary(replica, [])
         client_mock.list_imports.return_value = []
 
         await worker.process(_replica_to_pipeline_item(replica))
@@ -2425,7 +2622,7 @@ class TestGatewayReplicaWorkerRunningImportsSync:
             exported_models=["test-model"],
         )
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = []
+        client_mock.get_state_summary.return_value = _get_state_summary(replica, [])
         client_mock.list_imports.return_value = [
             ImportListItem(
                 importer_project="importer",
@@ -2486,7 +2683,7 @@ class TestGatewayReplicaWorkerRunningImportsSync:
         await session.commit()
         newer_export_id, older_export_id = newer_export.id, older_export.id
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = []
+        client_mock.get_state_summary.return_value = _get_state_summary(replica, [])
         client_mock.list_imports.return_value = []
 
         await worker.process(_replica_to_pipeline_item(replica))
@@ -2554,7 +2751,7 @@ class TestGatewayReplicaWorkerRunningImportsSync:
             exported_models=["test-model"],
         )
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = []
+        client_mock.get_state_summary.return_value = _get_state_summary(replica, [])
         # Registered while the gateway had a fixed domain.
         client_mock.list_imports.return_value = [
             ImportListItem(
@@ -2596,7 +2793,7 @@ class TestGatewayReplicaWorkerRunningImportsSync:
             exported_models=["test-model"],
         )
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = []
+        client_mock.get_state_summary.return_value = _get_state_summary(replica, [])
         request = Request("GET", "http://gateway/api/registry/imports/list")
         client_mock.list_imports.side_effect = HTTPStatusError(
             "Not Found", request=request, response=Response(404, request=request)
@@ -2637,7 +2834,7 @@ class TestGatewayReplicaWorkerRunningImportsSync:
             exported_models=["test-model"],
         )
         client_mock = _get_client_mock(mock_gateway_connection)
-        client_mock.list_services.return_value = []
+        client_mock.get_state_summary.return_value = _get_state_summary(replica, [])
 
         await worker.process(_replica_to_pipeline_item(replica))
 
@@ -2959,7 +3156,7 @@ class TestGatewayReplicaWorkerProvisioning:
         assert replica.status_message == "Failed to connect to gateway replica"
 
     @pytest.mark.parametrize("legacy_replica", [False, True])
-    async def test_provisioning_to_terminating_if_configure_fails(
+    async def test_provisioning_to_terminating_if_app_not_available(
         self, test_db, session: AsyncSession, worker: GatewayReplicaWorker, legacy_replica: bool
     ):
         project = await create_project(session=session)
@@ -2992,19 +3189,19 @@ class TestGatewayReplicaWorkerProvisioning:
                 "dstack._internal.server.services.gateways.connect_to_gateway_replica_with_retry"
             ) as connect_mock,
             patch(
-                "dstack._internal.server.services.gateways.configure_gateway_replica"
-            ) as configure_mock,
+                "dstack._internal.server.services.gateways.wait_for_gateway_replica_app"
+            ) as wait_mock,
         ):
             connect_mock.return_value = MagicMock()
-            configure_mock.side_effect = Exception("Configure failed")
+            wait_mock.side_effect = Exception("App not available")
             await worker.process(_replica_to_pipeline_item(replica))
             connect_mock.assert_called_once()
-            configure_mock.assert_called_once()
+            wait_mock.assert_called_once()
 
         await session.refresh(replica)
         assert replica.status == GatewayReplicaStatus.TERMINATING
         assert replica.active is False
-        assert replica.status_message == "Failed to configure gateway replica"
+        assert replica.status_message == "Gateway replica app is not available"
 
     @pytest.mark.parametrize(
         "gateway_status,to_be_deleted",
@@ -3050,7 +3247,7 @@ class TestGatewayReplicaWorkerProvisioning:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.gateway_replicas._connect_and_configure_gateway_replica"
+            "dstack._internal.server.background.pipeline_tasks.gateway_replicas._connect_to_gateway_replica"
         ) as connect_mock:
             await worker.process(_replica_to_pipeline_item(replica))
             connect_mock.assert_not_called()

@@ -3215,52 +3215,6 @@ class TestGatewayOTel:
         events = await list_events(session)
         assert all("s3cret" not in e.message for e in events)
 
-    async def test_cannot_update_otel_in_place(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
-        user = await create_user(session, global_role=GlobalRole.USER)
-        project = await create_project(session)
-        await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
-        )
-        backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
-        gateway = await create_gateway(
-            session=session,
-            project_id=project.id,
-            backend_id=backend.id,
-            name="my-gateway",
-            region="us-east-1",
-        )
-        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
-        get_response = await client.post(
-            f"/api/project/{project.name}/gateways/get",
-            json={"name": "my-gateway"},
-            headers=get_auth_headers(user.token),
-        )
-
-        response = await client.post(
-            f"/api/project/{project.name}/gateways/apply",
-            json={
-                "plan": {
-                    "spec": {
-                        "configuration": {
-                            "type": "gateway",
-                            "name": "my-gateway",
-                            "backend": "aws",
-                            "region": "us-east-1",
-                            "otel": {"endpoint": "https://otlp.example.com", "traces": True},
-                        }
-                    },
-                    "current_resource": get_response.json(),
-                },
-                "force": False,
-            },
-            headers=get_auth_headers(user.token),
-        )
-
-        assert response.status_code == 400
-        assert "cannot be updated in-place" in response.json()["detail"][0]["msg"]
-
     async def test_rejects_missing_secret(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):

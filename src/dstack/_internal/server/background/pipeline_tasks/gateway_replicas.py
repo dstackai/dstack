@@ -539,7 +539,6 @@ async def _process_provisioning_item(item: GatewayReplicaPipelineItem):
             GatewayReplicaModel.instance_id,
             GatewayReplicaModel.backend_id,
             GatewayReplicaModel.configuration,
-            GatewayReplicaModel.region,
         ],
         gateway_fields=_GATEWAY_FIELDS_MIN
         + [
@@ -550,7 +549,6 @@ async def _process_provisioning_item(item: GatewayReplicaPipelineItem):
             GatewayModel.backend_data,
         ],
         load_backends=True,
-        load_gateway_project=True,
         load_gateway_backend_type=True,
     )
     if replica_model is None:
@@ -565,7 +563,7 @@ async def _process_provisioning_item(item: GatewayReplicaPipelineItem):
     if _is_legacy_aws_acm_gateway_with_pending_migration(gateway_model):
         await _commit_update(item, replica_model, update_map={})
         return
-    error = await _connect_and_configure_gateway_replica(gateway_model, replica_model)
+    error = await _connect_to_gateway_replica(replica_model)
     if error is not None:
         await _commit_update(
             item,
@@ -629,14 +627,11 @@ async def _register_replica_with_load_balancer(
     return None
 
 
-async def _connect_and_configure_gateway_replica(
-    gateway_model: GatewayModel,
-    gateway_replica: GatewayReplicaModel,
-) -> Optional[str]:
+async def _connect_to_gateway_replica(gateway_replica: GatewayReplicaModel) -> Optional[str]:
     """Returns an error message on failure, None on success."""
     logger.debug("%s: connecting to gateway replica", fmt(gateway_replica))
     # TODO: do only one connection/configuration attempt per pipeline tick.
-    # Blocking on connect_to_gateway_replica_with_retry and configure_gateway_replica now has
+    # Blocking on connect_to_gateway_replica_with_retry and wait_for_gateway_replica_app now has
     # these cons:
     # - cannot terminate the gateway replica before it is provisioned because the DB model is locked
     # - connection retry counter is reset on server restart
@@ -645,15 +640,11 @@ async def _connect_and_configure_gateway_replica(
     if connection is None:
         return "Failed to connect to gateway replica"
     try:
-        async with get_session_ctx() as session:
-            otel_settings = await gateways_services.resolve_gateway_replica_otel_settings(
-                session, gateway_model, gateway_replica
-            )
-        await gateways_services.configure_gateway_replica(connection, otel_settings)
+        await gateways_services.wait_for_gateway_replica_app(connection)
     except Exception:
-        logger.exception("%s: failed to configure gateway replica", fmt(gateway_replica))
-        return "Failed to configure gateway replica"
-    logger.info("%s: gateway replica connected and configured", fmt(gateway_replica))
+        logger.exception("%s: gateway replica app is not available", fmt(gateway_replica))
+        return "Gateway replica app is not available"
+    logger.info("%s: gateway replica connected", fmt(gateway_replica))
     return None
 
 
@@ -696,7 +687,11 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
         return
     async with connection.client() as client:
         try:
-            currently_registered_services = await client.list_services()
+            state_summary = await client.get_state_summary()
+            if state_summary is not None:
+                currently_registered_services = state_summary.services
+            else:
+                currently_registered_services = await client.list_services()
         except Exception as e:
             if isinstance(e, HTTPStatusError) and e.response.status_code == 404:
                 logger.warning(
@@ -707,7 +702,7 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
                     fmt(replica_model),
                 )
             else:
-                logger.warning("%s: failed to list services: %r", fmt(replica_model), e)
+                logger.warning("%s: failed to get gateway state: %r", fmt(replica_model), e)
             await _commit_update(item, replica_model, update_map={})
             return
         # Imports are synced only where exports are enabled.
@@ -715,6 +710,22 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
         if are_exports_enabled():
             currently_registered_imports = await _list_imports(client, replica_model)
     await _run_process_running_gateway_replica_hooks(replica_model, connection)
+    if state_summary is not None:
+        try:
+            config_submitted = await _sync_gateway_config(
+                connection, gateway_model, replica_model, state_summary.config_hash
+            )
+        except Exception as e:
+            logger.warning("%s: failed to submit gateway config: %r", fmt(replica_model), e)
+            # Do not attempt service registration in this pipeline tick - we failed to submit the
+            # config, so the gateway may attempt to request certificates from the wrong ACME server
+            await _commit_update(item, replica_model, update_map={})
+            return
+        if config_submitted and state_summary.config_hash is not None:
+            # Do nothing else in this pipeline tick - the gateway app may be temporarily down
+            # if the OTel config has changed.
+            await _commit_update(item, replica_model, update_map={})
+            return
     run_filters = (RunModel.gateway_id == gateway_model.id, *get_running_service_filters())
     job_filters = (JobModel.status == JobStatus.RUNNING, JobModel.registered == True)
     run_fields: list[InstrumentedAttribute[Any]] = [RunModel.id]
@@ -774,22 +785,6 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
         run_models_by_id, job_models_by_id = await _load_runs_and_jobs_for_state_sync(
             session, plan
         )
-
-    if plan.register_services:
-        # Registering a service may request a TLS certificate. A reinstalled gateway has
-        # lost its global config along with its services, and certbot would fall back to
-        # its default ACME server, so resend the config first.
-        try:
-            async with get_session_ctx() as session:
-                otel_settings = await gateways_services.resolve_gateway_replica_otel_settings(
-                    session, gateway_model, replica_model
-                )
-            async with connection.client() as client:
-                await client.submit_gateway_config(otel_settings)
-        except Exception as e:
-            logger.warning("%s: failed to submit gateway config: %r", fmt(replica_model), e)
-            await _commit_update(item, replica_model, update_map={})
-            return
 
     sync_result = await _perform_state_sync(
         connection, gateway_model, replica_model, run_models_by_id, job_models_by_id, plan
@@ -917,6 +912,25 @@ async def _get_expected_imports(
         # The rows start with the oldest export, whose import is the one to stay.
         imports.setdefault((import_ref.importer_project, import_ref.name), import_ref)
     return set(imports.values())
+
+
+async def _sync_gateway_config(
+    connection: GatewayConnection,
+    gateway_model: GatewayModel,
+    replica_model: GatewayReplicaModel,
+    current_config_hash: Optional[str],
+) -> bool:
+    async with get_session_ctx() as session:
+        config = await gateways_services.get_gateway_replica_config(
+            session, gateway_model, replica_model
+        )
+    if config.config_hash == current_config_hash:
+        return False
+    logger.debug("%s: submitting gateway config", fmt(replica_model))
+    async with connection.client() as client:
+        await client.submit_gateway_config(config)
+    logger.info("%s: gateway config submitted", fmt(replica_model))
+    return True
 
 
 async def _perform_state_sync(
