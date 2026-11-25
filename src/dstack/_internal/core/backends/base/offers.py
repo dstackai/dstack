@@ -133,41 +133,6 @@ def catalog_item_to_offer(
     )
 
 
-def offer_to_catalog_item(offer: InstanceOffer) -> gpuhunt.CatalogItem:
-    cpu_arch = offer.instance.resources.cpu_arch
-    if cpu_arch is None:
-        cpu_arch = gpuhunt.CPUArchitecture.X86
-    gpu_count = len(offer.instance.resources.gpus)
-    gpu_vendor = None
-    gpu_name = None
-    gpu_memory = None
-    if gpu_count > 0:
-        gpu = offer.instance.resources.gpus[0]
-        gpu_vendor = gpu.vendor
-        gpu_name = gpu.name
-        gpu_memory = gpu.memory_mib / 1024
-    # Resources.disk.size_mib = 0 -> gpuhunt.CatalogItem.disk_size = None -> gpuhunt.matches()
-    # doesn't check disk size (gpuhunt.QueryFilter.{min_disk_size,max_disk_size} are ignored)
-    disk_size: Optional[float] = None
-    if (disk_size_mib := offer.instance.resources.disk.size_mib) != 0:
-        disk_size = disk_size_mib / 1024
-    return gpuhunt.CatalogItem(
-        provider=offer.backend.value,
-        instance_name=offer.instance.name,
-        location=offer.region,
-        price=offer.price,
-        cpu_arch=cpu_arch,
-        cpu=offer.instance.resources.cpus,
-        memory=offer.instance.resources.memory_mib / 1024,
-        gpu_count=gpu_count,
-        gpu_vendor=gpu_vendor,
-        gpu_name=gpu_name,
-        gpu_memory=gpu_memory,
-        spot=offer.instance.resources.spot,
-        disk_size=disk_size,
-    )
-
-
 def requirements_to_query_filter(
     req: Optional[Requirements], ignore_disk: bool = False
 ) -> gpuhunt.QueryFilter:
