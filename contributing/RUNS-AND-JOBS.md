@@ -85,4 +85,4 @@ Services' run lifecycle has some modifications:
 Services' jobs lifecycle has some modifications:
 
 - During STEP 3, once the primary job of a replica is `RUNNING` and ready to receive traffic, `JobRunningPipeline` registers that replica on the gateway. If the gateway is not accessible, the job fails with a gateway-related termination reason.
-- During STEP 5, `JobTerminatingPipeline` unregisters the replica from receiving requests before the job is fully cleaned up.
+- During STEP 5, `JobTerminatingPipeline` does not stop the replica until every running gateway replica has unregistered it, so that requests stop arriving first. Gateway replicas unregister replicas that are no longer `RUNNING` when they sync, and the pipeline asks them to sync right away. The wait is capped at a minute, since a gateway replica that cannot be reached never unregisters anything. Aborted jobs are not waited for. The in-server proxy stops routing requests to a replica as soon as it is no longer `RUNNING`, so it needs no wait.

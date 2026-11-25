@@ -574,6 +574,11 @@ class JobModel(PipelineModelMixin, BaseModel):
     over its last logs. `None` until the job starts terminating, and only set for jobs that are
     given time to finish -- the rest are stopped on their first terminating pass.
     """
+    unregister_deadline: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    """`unregister_deadline` is when a terminating service replica stops waiting to be
+    unregistered from gateway replicas and is terminated anyway. `None` until the replica is
+    found still registered on a terminating pass.
+    """
     volumes_detached_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     instance_assigned: Mapped[bool] = mapped_column(Boolean, default=False)
     """`instance_assigned` shows whether instance assignment has already been attempted.
