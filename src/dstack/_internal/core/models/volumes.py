@@ -4,7 +4,16 @@ from enum import Enum
 from pathlib import PurePosixPath
 from typing import Annotated, Any, Dict, List, Literal, Optional, Self, Tuple, Union
 
-from pydantic import Field, RootModel, ValidationError, field_validator
+from pydantic import (
+    ConfigDict,
+    Discriminator,
+    Field,
+    RootModel,
+    Tag,
+    ValidationError,
+    field_validator,
+)
+from typing_extensions import TypeAliasType
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.backends.base import BackendType
@@ -132,11 +141,49 @@ class GCPVolumeConfiguration(
 class RunpodVolumeConfiguration(
     VolumeConfigurationWithRegion, VolumeConfigurationWithVolumeID, VolumeConfigurationWithSize
 ):
+    model_config = ConfigDict(serialize_by_alias=True)
+
     backend: Annotated[Literal[BackendType.RUNPOD], Field(description="The volume backend")] = (
         BackendType.RUNPOD
     )
+    global_: Annotated[
+        Literal[False], Field(alias="global", description="Use a Runpod global volume")
+    ] = False
     availability_zone: Annotated[Optional[str], Field(exclude=True)] = None
     """Runpod doesn't have AZs but we accept this field for compatibility with older clients."""
+
+
+class RunpodGlobalVolumeConfiguration(VolumeConfigurationWithVolumeID):
+    model_config = ConfigDict(validate_by_name=True, serialize_by_alias=True)
+
+    backend: Annotated[Literal[BackendType.RUNPOD], Field(description="The volume backend")] = (
+        BackendType.RUNPOD
+    )
+    global_: Annotated[
+        Literal[True], Field(alias="global", description="Use a Runpod global volume")
+    ]
+
+
+def _get_runpod_volume_configuration_tag(value: Any) -> str:
+    # Existing regional configurations omit `global`. A callable discriminator preserves
+    # that input contract while keeping region and size out of the global configuration.
+    if isinstance(value, dict):
+        return "global" if value.get("global", value.get("global_", False)) else "network"
+    return "global" if isinstance(value, RunpodGlobalVolumeConfiguration) else "network"
+
+
+# A named alias gives the nested union a schema reference, as required by OpenAPI's
+# backend discriminator mapping.
+AnyRunpodVolumeConfiguration = TypeAliasType(
+    "AnyRunpodVolumeConfiguration",
+    Annotated[
+        Union[
+            Annotated[RunpodVolumeConfiguration, Tag("network")],
+            Annotated[RunpodGlobalVolumeConfiguration, Tag("global")],
+        ],
+        Discriminator(_get_runpod_volume_configuration_tag),
+    ],
+)
 
 
 class KubernetesVolumeConfiguration(VolumeConfigurationWithRegion, VolumeConfigurationWithSize):
@@ -196,7 +243,7 @@ class LiumVolumeConfiguration(VolumeConfigurationWithVolumeID):
 AnyVolumeConfiguration = Union[
     AWSVolumeConfiguration,
     GCPVolumeConfiguration,
-    RunpodVolumeConfiguration,
+    AnyRunpodVolumeConfiguration,
     KubernetesVolumeConfiguration,
     DaytonaVolumeConfiguration,
     LiumVolumeConfiguration,

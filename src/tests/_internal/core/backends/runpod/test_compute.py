@@ -8,15 +8,22 @@ from dstack._internal.core.backends.base.compute import parse_provider_ref_from_
 from dstack._internal.core.backends.runpod.api_client import RunpodV2ClientError
 from dstack._internal.core.backends.runpod.compute import RunpodCompute
 from dstack._internal.core.backends.runpod.models import RunpodAPIKeyCreds, RunpodConfig
-from dstack._internal.core.errors import ComputeError
+from dstack._internal.core.errors import ComputeError, SkipOffer
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.volumes import (
+    RunpodGlobalVolumeConfiguration,
+    RunpodVolumeConfiguration,
+    Volume,
+    VolumeMountPoint,
+)
 from dstack._internal.server.testing.common import (
     get_instance_offer_with_availability,
     get_job_provisioning_data,
+    get_volume,
 )
 
 # build_authorized_keys() rejects the project key unless it actually parses
@@ -63,6 +70,7 @@ def _job() -> MagicMock:
 def _run() -> MagicMock:
     run = MagicMock()
     run.user = "test-user"
+    run.run_spec.configuration.volumes = [VolumeMountPoint(name="data", path="/data")]
     return run
 
 
@@ -70,6 +78,7 @@ def _run_job(
     compute: RunpodCompute,
     offer: InstanceOfferWithAvailability,
     job: Optional[MagicMock] = None,
+    volumes: Optional[list[Volume]] = None,
 ) -> JobProvisioningData:
     with patch(
         "dstack._internal.core.backends.runpod.compute.get_docker_commands",
@@ -82,19 +91,24 @@ def _run_job(
             project_name="main",
             project_ssh_public_key=PROJECT_SSH_PUBLIC_KEY,
             project_ssh_private_key="private-key",
-            volumes=[],
+            volumes=volumes or [],
             placement_group=None,
             requirements=Requirements(resources=ResourcesSpec()),
             extra_authorized_keys=[],
         )
 
 
-def _run_jobs(compute: RunpodCompute, offer: InstanceOfferWithAvailability, job_count: int):
+def _run_jobs(
+    compute: RunpodCompute,
+    offer: InstanceOfferWithAvailability,
+    job_count: int,
+    volumes: Optional[list[Volume]] = None,
+):
     job_configurations = []
     for _ in range(job_count):
         job_configuration = MagicMock()
         job_configuration.job = _job()
-        job_configuration.volumes = []
+        job_configuration.volumes = volumes or []
         job_configurations.append(job_configuration)
     with patch(
         "dstack._internal.core.backends.runpod.compute.get_docker_commands",
@@ -140,6 +154,37 @@ SSH_PORTS = [
 
 
 class TestRunpodComputeRunJob:
+    @pytest.mark.parametrize("global_volume", [False, True])
+    def test_volume_mount(self, global_volume):
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.create_pod.return_value = {"id": "pod-1"}
+        config = (
+            RunpodGlobalVolumeConfiguration(global_=True)
+            if global_volume
+            else RunpodVolumeConfiguration(region="EU-RO-1")
+        )
+        volume = get_volume(configuration=config, volume_id="vol-1")
+
+        _run_job(compute, _gpu_offer(), volumes=[volume])
+
+        kwargs = api_client.create_pod.call_args.kwargs
+        assert kwargs["network_volume_id"] == (None if global_volume else "vol-1")
+        assert kwargs["volume_mount_path"] == (None if global_volume else "/data")
+        assert kwargs["global_volume_id"] == ("vol-1" if global_volume else None)
+        assert kwargs["global_volume_mount_path"] == ("/data" if global_volume else None)
+
+    def test_global_volume_skips_community_offer_before_api_calls(self):
+        compute, api_client = _compute_with_mocked_api_client()
+        offer = _gpu_offer().model_copy(update={"region": "US"})
+        volume = get_volume(
+            configuration=RunpodGlobalVolumeConfiguration(global_=True), volume_id="vol-1"
+        )
+
+        with pytest.raises(SkipOffer, match="Secure Cloud"):
+            _run_job(compute, offer, volumes=[volume])
+
+        assert api_client.mock_calls == []
+
     def test_requests_per_gpu_minimums_rounded_down(self):
         compute, api_client = _compute_with_mocked_api_client()
         api_client.create_pod.return_value = {"id": "pod-1"}
@@ -180,6 +225,17 @@ class TestRunpodComputeRunJob:
 
 
 class TestRunpodComputeRunJobs:
+    def test_global_volume_skips_cluster_before_api_calls(self):
+        compute, api_client = _compute_with_mocked_api_client()
+        volume = get_volume(
+            configuration=RunpodGlobalVolumeConfiguration(global_=True), volume_id="vol-1"
+        )
+
+        with pytest.raises(SkipOffer, match="Instant Clusters"):
+            _run_jobs(compute, _cluster_offer([2]), 2, volumes=[volume])
+
+        assert api_client.mock_calls == []
+
     def test_sets_internal_ip_from_cluster_ip(self):
         compute, api_client = _compute_with_mocked_api_client()
         api_client.create_cluster.return_value = {"id": "cluster-1", "name": "test"}
@@ -223,6 +279,43 @@ class TestRunpodComputeRunJobs:
 
         with pytest.raises(ComputeError, match="Expected 2 pods"):
             _run_jobs(compute, _cluster_offer([2, 4]), job_count=2)
+
+
+class TestRunpodComputeGlobalVolumes:
+    @pytest.mark.parametrize("external", [False, True])
+    def test_create_or_register_and_delete(self, external):
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.create_global_volume.return_value = {"id": "global-1"}
+        api_client.get_global_volume.return_value = {"id": "global-1"}
+        volume = get_volume(
+            configuration=RunpodGlobalVolumeConfiguration(
+                global_=True, volume_id="global-1" if external else None
+            ),
+            external=external,
+        )
+
+        data = compute.register_volume(volume) if external else compute.create_volume(volume)
+
+        assert data.volume_id == "global-1"
+        assert data.size_gb is None
+        assert data.price is None
+        assert not data.attachable and not data.detachable
+        api_client.create_network_volume.assert_not_called()
+        api_client.get_network_volume.assert_not_called()
+        volume.volume_id = data.volume_id
+        compute.delete_volume(volume)
+        api_client.delete_global_volume.assert_called_once_with("global-1")
+        api_client.delete_network_volume.assert_not_called()
+
+    def test_register_missing_volume(self):
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.get_global_volume.return_value = None
+        volume = get_volume(
+            configuration=RunpodGlobalVolumeConfiguration(global_=True, volume_id="missing")
+        )
+
+        with pytest.raises(ComputeError, match="Volume missing not found"):
+            compute.register_volume(volume)
 
 
 class TestRunpodComputeUpdateProvisioningData:

@@ -11,6 +11,7 @@ declare interface IVolumeConfiguration {
     type: "volume",
     name?: string,
     backend: TBackendType,
+    global?: boolean,
     region?: string,
     size?: number,
     volume_id?: string

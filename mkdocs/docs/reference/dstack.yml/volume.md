@@ -20,11 +20,31 @@ The `volume` configuration type allows creating, registering, and updating [volu
 
 === "Runpod"
 
-    #SCHEMA# dstack._internal.core.models.volumes.RunpodVolumeConfiguration
-        overrides:
-            show_root_heading: false
-            backend:
-                required: true
+    === "Regional (default)"
+
+        #SCHEMA# dstack._internal.core.models.volumes.RunpodVolumeConfiguration
+            overrides:
+                show_root_heading: false
+                backend:
+                    required: true
+                global_:
+                    name: global
+                    type: bool
+
+    === "Global"
+
+        Set `global: true` and omit `region` and `size`.
+        See [usage and limitations](../../concepts/volumes.md#network-volumes).
+
+        #SCHEMA# dstack._internal.core.models.volumes.RunpodGlobalVolumeConfiguration
+            overrides:
+                show_root_heading: false
+                backend:
+                    required: true
+                global_:
+                    name: global
+                    type: bool
+                    required: true
 
 === "Daytona"
 

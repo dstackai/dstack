@@ -302,6 +302,44 @@ class TestGetVolume:
 
 class TestCreateVolume:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("client_version", [None, "0.22.8"])
+    async def test_global_volume_and_legacy_read_responses(
+        self, test_db, session: AsyncSession, client: AsyncClient, client_version
+    ):
+        user = await create_user(session, global_role=GlobalRole.ADMIN)
+        project = await create_project(session, owner=user)
+        headers = get_auth_headers(user.token)
+        response = await client.post(
+            f"/api/project/{project.name}/volumes/create",
+            headers=headers,
+            json={"configuration": {"backend": "runpod", "name": "models", "global": True}},
+        )
+        assert response.status_code == 200
+        assert response.json()["configuration"]["global"] is True
+        assert "region" not in response.json()["configuration"]
+        if client_version is not None:
+            headers["x-api-version"] = client_version
+        for path, body in (
+            ("/api/volumes/list", {}),
+            (f"/api/project/{project.name}/volumes/list", {}),
+            (f"/api/project/{project.name}/volumes/get", {"name": "models"}),
+        ):
+            response = await client.post(path, headers=headers, json=body)
+            assert response.status_code == 200
+            payload = response.json()
+            config = (payload[0] if isinstance(payload, list) else payload)["configuration"]
+            if client_version is None:
+                assert config["global"] is True
+                assert "region" not in config
+            else:
+                assert config["region"] == ""
+        # Compatibility adaptation is only applied to the response, not the stored configuration.
+        volume = await session.scalar(select(VolumeModel))
+        assert volume is not None
+        assert json.loads(volume.configuration)["global"] is True
+
+    @pytest.mark.asyncio
     async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/project/main/volumes/create")
         assert response.status_code in [401, 403]
