@@ -236,6 +236,8 @@ class OfferMatcher:
             return self._matches_no_gpus
         if not _is_within(len(gpus), gpu_spec.count.min, gpu_spec.count.max):
             return False
+        # Assumes all GPUs are the same. On hosts with mixed GPUs (e.g. SSH or Kubernetes),
+        # the other GPUs are not checked and total memory is estimated from the first one.
         if not gpu_matches_gpu_spec(gpus[0], gpu_spec):
             return False
         return _is_within(len(gpus) * gpus[0].memory_mib, *self._total_gpu_memory_mib_bounds)
