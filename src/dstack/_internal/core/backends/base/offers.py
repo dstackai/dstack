@@ -33,13 +33,15 @@ SUPPORTED_GPUHUNT_FLAGS = [
 ]
 
 
-# NvidiaGPUInfo.name in KNOWN_NVIDIA_GPUS is not unique -- there are multiple variants
-# with the same name but different amount of memory, but Compute Capability of the variants
-# is always the same, so it's safe to use 1:1 mapping.
-# Keys are lowercase GPU names.
 NVIDIA_GPU_NAME_TO_COMPUTE_CAPABILITY_MAP = {
     gpu_info.name.lower(): gpu_info.compute_capability for gpu_info in gpuhunt.KNOWN_NVIDIA_GPUS
 }
+"""Keys are lowercase GPU names.
+
+`NvidiaGPUInfo.name` in `KNOWN_NVIDIA_GPUS` is not unique -- there are multiple variants with
+the same name but different amount of memory, but Compute Capability of the variants is always
+the same, so it's safe to use 1:1 mapping.
+"""
 
 
 def get_catalog_offers(
@@ -172,8 +174,8 @@ def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFi
     return q
 
 
-# `(min, max)`, where `None` means unbounded.
 _Bounds = tuple[Optional[float], Optional[float]]
+"""`(min, max)`, where `None` means unbounded."""
 
 
 class OfferMatcher:
@@ -309,12 +311,12 @@ class OfferDiskFitter:
 
     def __init__(self, requirements: Requirements) -> None:
         disk_spec = requirements.resources.disk
-        # The bounds fixed disks are checked against, `None` if fixed disks are not checked.
         self._fixed_disk_mib_bounds = (
             _get_mib_bounds(disk_spec.size) if disk_spec is not None else None
         )
-        # The range configurable disks are fitted to.
+        """The bounds fixed disks are checked against, `None` if fixed disks are not checked."""
         self._target_disk_range = disk_spec.size if disk_spec is not None else DEFAULT_DISK.size
+        """The range configurable disks are fitted to."""
         self._disk_by_range: dict[tuple[Optional[float], Optional[float]], Optional[Disk]] = {}
 
     def fit(
