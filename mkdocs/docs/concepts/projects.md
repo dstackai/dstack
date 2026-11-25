@@ -43,8 +43,8 @@ A user can be added to a project and assigned or unassigned as a project role on
 
 ## Project exports
 
-Projects can export resources such as fleets to other projects, allowing them to be used across team
-boundaries. See [Exports](exports.md) for more details.
+Projects can export resources such as fleets, gateways, and models to other projects, allowing them
+to be used across team boundaries. See [Exports](exports.md) for more details.
 
 ## Authorization
 

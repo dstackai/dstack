@@ -139,3 +139,6 @@ class ChatModel(ImmutableModel):
     created_at: datetime
     run_name: str
     format_spec: Annotated[AnyModelFormat, Field(discriminator="format")]
+    export_id: Optional[str] = None
+    """Only set on gateways, for a model that a project imports: the export that the model
+    comes through. `project_name` and `run_name` are then the exporter project's."""

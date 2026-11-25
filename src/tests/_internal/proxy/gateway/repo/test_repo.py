@@ -3,10 +3,26 @@ from pathlib import Path
 import pytest
 from pydantic import AnyHttpUrl
 
-from dstack._internal.proxy.gateway.models import ACMESettings, GlobalProxyConfig, ModelEntrypoint
+from dstack._internal.proxy.gateway.models import (
+    ACMESettings,
+    GlobalProxyConfig,
+    ImportedModel,
+    ModelEntrypoint,
+)
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.lib.testing.common import make_project, make_service
-from tests._internal.proxy.lib.routers.test_model_proxy import make_model
+from tests._internal.proxy.lib.routers.test_model_proxy import TGI_FORMAT, make_model
+
+
+def make_import(
+    export_id: str = "export-1", exporter_project: str = "exporter-proj"
+) -> ImportedModel:
+    return ImportedModel(
+        importer_project="importer-proj",
+        export_id=export_id,
+        exporter_project=exporter_project,
+        name="test-model",
+    )
 
 
 @pytest.mark.asyncio
@@ -16,6 +32,7 @@ async def test_persist_repo(tmp_path: Path) -> None:
     srv_1 = make_service("proj-1", "run-1", domain="run-1.gtw.test")
     srv_2 = make_service("proj-2", "run-2", domain="run-2.gtw.test")
     model_1 = make_model("proj-1", "model-1", run_name="run-1")
+    import_1 = make_import()
     entrypoint_1 = ModelEntrypoint(project_name="proj-1", domain="gateway.gtw.test", https=True)
     config = GlobalProxyConfig(acme_settings=ACMESettings(server=AnyHttpUrl("https://acme.test")))
     file = tmp_path / "state-v2.json"
@@ -28,6 +45,7 @@ async def test_persist_repo(tmp_path: Path) -> None:
     await repo.set_service(srv_1)
     await repo.set_service(srv_2)
     await repo.set_model(model_1)
+    await repo.set_import(import_1)
 
     repo = GatewayProxyRepo.load(file)  # reload from file
     assert await repo.get_config() == config
@@ -39,6 +57,86 @@ async def test_persist_repo(tmp_path: Path) -> None:
         srv_2,
     ]
     assert await repo.list_models("proj-1") == [model_1]
+    assert await repo.list_imports() == [import_1]
+
+
+@pytest.mark.asyncio
+class TestImports:
+    async def test_importer_project_gets_model_of_exporter_project(self) -> None:
+        repo = GatewayProxyRepo()
+        model = make_model("exporter-proj", "test-model", run_name="run-1")
+        await repo.set_model(model)
+        await repo.set_import(make_import())
+
+        imported_model = model.model_copy(update={"export_id": "export-1"})
+        assert await repo.list_models("importer-proj") == [imported_model]
+        assert await repo.list_models("Importer-Proj") == [imported_model]
+        assert await repo.get_model("Importer-Proj", "test-model") == imported_model
+        assert await repo.get_model("exporter-proj", "test-model") == model
+        assert await repo.list_models("other-proj") == []
+
+        await repo.delete_import("importer-proj", "export-1", "test-model")
+        assert await repo.list_models("importer-proj") == []
+        assert await repo.get_model("importer-proj", "test-model") is None
+
+    async def test_import_follows_model_to_another_service(self) -> None:
+        repo = GatewayProxyRepo()
+        await repo.set_import(make_import())
+        # No service of the exporter project has registered the model yet.
+        assert await repo.list_models("importer-proj") == []
+        assert await repo.get_model("importer-proj", "test-model") is None
+
+        await repo.set_model(make_model("exporter-proj", "test-model", run_name="run-1"))
+        model = await repo.get_model("importer-proj", "test-model")
+        assert model is not None
+        assert model.run_name == "run-1"
+
+        # Another service registers the model, and the first service is unregistered.
+        await repo.set_model(make_model("exporter-proj", "test-model", run_name="run-2"))
+        await repo.delete_models_by_run("exporter-proj", "run-1")
+        model = await repo.get_model("importer-proj", "test-model")
+        assert model is not None
+        assert (model.project_name, model.run_name) == ("exporter-proj", "run-2")
+        assert model.export_id == "export-1"
+
+        # Requests to models with the `tgi` format are not metered.
+        await repo.set_model(
+            make_model("exporter-proj", "test-model", run_name="run-3", format_spec=TGI_FORMAT)
+        )
+        assert await repo.list_models("importer-proj") == []
+        assert await repo.get_model("importer-proj", "test-model") is None
+
+    async def test_own_model_wins_over_import_with_same_name(self) -> None:
+        repo = GatewayProxyRepo()
+        own_model = make_model("importer-proj", "test-model", run_name="own-run")
+        await repo.set_model(own_model)
+        await repo.set_model(make_model("exporter-proj", "test-model", run_name="run-1"))
+        await repo.set_import(make_import())
+        assert await repo.list_models("importer-proj") == [own_model]
+        assert await repo.get_model("importer-proj", "test-model") == own_model
+
+        await repo.delete_models_by_run("importer-proj", "own-run")
+        [model] = await repo.list_models("importer-proj")
+        assert model.export_id == "export-1"
+
+    async def test_keeps_one_import_per_project_and_model_name(self) -> None:
+        repo = GatewayProxyRepo()
+        await repo.set_model(make_model("exporter-proj", "test-model", run_name="run-1"))
+        await repo.set_model(make_model("exporter-proj-2", "test-model", run_name="run-2"))
+        await repo.set_import(make_import("export-1", "exporter-proj"))
+        # The import of the model through another export replaces it.
+        new_import = make_import("export-2", "exporter-proj-2")
+        await repo.set_import(new_import)
+        assert await repo.list_imports() == [new_import]
+        model = await repo.get_model("importer-proj", "test-model")
+        assert model is not None
+        assert (model.project_name, model.export_id) == ("exporter-proj-2", "export-2")
+
+        # Deleting the import through the previous export changes nothing.
+        await repo.delete_import("importer-proj", "export-1", "test-model")
+        assert await repo.list_imports() == [new_import]
+        await repo.delete_import("importer-proj", "export-2", "test-model")
+        assert await repo.list_imports() == []
 
 
 @pytest.mark.asyncio

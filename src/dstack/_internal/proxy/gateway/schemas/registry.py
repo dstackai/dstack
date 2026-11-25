@@ -74,6 +74,30 @@ class RegisterEntrypointRequest(BaseModel):
     read_timeout: int = DEFAULT_SERVICE_READ_TIMEOUT
 
 
+class RegisterImportRequest(BaseModel):
+    export_id: str
+    exporter_project: str
+    name: str
+    """The model's name in the exporter project."""
+
+
+class UnregisterImportRequest(BaseModel):
+    export_id: str
+    name: str
+
+
+class ImportListItem(BaseModel):
+    importer_project: str
+    export_id: str
+    exporter_project: str
+    name: str
+    """The model's name in the exporter project."""
+
+
+class ImportListResponse(BaseModel):
+    imports: list[ImportListItem]
+
+
 class ReplicaProxyJumpKeyUpdate(BaseModel):
     project_name: str
     run_name: str

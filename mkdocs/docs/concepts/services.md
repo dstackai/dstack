@@ -595,6 +595,7 @@ Here are cases where a service may need a [gateway](gateways.md):
 
 * To use [auto-scaling](#scaling) or [rate limits](#rate-limits)
 * To enable HTTPS for the endpoint and map it to your domain
+* To [export](exports.md#export-models) models to other projects or [meter tokens](gateways.md#meter-tokens)
 * If your service requires WebSockets
 * If your service cannot work with a [path prefix](#path-prefix)
 
@@ -754,6 +755,12 @@ See the [reference](../reference/dstack.yml/service.md#probes) for more probe co
 If the service runs a model with an OpenAI-compatible interface, you can set the [`model`](#model) property to make the model accessible through `dstack`'s chat UI on the `Models` page.
 In this case, `dstack` will use the service's `/v1/chat/completions` service.
 
+If you have a [gateway](gateways.md) created, the model is also accessible at the project's OpenAI-compatible model endpoint, `https://gateway.<gateway domain>/<project name>`, with a `dstack` user token as the API key.
+
+??? info "Limitations"
+    The model endpoint supports only `/models` and `/chat/completions`, and requests of up to 1MB.
+    For other routes or larger requests (e.g. with images), use the service endpoint.
+
 When `model` is set, `dstack` automatically configures [`probes`](#probes) to verify model health.
 To customize or disable this, set `probes` explicitly.
 
@@ -817,6 +824,8 @@ rate_limits:
 The rps limit sets the max requests per second, tracked in milliseconds (e.g., `rps: 4` means 1 request every 250 ms). Use `burst` to allow short spikes while keeping the average within `rps`.
 
 Limits apply to the whole service (all replicas) and per client (by IP). Clients exceeding the limit get a 429 error.
+
+Requests to the project's [model endpoint](#model) are not limited per client.
 
 ??? info "Partitioning key"
     Instead of partitioning requests by client IP address,

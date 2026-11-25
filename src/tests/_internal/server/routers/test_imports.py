@@ -5,6 +5,8 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.runs import RunStatus
+from dstack._internal.core.models.services import OpenAIChatModel
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import ExportModel, ImportModel
 from dstack._internal.server.services import exports as exports_service
@@ -19,6 +21,8 @@ from dstack._internal.server.testing.common import (
     create_fleet,
     create_gateway,
     create_project,
+    create_repo,
+    create_service_run,
     create_user,
     get_auth_headers,
     get_fleet_spec,
@@ -415,6 +419,149 @@ class TestListImports:
         assert imports[0]["export"]["name"] == "test-export"
         assert len(imports[0]["export"]["exported_fleets"]) == 1
         assert imports[0]["export"]["exported_fleets"][0]["name"] == "fleet"
+
+    async def test_lists_imported_models(self, session: AsyncSession, client: AsyncClient):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        importer_project = await create_project(
+            session=session, name="ImporterProject", owner=user
+        )
+        await add_project_member(
+            session=session, project=importer_project, user=user, project_role=ProjectRole.USER
+        )
+        exporter_project = await create_project(
+            session=session, name="ExporterProject", owner=user
+        )
+        repo = await create_repo(session=session, project_id=exporter_project.id)
+        backend = await create_backend(session=session, project_id=exporter_project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=exporter_project.id,
+            backend_id=backend.id,
+            wildcard_domain="example.com",
+        )
+        await create_service_run(
+            session=session,
+            project=exporter_project,
+            repo=repo,
+            user=user,
+            gateway=gateway,
+            model=OpenAIChatModel(name="running-model", format="openai"),
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_models=["running-model", "not-running-model"],
+            name="test-export",
+        )
+        # Another project exports a model with the same name but does not run it.
+        other_exporter_project = await create_project(
+            session=session, name="OtherExporterProject", owner=user
+        )
+        await create_export(
+            session=session,
+            exporter_project=other_exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_models=["running-model"],
+            name="other-export",
+        )
+
+        response = await client.post(
+            f"/api/project/{importer_project.name}/imports/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        exported_models = {
+            imp["export"]["project_name"]: sorted(
+                imp["export"]["exported_models"], key=lambda m: m["name"]
+            )
+            for imp in response.json()["imports"]
+        }
+        assert exported_models == {
+            "ExporterProject": [
+                {"name": "not-running-model", "base_url": None},
+                {
+                    "name": "running-model",
+                    "base_url": "https://gateway.example.com/ImporterProject",
+                },
+            ],
+            "OtherExporterProject": [{"name": "running-model", "base_url": None}],
+        }
+
+    async def test_imported_model_url_follows_its_service(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        importer_project = await create_project(
+            session=session, name="ImporterProject", owner=user
+        )
+        await add_project_member(
+            session=session, project=importer_project, user=user, project_role=ProjectRole.USER
+        )
+        exporter_project = await create_project(
+            session=session, name="ExporterProject", owner=user
+        )
+        repo = await create_repo(session=session, project_id=exporter_project.id)
+        backend = await create_backend(session=session, project_id=exporter_project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=exporter_project.id,
+            backend_id=backend.id,
+            name="gateway",
+            wildcard_domain="example.com",
+        )
+        other_gateway = await create_gateway(
+            session=session,
+            project_id=exporter_project.id,
+            backend_id=backend.id,
+            name="other-gateway",
+            wildcard_domain="other.example.com",
+        )
+        model = OpenAIChatModel(name="test-model", format="openai")
+        run = await create_service_run(
+            session=session,
+            project=exporter_project,
+            repo=repo,
+            user=user,
+            gateway=gateway,
+            model=model,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_models=["test-model"],
+            name="test-export",
+        )
+
+        async def get_base_url() -> Optional[str]:
+            response = await client.post(
+                f"/api/project/{importer_project.name}/imports/list",
+                headers=get_auth_headers(user.token),
+            )
+            assert response.status_code == 200
+            return response.json()["imports"][0]["export"]["exported_models"][0]["base_url"]
+
+        assert await get_base_url() == "https://gateway.example.com/ImporterProject"
+
+        # The service is stopped
+        run.status = RunStatus.TERMINATED
+        await session.commit()
+        assert await get_base_url() is None
+
+        # The service is applied again on another gateway
+        await create_service_run(
+            session=session,
+            project=exporter_project,
+            repo=repo,
+            user=user,
+            gateway=other_gateway,
+            model=model,
+        )
+        assert await get_base_url() == "https://gateway.other.example.com/ImporterProject"
 
     async def test_does_not_include_other_projects_imports(
         self, session: AsyncSession, client: AsyncClient

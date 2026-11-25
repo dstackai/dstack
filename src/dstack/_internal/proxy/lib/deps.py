@@ -4,8 +4,9 @@ from typing import Annotated, AsyncGenerator, Optional
 from fastapi import Depends, FastAPI, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
+from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider, ProxyCaller
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
+from dstack._internal.proxy.lib.metering import BaseProxyMeter
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
 from dstack._internal.proxy.lib.services.service_connection import ServiceConnectionPool
 
@@ -30,6 +31,10 @@ class ProxyDependencyInjector(ABC):
 
     @abstractmethod
     def get_auth_provider(self) -> AsyncGenerator[BaseProxyAuthProvider, None]:
+        pass
+
+    @abstractmethod
+    def get_meter(self) -> BaseProxyMeter:
         pass
 
     async def get_service_connection_pool(self) -> ServiceConnectionPool:
@@ -61,6 +66,12 @@ async def get_proxy_auth_provider(
         yield provider
 
 
+async def get_proxy_meter(
+    injector: Annotated[ProxyDependencyInjector, Depends(get_injector)],
+) -> BaseProxyMeter:
+    return injector.get_meter()
+
+
 async def get_service_connection_pool(
     injector: Annotated[ProxyDependencyInjector, Depends(get_injector)],
 ) -> ServiceConnectionPool:
@@ -77,10 +88,26 @@ class ProxyAuthContext:
         if self._token is None or not await self._provider.is_project_member(
             self._project_name, self._token
         ):
-            raise ProxyError(
-                f"Unauthenticated or unauthorized to access project {self._project_name}",
-                status.HTTP_403_FORBIDDEN,
-            )
+            raise self._forbidden_error()
+
+    async def get_caller(self) -> ProxyCaller:
+        """
+        Returns who makes the request. Raises the same error as `enforce`
+        unless the token belongs to a member of the project or to a global admin.
+        The auth provider may raise a 404 `ProxyError` instead if the project does not exist.
+        """
+        if self._token is None:
+            raise self._forbidden_error()
+        caller = await self._provider.get_caller(self._project_name, self._token)
+        if caller is None:
+            raise self._forbidden_error()
+        return caller
+
+    def _forbidden_error(self) -> ProxyError:
+        return ProxyError(
+            f"Unauthenticated or unauthorized to access project {self._project_name}",
+            status.HTTP_403_FORBIDDEN,
+        )
 
 
 class ProxyAuth:
@@ -103,3 +130,9 @@ class ProxyAuth:
         if self._auto_enforce:
             await context.enforce()
         return context
+
+
+async def get_proxy_caller(
+    auth: Annotated[ProxyAuthContext, Depends(ProxyAuth(auto_enforce=False))],
+) -> ProxyCaller:
+    return await auth.get_caller()

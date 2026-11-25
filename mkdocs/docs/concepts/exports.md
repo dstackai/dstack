@@ -14,14 +14,17 @@ An export is created in the exporter project and specifies the resources to expo
 importer projects that will gain access to them.
 
 Once an export is created, the importer projects can see the exported resources in their resource lists and use them
-for running tasks, dev environments, and services. Imported resources appear with a project prefix
+for running tasks, dev environments, and services. Imported fleets and gateways appear with a project prefix
 (e.g., `team-a/my-fleet`) to distinguish them from the project's own resources.
 
-Currently, [fleets](fleets.md) and [gateways](gateways.md) can be exported.
+Currently, [fleets](fleets.md), [gateways](gateways.md), and [models](services.md#model) can be exported.
 
 ??? info "Limitations"
     - [Container-based](backends.md#container-based) backends of the exporter project cannot be used for fleet importers' runs.
     - Runs that mount [network volumes](volumes.md#network-volumes) cannot use imported backend fleets.
+    - Models cannot be added to [global exports](#global-exports).
+    - Importer projects can access an exported model only if its service uses the `openai` model format (the default) and a [gateway](gateways.md) whose `domain` doesn't include `${{ run.project_name }}`.
+    - If the importer project runs a model with the same name on the same gateway, the project's own model is used.
 
 ??? info "Required role"
     The user creating or updating an export must have the project admin role on both the exporter project and
@@ -32,27 +35,28 @@ Currently, [fleets](fleets.md) and [gateways](gateways.md) can be exported.
 ### Create exports
 
 Use the `dstack export create` command to create a new export. Specify the fleets to export
-with `--fleet`, the gateways to export with `--gateway`, and the importer projects with `--importer`:
+with `--fleet`, the gateways to export with `--gateway`, the [models](#export-models) to export with `--model`,
+and the importer projects with `--importer`:
 
 <div class="termy">
 
 ```shell
 $ dstack export create my-export --fleet my-fleet --gateway my-gateway --importer team-b
- NAME        FLEETS    GATEWAYS    IMPORTERS
- my-export   my-fleet  my-gateway  team-b
+ NAME       FLEETS    GATEWAYS    MODELS  IMPORTERS
+ my-export  my-fleet  my-gateway  -       team-b
 
 ```
 
 </div>
 
-`--fleet`, `--gateway`, and `--importer` can be specified multiple times:
+`--fleet`, `--gateway`, `--model`, and `--importer` can be specified multiple times:
 
 <div class="termy">
 
 ```shell
 $ dstack export create shared-gpus --fleet gpu-fleet-1 --fleet gpu-fleet-2 --importer team-b --importer team-c
- NAME         FLEETS                    GATEWAYS  IMPORTERS
- shared-gpus  gpu-fleet-1, gpu-fleet-2  -         team-b, team-c
+ NAME         FLEETS                    GATEWAYS  MODELS  IMPORTERS
+ shared-gpus  gpu-fleet-1, gpu-fleet-2  -         -       team-b, team-c
 
 ```
 
@@ -66,9 +70,9 @@ Use `dstack export list` (or simply `dstack export`) to list all exports in the 
 
 ```shell
 $ dstack export list
- NAME         FLEETS                    GATEWAYS    IMPORTERS
- my-export    my-fleet                  my-gateway  team-b
- shared-gpus  gpu-fleet-1, gpu-fleet-2  -           team-b, team-c
+ NAME         FLEETS                    GATEWAYS    MODELS  IMPORTERS
+ my-export    my-fleet                  my-gateway  -       team-b
+ shared-gpus  gpu-fleet-1, gpu-fleet-2  -           -       team-b, team-c
 
 ```
 
@@ -76,27 +80,27 @@ $ dstack export list
 
 ### Update exports
 
-Use the `dstack export update` command to add or remove fleets, gateways, and importers from an existing export:
+Use the `dstack export update` command to add or remove fleets, gateways, models, and importers from an existing export:
 
 <div class="termy">
 
 ```shell
 $ dstack export update my-export --add-fleet another-fleet --add-importer team-c
- NAME        FLEETS                   GATEWAYS    IMPORTERS
- my-export   my-fleet, another-fleet  my-gateway  team-b, team-c
+ NAME       FLEETS                   GATEWAYS    MODELS  IMPORTERS
+ my-export  my-fleet, another-fleet  my-gateway  -       team-b, team-c
 
 ```
 
 </div>
 
-To remove a fleet, gateway, or importer:
+To remove a fleet, gateway, model, or importer:
 
 <div class="termy">
 
 ```shell
 $ dstack export update my-export --remove-importer team-b
- NAME        FLEETS                   GATEWAYS    IMPORTERS
- my-export   my-fleet, another-fleet  my-gateway  team-c
+ NAME       FLEETS                   GATEWAYS    MODELS  IMPORTERS
+ my-export  my-fleet, another-fleet  my-gateway  -       team-c
 
 ```
 
@@ -126,14 +130,31 @@ Users with the global admin role can mark any export as a global export. Global 
 
 ```shell
 $ dstack export create global-export --gateway shared-gateway --global
- NAME           FLEETS  GATEWAYS        IMPORTERS
- global-export  -       shared-gateway  *
+ NAME           FLEETS  GATEWAYS        MODELS  IMPORTERS
+ global-export  -       shared-gateway  -       *
 
 ```
 
 </div>
 
 Only promoting an export to global requires the global admin role. Regular project admins can add or remove resources, remove global status, or delete the export.
+
+### Export models
+
+To export a [model](services.md#model), pass the name set in the service's `model` property with `--model`:
+
+<div class="termy">
+
+```shell
+$ dstack export create my-models --model Qwen/Qwen3.8-27B-FP8 --importer team-b
+ NAME       FLEETS  GATEWAYS  MODELS                IMPORTERS
+ my-models  -       -         Qwen/Qwen3.8-27B-FP8  team-b
+
+```
+
+</div>
+
+Models are exported by name, so an export stays in place when the model's service is stopped, replaced, or not started yet.
 
 ## Access imported resources
 
@@ -143,8 +164,9 @@ From the importer project's perspective, use `dstack import list` (or simply `ds
 
 ```shell
 $ dstack import list
- NAME              FLEETS                   GATEWAYS
- team-a/my-export  my-fleet, another-fleet  my-gateway
+ NAME              FLEETS                   GATEWAYS    MODELS
+ team-a/my-export  my-fleet, another-fleet  my-gateway  -
+ team-a/my-models  -                        -           Qwen/Qwen3.8-27B-FP8
 
 ```
 
@@ -187,12 +209,33 @@ fleets:
 
 </div>
 
+### Imported models
+
+Imported models are available at the importer project's [model endpoint](services.md#model). Use `dstack import list -v` to see their URLs:
+
+<div class="termy">
+
+```shell
+$ dstack import list -v
+ NAME              FLEETS                   GATEWAYS    MODEL                 URL
+ team-a/my-export  my-fleet, another-fleet  my-gateway  -
+ team-a/my-models  -                        -           Qwen/Qwen3.8-27B-FP8  https://gateway.example.com/team-b
+
+```
+
+</div>
+
+A model has a URL only while its service is running.
+
 !!! info "Tenant isolation"
     Exported fleets share the same access model as regular fleets. See [Tenant isolation](../guides/tenant-isolation.md) for details.
 
+    Requests to imported models, including user tokens, go through the exporter project's gateway.
+
 !!! info "What's next?"
     1. Check the [`dstack export` CLI reference](../reference/cli/dstack/export.md)
-    1. Check the [`dstack import` CLI reference](../reference/cli/dstack/import.md)
-    1. Learn how to manage [fleets](fleets.md)
-    1. Learn how to manage [gateways](gateways.md)
-    1. Read about [projects](projects.md) and project roles
+    2. Check the [`dstack import` CLI reference](../reference/cli/dstack/import.md)
+    3. Learn how to manage [fleets](fleets.md)
+    4. Learn how to manage [gateways](gateways.md)
+    5. Learn how to run [services](services.md)
+    6. Read about [projects](projects.md) and project roles

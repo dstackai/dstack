@@ -386,5 +386,15 @@ def interpolate_gateway_domain(
         raise exception_type(f"Cannot interpolate gateway domain name: {e.args[0]}") from e
 
 
+def is_gateway_domain_fixed(domain: str) -> bool:
+    """
+    Returns `True` if the gateway domain is the same for all projects,
+    that is, it has no `${{ run.project_name }}`.
+    """
+    return domain == interpolate_gateway_domain(
+        domain=domain, run_project_name="", exception_type=None
+    )
+
+
 def list_enum_values_for_annotation(enum_class: type[enum.Enum]) -> str:
     return ", ".join(f"`{e.value}`" for e in enum_class)

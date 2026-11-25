@@ -106,4 +106,5 @@ export type { IProps as ButtonProps } from './Button';
 export { Code } from './Code';
 export { Hotspot } from './Hotspot';
 export { TokenVisibilityButton } from './TokenVisibilityButton';
+export { UserAvatar } from './UserAvatar';
 export type { IProps as TabsProps } from './Tabs';

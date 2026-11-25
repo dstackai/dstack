@@ -1,14 +1,15 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Header, Loader, PropertyFilter, Table } from 'components';
+import { Alert, Button, Header, PropertyFilter, Table, Toggle } from 'components';
 
-import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
-import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
+import { useBreadcrumbs, useCollection } from 'hooks';
+import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
-import { useLazyGetModelsQuery } from 'services/run';
 
 import { useModelListPreferences } from './Preferences/useModelListPreferences';
+import { getImportedModelStatus, mergeModels } from '../helpers';
+import { useProjectsImports, useRunModels } from '../hooks';
 import { useColumnsDefinitions, useEmptyMessages, useFilters } from './hooks';
 import { Preferences } from './Preferences';
 
@@ -26,6 +27,8 @@ export const List: React.FC = () => {
         filteringOptions,
         filteringProperties,
         filteringRequestParams,
+        onlyActive,
+        onChangeOnlyActive,
         filteringStatusType,
         handleLoadItems,
     } = useFilters();
@@ -40,12 +43,38 @@ export const List: React.FC = () => {
     const { columns } = useColumnsDefinitions();
     const [preferences] = useModelListPreferences();
 
-    const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IModelExtended, TRunsRequestParams>({
-        useLazyQuery: useLazyGetModelsQuery,
-        args: { ...filteringRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE },
+    // With `Active models` off, the list also has the models of the latest runs
+    const {
+        models: runModels,
+        isFetching: isFetchingRuns,
+        error,
+        refetch: refetchRuns,
+    } = useRunModels(filteringRequestParams, () => !onlyActive);
 
-        getPaginationParams: (lastModel) => ({ prev_submitted_at: lastModel.submitted_at }),
-    });
+    const {
+        projectsImports,
+        isFetching: isFetchingImports,
+        refetch: refetchImports,
+    } = useProjectsImports(filteringRequestParams);
+
+    const models = useMemo(() => {
+        // A failed runs request shows its error, not the part of the models that was loaded
+        if (error) {
+            return [];
+        }
+
+        const mergedModels = mergeModels(runModels, projectsImports);
+
+        // With `Active models` on, only the active runs are read, and an imported model is active while a service serves it
+        return mergedModels.filter((model) => !onlyActive || model.run || getImportedModelStatus(model) === 'running');
+    }, [error, runModels, projectsImports, onlyActive]);
+
+    const isLoading = isFetchingRuns || isFetchingImports;
+
+    const refreshModels = () => {
+        refetchRuns();
+        refetchImports();
+    };
 
     const isDisabledClearFilter = !propertyFilterQuery.tokens.length;
 
@@ -54,9 +83,13 @@ export const List: React.FC = () => {
         isDisabledClearFilter,
     });
 
-    const { items, collectionProps } = useCollection<IModelExtended>(data, {
+    const { items, collectionProps } = useCollection<IModelExtended>(models, {
         filtering: {
-            empty: renderEmptyMessage(),
+            empty: error ? (
+                <Alert type="error">{t('common.server_error', { error: getServerError(error) })}</Alert>
+            ) : (
+                renderEmptyMessage()
+            ),
             noMatch: renderNoMatchMessage(),
         },
         selection: {},
@@ -78,9 +111,9 @@ export const List: React.FC = () => {
                     actions={
                         <Button
                             iconName="refresh"
-                            disabled={isLoading || isLoadingMore}
+                            disabled={isLoading}
                             ariaLabel={t('common.refresh')}
-                            onClick={refreshList}
+                            onClick={refreshModels}
                         />
                     }
                 >
@@ -108,10 +141,15 @@ export const List: React.FC = () => {
                             onLoadItems={handleLoadItems}
                         />
                     </div>
+
+                    <div className={styles.activeOnly}>
+                        <Toggle onChange={onChangeOnlyActive} checked={onlyActive}>
+                            {t('models.active_only')}
+                        </Toggle>
+                    </div>
                 </div>
             }
             preferences={<Preferences />}
-            footer={<Loader show={isLoadingMore} padding={{ vertical: 'm' }} />}
         />
     );
 };

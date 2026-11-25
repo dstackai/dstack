@@ -1,5 +1,4 @@
 import React from 'react';
-import Avatar from 'react-avatar';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -17,6 +16,7 @@ import {
     SideNavigation,
     Tabs,
     TopNavigation,
+    UserAvatar,
 } from 'components';
 
 import { DISCORD_URL, DOCS_URL } from 'consts';
@@ -125,8 +125,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
     const isVisibleInfoTab = helpPanelContent.header || helpPanelContent.footer || helpPanelContent.body;
 
-    const avatarProps = product.isSky ? { githubHandle: userName } : { name: userName };
-
     const onChangeSystemModeToggle: SideNavigationProps['onFollow'] = (event) => {
         event.preventDefault();
 
@@ -193,7 +191,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                                 type: 'menu-dropdown',
                                 text: (
                                     <div className={styles.userAvatar}>
-                                        <Avatar {...avatarProps} size="40px" />
+                                        <UserAvatar userName={userName} size={40} />
                                     </div>
                                 ),
                                 items: profileActions,

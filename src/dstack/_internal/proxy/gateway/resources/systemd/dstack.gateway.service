@@ -9,6 +9,8 @@ User=ubuntu
 Group=ubuntu
 Restart=always
 RestartSec=5
+# Above uvicorn's graceful shutdown timeout in start.sh, so that the app can shut down after it
+TimeoutStopSec=30
 LimitNOFILE=65535
 
 [Install]

@@ -12,7 +12,7 @@
 
 `dstack-proxy` acts as a reverse proxy and load balancer for services.
 
-The in-server proxy uses a custom reverse proxy implementation based on FastAPI and httpx. It routes requests based on the `/proxy/services/<project>/<service>` path. It performs load balancing by selecting a random service replica for each forwarded request.
+The in-server proxy uses a custom reverse proxy implementation based on FastAPI and httpx2. It routes requests based on the `/proxy/services/<project>/<service>` path. It performs load balancing by selecting a random service replica for each forwarded request.
 
 The gateway uses Nginx. It automatically maintains Nginx configs for each service in `/etc/nginx/sites-enabled/*`. Each service is published at a subdomain. Nginx performs load balancing using the round-robin method. Nginx forwards requests directly to service replicas, so traffic does not go through the gateway app.
 
@@ -30,9 +30,15 @@ The in-server proxy validates the tokens by querying the correct token from the 
 
 On gateways, Nginx makes a headers-only subrequest to the gateway app to check authorization for each incoming request. The gateway app then makes a request to the `dstack` server to validate the token. Responses from the `dstack` server are cached for 60 seconds. If the `dstack` server does not respond, the incoming request is denied.
 
+For requests to models, the gateway app also requests the token's user from the `dstack` server, to meter tokens per user, and caches it for an hour.
+
 ### OpenAI-compatible API
 
-The OpenAI interface emulates the real OpenAI API for chat completion models. It can list running models in the project, convert between OpenAI and TGI request formats, and forward requests to the correct service.
+The OpenAI interface emulates the real OpenAI API for chat completion models. It can list running models in the project, convert between OpenAI and TGI request formats, and forward requests to the correct service. Requests to models with the `openai` format and their responses are forwarded without conversion.
+
+Only members of the project and global admins can use the interface.
+
+On gateways, the models of a project include the models it imports through exports. `GatewayReplicaPipeline` registers an import on the gateway for each exported model and importer project, and the gateway app finds the model in the exporter project by its name when a request arrives.
 
 The in-server proxy forwards requests directly to service replicas.
 
@@ -42,15 +48,21 @@ sequenceDiagram
     dstack server->>Service replica: http+unix:///path/to/ssh/socket
 ```
 
-The gateway uses Nginx to forward requests so they are included in access logs and service stats.
+The gateway uses Nginx to forward requests so they are included in access logs and service stats. The project is part of the URL path, so one domain serves the models of every project on the gateway.
 
 ```mermaid
 sequenceDiagram
-    User->>Nginx: http(s)://gateway.<gateway>/
+    User->>Nginx: http(s)://gateway.<gateway>/<project>/
     Nginx->>Gateway app: http://localhost:8000/api/models/<project>/
     Gateway app->>Nginx: http://<service>.<gateway>/
     Nginx->>Service replica: http+unix:///path/to/ssh/socket
 ```
+
+### Token metering
+
+`dstack-proxy` meters the tokens of requests to models with the `openai` format: input, cached input, and output tokens per hour, project, user, service, and export. It reads them from `usage` in the model's responses. For streaming requests, it asks the model for `usage` on every chunk (`stream_options.include_usage` and `stream_options.continuous_usage_stats`), so a stream stopped by the client is metered up to its last chunk, and removes the `usage` that the client did not ask for.
+
+Metering is only supported on gateways. The gateway app writes the counts every 5 seconds to batch files in `~/dstack/metering/` and returns them from `POST /api/metering/collect`, deleting the batches that the caller has saved. Batches that nobody collects are deleted after 7 days. The open-source `dstack` server does not collect them. A server extension can collect them in a hook registered with `register_process_running_gateway_replica_hook`.
 
 ### Stats collector
 
@@ -81,11 +93,11 @@ Gateway-to-server communication happens over an SSH connection that is establish
 
 The in-server proxy repo implementation fetches the models from the database. It doesn't write to the database, as all the details about services and replicas are written by the `dstack` server.
 
-The gateway maintains its own in-memory storage repo. A copy of the repo is also stored in `~/dstack/state-v2.json`. The copy is updated on every write operation and is used for data recovery after restarts. The repo is populated when new services and replicas are registered.
+The gateway maintains its own in-memory storage repo. A copy of the repo is also stored in `~/dstack/state-v2.json`. The copy is updated on every write operation and is used for data recovery after restarts. The repo is populated when new services, replicas, and imports are registered.
 
 ## Dependency injection
 
-When a module has to be implemented differently for the in-server proxy and the gateway, `dstack-proxy` uses interfaces with multiple implementations. For example, there are common interfaces for the storage repo and for auth checks. The in-server proxy and the gateway provide their own implementations for both interfaces.
+When a module has to be implemented differently for the in-server proxy and the gateway, `dstack-proxy` uses interfaces with multiple implementations. For example, there are common interfaces for the storage repo, for auth checks, and for token metering. The in-server proxy and the gateway provide their own implementations for these interfaces.
 
 ```mermaid
 classDiagram
@@ -100,6 +112,12 @@ classDiagram
     }
     BaseProxyAuthProvider <|-- ServerProxyAuthProvider
     BaseProxyAuthProvider <|-- GatewayProxyAuthProvider
+
+    class BaseProxyMeter {
+        <<abstract>>
+    }
+    BaseProxyMeter <|-- ServerProxyMeter
+    BaseProxyMeter <|-- GatewayProxyMeter
 ```
 
 `dstack-proxy` then uses dependency injection to select the relevant implementation. Both the in-server proxy and the gateway provide an "injector" class that is used to obtain concrete interface implementations.
@@ -110,22 +128,25 @@ classDiagram
         <<abstract>>
         +get_repo() BaseProxyRepo
         +get_auth_provider() BaseProxyAuthProvider
+        +get_meter() BaseProxyMeter
     }
     class ServerProxyDependencyInjector {
         +get_repo() ServerProxyRepo
         +get_auth_provider() ServerProxyAuthProvider
+        +get_meter() ServerProxyMeter
     }
     class GatewayDependencyInjector {
         +get_repo() GatewayProxyRepo
         +get_auth_provider() GatewayProxyAuthProvider
+        +get_meter() GatewayProxyMeter
     }
     ProxyDependencyInjector <|-- ServerProxyDependencyInjector
     ProxyDependencyInjector <|-- GatewayDependencyInjector
 ```
 
-An instance of the relevant injector class is stored in the FastAPI global app state and can be accessed from FastAPI path operations. There are helper functions that can be used as FastAPI path operation dependencies to obtain the injector or a module implementation: `get_injector`, `get_proxy_repo`, `get_proxy_auth_provider`, etc.
+An instance of the relevant injector class is stored in the FastAPI global app state and can be accessed from FastAPI path operations. There are helper functions that can be used as FastAPI path operation dependencies to obtain the injector or a module implementation: `get_injector`, `get_proxy_repo`, `get_proxy_auth_provider`, `get_proxy_meter`, etc.
 
-There are also similar gateway-specific helper functions to obtain gateway-specific module implementations: `get_gateway_proxy_repo` (guaranteed to return the gateway repo, which has more methods than the base repo interface), `get_nginx`, `get_stats_collector`, etc.
+There are also similar gateway-specific helper functions to obtain gateway-specific module implementations: `get_gateway_proxy_repo` (guaranteed to return the gateway repo, which has more methods than the base repo interface), `get_nginx`, `get_stats_collector`, `get_gateway_proxy_meter`, etc.
 
 ## Gateway operations
 

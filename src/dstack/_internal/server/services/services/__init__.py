@@ -2,6 +2,8 @@
 Application logic related to `type: service` runs.
 """
 
+from urllib.parse import urlparse
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import (
@@ -27,6 +29,7 @@ from dstack._internal.server.services.gateways import (
     get_project_default_gateway_model,
     get_project_gateway_model_by_reference,
 )
+from dstack._internal.server.services.gateways.client import get_gateway_endpoint_domain
 from dstack._internal.server.services.services.options import get_service_options
 from dstack._internal.utils.common import interpolate_gateway_domain
 from dstack._internal.utils.logging import get_logger
@@ -139,12 +142,18 @@ async def _assign_service_to_gateway(
         run_project_name=run_model.project.name,
         exception_type=GatewayError,
     )
-    service_url = f"{service_protocol}://{run_model.run_name}.{wildcard_domain}"
-    if isinstance(run_spec.configuration.model, OpenAIChatModel):
-        model_url = service_url + run_spec.configuration.model.prefix
-    else:
-        gateway_protocol = "https" if gateway_configuration.certificate is not None else "http"
-        model_url = f"{gateway_protocol}://gateway.{wildcard_domain}"
+    service_domain = f"{run_model.run_name}.{wildcard_domain}"
+    if service_domain == get_gateway_endpoint_domain(service_domain):
+        raise ServerClientError(
+            f"Domain name {service_domain!r} is taken by the gateway's model endpoint."
+            " Please use a different run name"
+        )
+    service_url = f"{service_protocol}://{service_domain}"
+    model_url = get_gateway_endpoint_url(
+        service_url=service_url,
+        configuration=gateway_configuration,
+        project_name=run_model.project.name,
+    )
     service_spec = _get_service_spec(
         configuration=run_spec.configuration,
         service_url=service_url,
@@ -216,6 +225,19 @@ def _get_service_spec(
         )
         service_spec.options = get_service_options(configuration)
     return service_spec
+
+
+def get_gateway_endpoint_url(
+    service_url: str, configuration: GatewayConfiguration, project_name: str
+) -> str:
+    """
+    Returns the URL where the project accesses models
+    on the gateway that publishes the service at `service_url`.
+    """
+    service_domain = urlparse(service_url).hostname
+    assert service_domain is not None
+    protocol = "https" if configuration.certificate is not None else "http"
+    return f"{protocol}://{get_gateway_endpoint_domain(service_domain)}/{project_name}"
 
 
 def should_configure_service_https_on_gateway_replica(

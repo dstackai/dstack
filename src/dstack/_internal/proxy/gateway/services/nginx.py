@@ -73,7 +73,6 @@ class ServiceConfig(SiteConfig):
 
 class ModelEntrypointConfig(SiteConfig):
     type: Literal["entrypoint"] = "entrypoint"
-    project_name: str
     read_timeout: int
 
 
