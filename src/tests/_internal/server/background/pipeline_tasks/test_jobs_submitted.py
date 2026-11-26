@@ -24,6 +24,7 @@ from dstack._internal.core.models.configurations import (
     TaskConfiguration,
 )
 from dstack._internal.core.models.envs import Env
+from dstack._internal.core.models.events import EventTargetType
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.placement import PlacementGroup
@@ -88,6 +89,7 @@ from dstack._internal.server.testing.common import (
     get_run_spec,
     get_ssh_fleet_configuration,
     get_volume_provisioning_data,
+    list_events,
     mock_lease,
 )
 from dstack._internal.utils.common import get_current_datetime, get_or_error
@@ -2806,6 +2808,15 @@ class TestJobSubmittedWorker:
         assert volume.lock_token is None
         assert volume.lock_expires_at is None
         backend_mock.compute.return_value.attach_volume.assert_called_once()
+        attach_events = [
+            e for e in await list_events(session) if e.message == "Volume attached to instance"
+        ]
+        assert len(attach_events) == 1
+        assert {(t.entity_type, t.entity_id) for t in attach_events[0].targets} == {
+            (EventTargetType.VOLUME, volume.id),
+            (EventTargetType.INSTANCE, instance.id),
+            (EventTargetType.JOB, job.id),
+        }
 
     async def test_terminates_job_when_volume_is_locked_for_processing(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker

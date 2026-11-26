@@ -345,7 +345,7 @@ class _ProcessResult:
     instance_update_map: Optional[_InstanceUpdateMap] = None
     delete_instance: bool = False
     volume_update_rows: list[_VolumeUpdateRow] = field(default_factory=list)
-    detached_volume_ids: set[uuid.UUID] = field(default_factory=set)
+    detached_volumes: list[VolumeModel] = field(default_factory=list)
     unassign_event_message: Optional[str] = None
     graceful_stop_event_message: Optional[str] = None
     sync_gateway_replicas: bool = False
@@ -355,7 +355,7 @@ class _ProcessResult:
 @dataclass
 class _VolumeDetachResult:
     all_detached: bool
-    detached_volume_ids: set[uuid.UUID] = field(default_factory=set)
+    detached_volumes: list[VolumeModel] = field(default_factory=list)
     set_volumes_detached_at: bool = False
 
 
@@ -575,13 +575,31 @@ async def _apply_process_result(
             # updates active attached volumes and/or the races are accepted.
             await session.execute(update(VolumeModel), result.volume_update_rows)
 
-        if result.detached_volume_ids and instance_model is not None:
-            await session.execute(
-                delete(VolumeAttachmentModel).where(
+        if result.detached_volumes and instance_model is not None:
+            res = await session.execute(
+                delete(VolumeAttachmentModel)
+                .where(
                     VolumeAttachmentModel.instance_id == instance_model.id,
-                    VolumeAttachmentModel.volume_id.in_(result.detached_volume_ids),
+                    VolumeAttachmentModel.volume_id.in_([v.id for v in result.detached_volumes]),
                 )
+                .returning(VolumeAttachmentModel.volume_id)
             )
+            deleted_attachment_volume_ids = set(res.scalars().all())
+            for volume_model in result.detached_volumes:
+                if volume_model.id not in deleted_attachment_volume_ids:
+                    # Only emit events for attachments deleted now. Volumes detached on earlier
+                    # passes are reported as detached again while other volumes are still detaching.
+                    continue
+                events.emit(
+                    session,
+                    "Volume detached from instance",
+                    actor=events.SystemActor(),
+                    targets=[
+                        events.Target.from_model(volume_model),
+                        events.Target.from_model(instance_model),
+                        events.Target.from_model(job_model),
+                    ],
+                )
 
         emit_job_status_change_event(
             session=session,
@@ -744,7 +762,7 @@ async def _process_terminating_job(
         instance_model=instance_model,
         job_provisioning_data=jpd,
     )
-    result.detached_volume_ids = detach_result.detached_volume_ids
+    result.detached_volumes = detach_result.detached_volumes
     if detach_result.set_volumes_detached_at:
         result.job_update_map["volumes_detached_at"] = NOW_PLACEHOLDER
 
@@ -935,7 +953,7 @@ async def _process_job_volumes_detaching(
         instance_model=instance_model,
         job_provisioning_data=jpd,
     )
-    result.detached_volume_ids = detach_result.detached_volume_ids
+    result.detached_volumes = detach_result.detached_volumes
     if detach_result.all_detached:
         result.job_update_map["status"] = _get_job_termination_status(job_model)
     return result
@@ -1066,7 +1084,7 @@ async def _detach_volumes_from_job_instance(
             )
             return _VolumeDetachResult(all_detached=False)
 
-        detached_volume_ids = set()
+        detached_volumes = []
         all_detached = True
         for volume_model in volume_models:
             detached = await _detach_volume_from_job_instance(
@@ -1079,13 +1097,13 @@ async def _detach_volumes_from_job_instance(
                 run_termination_reason=run_termination_reason,
             )
             if detached:
-                detached_volume_ids.add(volume_model.id)
+                detached_volumes.append(volume_model)
             else:
                 all_detached = False
 
     return _VolumeDetachResult(
         all_detached=all_detached,
-        detached_volume_ids=detached_volume_ids,
+        detached_volumes=detached_volumes,
         set_volumes_detached_at=job_model.volumes_detached_at is None,
     )
 

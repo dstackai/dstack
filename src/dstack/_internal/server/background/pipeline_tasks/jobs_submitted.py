@@ -413,9 +413,8 @@ class _TerminateSubmittedJobResult:
 
 @dataclass
 class _VolumeAttachmentPayload:
-    volume_id: uuid.UUID
+    volume_model: VolumeModel
     attachment_data: str
-    volume_name: str
 
 
 @dataclass
@@ -1954,9 +1953,8 @@ async def _process_volume_attachments(
                     )
                     attachments.append(
                         _VolumeAttachmentPayload(
-                            volume_id=volume_model.id,
+                            volume_model=volume_model,
                             attachment_data=attachment_data.model_dump_json(),
-                            volume_name=volume.name,
                         )
                     )
                     break
@@ -2121,11 +2119,13 @@ async def _apply_volume_attachment_result(
 ) -> None:
     job_runtime_data = get_or_error(get_job_runtime_data(job_model))
     job_runtime_data.volume_names = [
-        attachment.volume_name for attachment in volume_attachment_result.attachments
+        attachment.volume_model.name for attachment in volume_attachment_result.attachments
     ]
     job_model.job_runtime_data = job_runtime_data.model_dump_json()
 
-    volume_ids = [attachment.volume_id for attachment in volume_attachment_result.attachments]
+    volume_ids = [
+        attachment.volume_model.id for attachment in volume_attachment_result.attachments
+    ]
     if volume_ids:
         now = get_current_datetime()
         await session.execute(
@@ -2136,10 +2136,20 @@ async def _apply_volume_attachment_result(
         for attachment in volume_attachment_result.attachments:
             session.add(
                 VolumeAttachmentModel(
-                    volume_id=attachment.volume_id,
+                    volume_id=attachment.volume_model.id,
                     instance=instance_model,
                     attachment_data=attachment.attachment_data,
                 )
+            )
+            events.emit(
+                session,
+                "Volume attached to instance",
+                actor=events.SystemActor(),
+                targets=[
+                    events.Target.from_model(attachment.volume_model),
+                    events.Target.from_model(instance_model),
+                    events.Target.from_model(job_model),
+                ],
             )
 
     if volume_attachment_result.termination_message is None:

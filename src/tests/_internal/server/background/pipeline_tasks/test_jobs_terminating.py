@@ -11,6 +11,7 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import TaskConfiguration
+from dstack._internal.core.models.events import EventTargetType
 from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import (
@@ -1258,6 +1259,15 @@ class TestJobTerminatingWorker:
         instance = res.unique().scalar_one()
         assert job.status == JobStatus.TERMINATED
         assert len(instance.volume_attachments) == 0
+        detach_events = [
+            e for e in await list_events(session) if e.message == "Volume detached from instance"
+        ]
+        assert len(detach_events) == 1
+        assert {(t.entity_type, t.entity_id) for t in detach_events[0].targets} == {
+            (EventTargetType.VOLUME, volume.id),
+            (EventTargetType.INSTANCE, instance.id),
+            (EventTargetType.JOB, job.id),
+        }
 
     async def test_terminates_job_on_shared_instance(
         self, test_db, session: AsyncSession, worker: JobTerminatingWorker
@@ -1371,6 +1381,13 @@ class TestJobTerminatingWorker:
         assert job.status == JobStatus.TERMINATED
         assert len(instance.volume_attachments) == 1
         assert instance.volume_attachments[0].volume == volume_2
+        detach_events = [
+            e for e in await list_events(session) if e.message == "Volume detached from instance"
+        ]
+        assert len(detach_events) == 1
+        assert (EventTargetType.VOLUME, volume_1.id) in {
+            (t.entity_type, t.entity_id) for t in detach_events[0].targets
+        }
 
     async def test_resets_job_for_retry_if_related_instance_is_locked(
         self, test_db, session: AsyncSession, worker: JobTerminatingWorker
