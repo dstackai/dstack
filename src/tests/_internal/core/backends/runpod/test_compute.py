@@ -239,6 +239,37 @@ class TestRunpodComputeRunJob:
         assert kwargs["min_cpu_count_per_gpu"] == 7
         assert kwargs["min_memory_in_gb_per_gpu"] == 125
 
+    def test_reports_allocated_vcpu_and_ram(self):
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.create_pod.return_value = {
+            "id": "pod-1",
+            "gpu": {"id": "NVIDIA H100 80GB HBM3", "count": 1, "vcpuCount": 28, "memory": 251},
+        }
+        offer = _gpu_offer(gpu_count=1, cpu_count=20, memory_gib=125)
+
+        jpd = _run_job(compute, offer)
+
+        resources = jpd.instance_type.resources
+        assert (resources.cpus, resources.memory_mib) == (28, 251 * 1024)
+        assert resources.gpus == offer.instance.resources.gpus
+        assert resources.disk == offer.instance.resources.disk
+        assert jpd.instance_type.name == offer.instance.name
+        assert jpd.price == offer.price
+        # The offer is left intact
+        assert (offer.instance.resources.cpus, offer.instance.resources.memory_mib) == (
+            20,
+            125 * 1024,
+        )
+
+    def test_falls_back_to_offer_if_allocation_is_not_reported(self):
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.create_pod.return_value = {"id": "pod-1"}
+        offer = _gpu_offer()
+
+        jpd = _run_job(compute, offer)
+
+        assert jpd.instance_type == offer.instance
+
     def test_failed_registry_credentials_cleanup_does_not_fail_provisioning(self):
         compute, api_client = _compute_with_mocked_api_client()
         api_client.create_pod.return_value = {"id": "pod-1"}

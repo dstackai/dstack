@@ -35,6 +35,7 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
+    InstanceType,
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
@@ -207,7 +208,7 @@ class RunpodCompute(
 
         return JobProvisioningData(
             backend=instance_offer.backend,
-            instance_type=instance_offer.instance,
+            instance_type=_get_pod_instance_type(pod, instance_offer),
             instance_id=instance_id,
             hostname=None,
             internal_ip=None,
@@ -378,6 +379,26 @@ def _get_cpu_type_id(offer: InstanceOfferWithAvailability) -> str:
     if match is None:
         raise ComputeError(f"Failed to parse CPU instance type: {offer.instance.name!r}")
     return match.group("flavor_id")
+
+
+def _get_pod_instance_type(pod: V2Pod, offer: InstanceOfferWithAvailability) -> InstanceType:
+    """
+    Returns the offer's instance type with the vCPU count and RAM allocated to the pod.
+    A GPU pod may get more than the offer, as the offer has the minimums of the hosts that fit
+    the requirements, and the pod is placed on any of them.
+    """
+    # The pod is placed synchronously, so the create response reports the allocation
+    config = pod.get("gpu") or pod.get("cpu")
+    vcpu_count = config.get("vcpuCount") if config is not None else None
+    memory_gb = config.get("memory") if config is not None else None
+    if not vcpu_count or not memory_gb:
+        # Not expected, but the pod is already created, so it must not fail provisioning
+        logger.warning("Pod %s does not report allocated vCPU and RAM", pod["id"])
+        return offer.instance
+    instance_type = offer.instance.model_copy(deep=True)
+    instance_type.resources.cpus = int(vcpu_count)
+    instance_type.resources.memory_mib = round(memory_gb * 1024)
+    return instance_type
 
 
 def _parse_pod_created_at(pod: V2Pod) -> Optional[datetime]:
