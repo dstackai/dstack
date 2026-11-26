@@ -46,6 +46,26 @@ class V2Pod(TypedDict):
     mounts: "V2Mounts"
     createdAt: str
     dataCenterId: Optional[str]
+    gpu: NotRequired["V2GpuConfig"]
+    """Present for GPU pods"""
+    cpu: NotRequired["V2CpuConfig"]
+    """Present for CPU pods"""
+
+
+class V2GpuConfig(TypedDict):
+    id: str
+    count: NotRequired[int]
+    vcpuCount: float
+    """Total vCPU count allocated to the pod across all GPUs"""
+    memory: float
+    """Total system RAM in GB allocated to the pod across all GPUs"""
+
+
+class V2CpuConfig(TypedDict):
+    id: str
+    vcpuCount: int
+    memory: int
+    """System RAM in GB allocated to the pod"""
 
 
 class V2Pagination(TypedDict):
