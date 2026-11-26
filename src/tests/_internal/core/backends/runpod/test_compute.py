@@ -3,6 +3,7 @@ from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import gpuhunt
+import pytest
 from gpuhunt.providers.base import OnlineProvider
 
 from dstack._internal.core.backends.base.compute import parse_provider_ref_from_name
@@ -206,6 +207,13 @@ class TestRunpodComputeGetOffers:
         [offer] = offers
         assert offer.instance.name == "cpu3c-8-16"
         assert offer.instance.resources.disk.size_mib == 50 * 1024
+
+    def test_adds_fitted_container_disk_price(self):
+        offers, _ = _get_offers([_gpu_item()], {"gpu": "1", "disk": "1000GB.."})
+
+        [offer] = offers
+        # The Runpod console shows $0.139/hr for 1000GB of container disk
+        assert offer.price == pytest.approx(4.39 + 0.1389, abs=1e-4)
 
     def test_filters_by_configured_regions(self):
         items = [_gpu_item("EU-RO-1"), _gpu_item("US-KS-2")]
