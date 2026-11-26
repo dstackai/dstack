@@ -175,8 +175,6 @@ This property ensures that instances are interconnected. This is required for ru
         If the Kubernetes cluster has interconnect configured, `dstack` can use it without additional setup.
         See the [Lambda](../examples/clusters/lambda.md#kubernetes) or [Crusoe](../examples/clusters/crusoe.md#kubernetes) examples.
 
-    <!-- TODO: Add Runpod tab to cluster backends once cluster support is fully tested -->
-
 === "SSH fleets"
     If the hosts in the SSH fleet have interconnect configured, you only need to set `placement` to `cluster`.
 

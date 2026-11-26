@@ -936,7 +936,7 @@ resources:
 
 </div>
 
-Network volumes cannot be used with multi-node tasks (no multi-attach support), except where multi-attach is supported (Runpod) or via volume interpolation. 
+Network volumes cannot be used with multi-node tasks (no multi-attach support), except via volume interpolation.
 
 For multi-node tasks, use interpolation to attach different volumes to each node.
 

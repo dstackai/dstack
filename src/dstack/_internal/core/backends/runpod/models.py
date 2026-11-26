@@ -4,8 +4,6 @@ from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
 
-RUNPOD_COMMUNITY_CLOUD_DEFAULT = False
-
 
 class RunpodAPIKeyCreds(CoreModel):
     type: Literal["api_key"] = "api_key"
@@ -26,11 +24,13 @@ class RunpodBackendConfig(CoreModel):
         Optional[bool],
         Field(
             description=(
-                "Whether Community Cloud offers can be suggested in addition to Secure Cloud."
-                f" Defaults to `{str(RUNPOD_COMMUNITY_CLOUD_DEFAULT).lower()}`"
+                "Deprecated and ignored since 0.22.10."
+                " Only Secure Cloud offers are suggested."
+                " Will be removed in future versions"
             )
         ),
     ] = None
+    """`community_cloud` is kept so that existing configs that set it still load."""
 
 
 class RunpodBackendConfigWithCreds(RunpodBackendConfig):
@@ -46,9 +46,3 @@ class RunpodStoredConfig(RunpodBackendConfig):
 
 class RunpodConfig(RunpodStoredConfig):
     creds: AnyRunpodCreds
-
-    @property
-    def allow_community_cloud(self) -> bool:
-        if self.community_cloud is not None:
-            return self.community_cloud
-        return RUNPOD_COMMUNITY_CLOUD_DEFAULT

@@ -2,16 +2,19 @@ from datetime import datetime, timezone
 from typing import Optional
 from unittest.mock import MagicMock, patch
 
-import pytest
+import gpuhunt
+from gpuhunt.providers.base import OnlineProvider
 
 from dstack._internal.core.backends.base.compute import parse_provider_ref_from_name
 from dstack._internal.core.backends.runpod.api_client import RunpodV2ClientError
 from dstack._internal.core.backends.runpod.compute import RunpodCompute
 from dstack._internal.core.backends.runpod.models import RunpodAPIKeyCreds, RunpodConfig
-from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
-from dstack._internal.core.models.instances import InstanceOfferWithAvailability
+from dstack._internal.core.models.instances import (
+    InstanceAvailability,
+    InstanceOfferWithAvailability,
+)
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.server.testing.common import (
@@ -44,12 +47,6 @@ def _gpu_offer(
         memory_gib=memory_gib,
         instance_type="NVIDIA H100 80GB HBM3",
     )
-
-
-def _cluster_offer(pod_counts: list[int]) -> InstanceOfferWithAvailability:
-    offer = _gpu_offer(gpu_count=8, cpu_count=128, memory_gib=1024)
-    offer.backend_data = {"pod_counts": pod_counts}
-    return offer
 
 
 def _job() -> MagicMock:
@@ -89,54 +86,133 @@ def _run_job(
         )
 
 
-def _run_jobs(compute: RunpodCompute, offer: InstanceOfferWithAvailability, job_count: int):
-    job_configurations = []
-    for _ in range(job_count):
-        job_configuration = MagicMock()
-        job_configuration.job = _job()
-        job_configuration.volumes = []
-        job_configurations.append(job_configuration)
-    with patch(
-        "dstack._internal.core.backends.runpod.compute.get_docker_commands",
-        return_value=["echo hi"],
-    ):
-        return compute.run_jobs(
-            run=_run(),
-            job_configurations=job_configurations,
-            instance_offer=offer,
-            project_name="main",
-            project_ssh_public_key=PROJECT_SSH_PUBLIC_KEY,
-            project_ssh_private_key="private-key",
-            placement_group=None,
-            requirements=Requirements(resources=ResourcesSpec(), multinode=True),
-            extra_authorized_keys=[],
-        )
-
-
-def _pod(
-    pod_id: str = "pod-1",
-    *,
-    ports: Optional[list[dict]] = None,
-    cluster_ip: Optional[str] = None,
-    is_cluster_pod: bool = False,
-) -> dict:
-    pod: dict = {
+def _pod(pod_id: str = "pod-1", *, ports: Optional[list[dict]] = None) -> dict:
+    return {
         "id": pod_id,
         "status": "RUNNING",
         "runtime": None if ports is None else {"ports": ports},
         "mounts": {},
     }
-    if is_cluster_pod or cluster_ip is not None:
-        pod["cluster"] = {"id": "cluster-1", "rank": 0}
-        if cluster_ip is not None:
-            pod["cluster"]["ip"] = cluster_ip
-    return pod
 
 
 SSH_PORTS = [
     {"ip": "100.65.0.1", "private": 8080, "public": None, "type": "http"},
     {"ip": "203.0.113.10", "private": 10022, "public": 40022, "type": "tcp"},
 ]
+
+
+class _FakeRunpodProvider(OnlineProvider):
+    NAME = "runpod"
+
+    def __init__(self, items: list[gpuhunt.CatalogItem]):
+        self.items = items
+        self.query_filters: list[Optional[gpuhunt.QueryFilter]] = []
+
+    @classmethod
+    def from_env(cls) -> "_FakeRunpodProvider":
+        raise NotImplementedError
+
+    def get(
+        self,
+        query_filter: Optional[gpuhunt.QueryFilter] = None,
+        balance_resources: bool = True,
+        apply_filter: bool = False,
+    ) -> list[gpuhunt.CatalogItem]:
+        self.query_filters.append(query_filter)
+        return self.items
+
+
+def _gpu_item(location: str = "EU-RO-1") -> gpuhunt.CatalogItem:
+    return gpuhunt.CatalogItem(
+        provider="runpod",
+        instance_name="NVIDIA H100 80GB HBM3",
+        location=location,
+        price=4.39,
+        cpu=16,
+        memory=251,
+        gpu_vendor=gpuhunt.AcceleratorVendor.NVIDIA,
+        gpu_count=1,
+        gpu_name="H100",
+        gpu_memory=80,
+        spot=False,
+        disk_size=None,
+    )
+
+
+def _cpu_item(vcpu: int, max_disk_size: float) -> gpuhunt.CatalogItem:
+    return gpuhunt.CatalogItem(
+        provider="runpod",
+        instance_name=f"cpu3c-{vcpu}-{vcpu * 2}",
+        location="EU-RO-1",
+        price=0.03 * vcpu,
+        cpu=vcpu,
+        memory=vcpu * 2,
+        gpu_count=0,
+        gpu_name=None,
+        gpu_memory=None,
+        spot=False,
+        disk_size=max_disk_size,
+    )
+
+
+def _get_offers(
+    items: list[gpuhunt.CatalogItem], resources: dict, regions: Optional[list[str]] = None
+) -> tuple[list[InstanceOfferWithAvailability], _FakeRunpodProvider]:
+    compute = RunpodCompute(RunpodConfig(creds=RunpodAPIKeyCreds(api_key="test"), regions=regions))
+    provider = _FakeRunpodProvider(items)
+    compute.catalog = gpuhunt.Catalog(balance_resources=False, auto_reload=False)
+    compute.catalog.add_provider(provider)
+    requirements = Requirements(resources=ResourcesSpec.model_validate(resources))
+    offers = list(compute.get_offers(requirements, full_offers=False, unallocated_resources=False))
+    return offers, provider
+
+
+class TestRunpodComputeGetOffers:
+    def test_queries_catalog_with_requirements(self):
+        _, provider = _get_offers(
+            [], {"cpu": "16..", "memory": "64GB..", "gpu": "H100:2..4", "disk": "50GB"}
+        )
+
+        [query_filter] = provider.query_filters
+        assert query_filter is not None
+        assert (query_filter.min_cpu, query_filter.min_memory) == (16, 64)
+        assert (query_filter.min_gpu_count, query_filter.max_gpu_count) == (2, 4)
+        assert query_filter.gpu_name == ["H100"]
+        # Disks are fitted by the compute
+        assert (query_filter.min_disk_size, query_filter.max_disk_size) == (None, None)
+
+    def test_offers_are_available(self):
+        offers, _ = _get_offers([_gpu_item()], {"gpu": "1"})
+
+        [offer] = offers
+        assert offer.availability == InstanceAvailability.AVAILABLE
+        assert offer.region == "EU-RO-1"
+        assert (offer.instance.resources.cpus, offer.instance.resources.memory_mib) == (
+            16,
+            251 * 1024,
+        )
+
+    def test_fits_gpu_offer_disk_to_requirements(self):
+        offers, _ = _get_offers([_gpu_item()], {"gpu": "1", "disk": "500GB.."})
+
+        [offer] = offers
+        assert offer.instance.resources.disk.size_mib == 500 * 1024
+
+    def test_fits_cpu_offer_disk_to_requirements_within_max_disk_size(self):
+        items = [_cpu_item(vcpu=2, max_disk_size=20), _cpu_item(vcpu=8, max_disk_size=80)]
+
+        offers, _ = _get_offers(items, {"gpu": 0, "disk": "50GB"})
+
+        [offer] = offers
+        assert offer.instance.name == "cpu3c-8-16"
+        assert offer.instance.resources.disk.size_mib == 50 * 1024
+
+    def test_filters_by_configured_regions(self):
+        items = [_gpu_item("EU-RO-1"), _gpu_item("US-KS-2")]
+
+        offers, _ = _get_offers(items, {"gpu": "1"}, regions=["US-KS-2"])
+
+        assert [o.region for o in offers] == ["US-KS-2"]
 
 
 class TestRunpodComputeRunJob:
@@ -178,51 +254,27 @@ class TestRunpodComputeRunJob:
         pod_name = api_client.create_pod.call_args.kwargs["name"]
         assert parse_provider_ref_from_name(pod_name) == "abcdef123456"
 
-
-class TestRunpodComputeRunJobs:
-    def test_sets_internal_ip_from_cluster_ip(self):
+    def test_cpu_offer(self):
         compute, api_client = _compute_with_mocked_api_client()
-        api_client.create_cluster.return_value = {"id": "cluster-1", "name": "test"}
-        api_client.list_cluster_pods.return_value = [
-            _pod("pod-1", cluster_ip="10.65.0.2"),
-            _pod("pod-2", is_cluster_pod=True),
-        ]
+        api_client.create_pod.return_value = {"id": "pod-1"}
+        offer = get_instance_offer_with_availability(
+            backend=BackendType.RUNPOD,
+            region="EU-RO-1",
+            cpu_count=16,
+            memory_gib=32,
+            disk_gib=50,
+            instance_type="cpu3c-16-32",
+        )
 
-        cgpd = _run_jobs(compute, _cluster_offer([2, 4]), job_count=2)
+        _run_job(compute, offer)
 
-        assert cgpd.compute_group_id == "cluster-1"
-        assert [jpd.instance_id for jpd in cgpd.job_provisioning_datas] == ["pod-1", "pod-2"]
-        assert [jpd.internal_ip for jpd in cgpd.job_provisioning_datas] == ["10.65.0.2", None]
-
-    def test_deletes_cluster_if_pod_count_mismatch(self):
-        compute, api_client = _compute_with_mocked_api_client()
-        api_client.create_cluster.return_value = {"id": "cluster-1", "name": "test"}
-        api_client.list_cluster_pods.return_value = [_pod("pod-1", is_cluster_pod=True)]
-
-        with pytest.raises(ComputeError, match="Expected 2 pods"):
-            _run_jobs(compute, _cluster_offer([2, 4]), job_count=2)
-
-        api_client.delete_cluster.assert_called_once_with("cluster-1")
-
-    def test_deletes_cluster_if_listing_pods_fails(self):
-        compute, api_client = _compute_with_mocked_api_client()
-        api_client.create_cluster.return_value = {"id": "cluster-1", "name": "test"}
-        error = RunpodV2ClientError(status=429, title="Too Many Requests", detail="-")
-        api_client.list_cluster_pods.side_effect = error
-
-        with pytest.raises(RunpodV2ClientError):
-            _run_jobs(compute, _cluster_offer([2, 4]), job_count=2)
-
-        api_client.delete_cluster.assert_called_once_with("cluster-1")
-
-    def test_raises_original_error_if_cluster_deletion_fails(self):
-        compute, api_client = _compute_with_mocked_api_client()
-        api_client.create_cluster.return_value = {"id": "cluster-1", "name": "test"}
-        api_client.list_cluster_pods.return_value = []
-        api_client.delete_cluster.side_effect = RuntimeError("delete failed")
-
-        with pytest.raises(ComputeError, match="Expected 2 pods"):
-            _run_jobs(compute, _cluster_offer([2, 4]), job_count=2)
+        kwargs = api_client.create_pod.call_args.kwargs
+        assert kwargs["cloud"] == "SECURE"
+        assert kwargs["data_center_ids"] == ["EU-RO-1"]
+        assert kwargs["cpu_type_id"] == "cpu3c"
+        assert kwargs["cpu_count"] == 16
+        assert kwargs["container_disk_in_gb"] == 50
+        assert kwargs["gpu_type_id"] is None
 
 
 class TestRunpodComputeUpdateProvisioningData:
@@ -251,31 +303,6 @@ class TestRunpodComputeUpdateProvisioningData:
         self._update(compute, jpd)
 
         assert jpd.hostname is None
-
-    def test_cluster_pod_waits_for_cluster_ip(self):
-        compute, api_client = _compute_with_mocked_api_client()
-        api_client.get_pod.return_value = _pod(ports=SSH_PORTS, is_cluster_pod=True)
-        jpd = get_job_provisioning_data(
-            backend=BackendType.RUNPOD, hostname=None, internal_ip=None
-        )
-
-        self._update(compute, jpd)
-
-        assert jpd.hostname is None
-        assert jpd.internal_ip is None
-
-    def test_cluster_pod_sets_internal_ip(self):
-        compute, api_client = _compute_with_mocked_api_client()
-        api_client.get_pod.return_value = _pod(ports=SSH_PORTS, cluster_ip="10.65.0.3")
-        jpd = get_job_provisioning_data(
-            backend=BackendType.RUNPOD, hostname=None, internal_ip=None
-        )
-
-        self._update(compute, jpd)
-
-        assert jpd.hostname == "203.0.113.10"
-        assert jpd.ssh_port == 40022
-        assert jpd.internal_ip == "10.65.0.3"
 
 
 def _listed_pod(
