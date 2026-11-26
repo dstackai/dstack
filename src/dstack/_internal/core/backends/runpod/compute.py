@@ -24,7 +24,7 @@ from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient, V2Pod
 from dstack._internal.core.backends.runpod.models import RunpodConfig
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
-from dstack._internal.core.errors import BackendError, ComputeError
+from dstack._internal.core.errors import BackendError, ComputeError, SkipOffer
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import (
     ListedResourceGroup,
@@ -42,6 +42,7 @@ from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
+    RunpodGlobalVolumeConfiguration,
     RunpodVolumeConfiguration,
     Volume,
     VolumeProvisioningData,
@@ -152,11 +153,19 @@ class RunpodCompute(
 
         network_volume_id = None
         volume_mount_path = None
+        global_volume_id = None
+        global_volume_mount_path = None
         if len(volumes) > 1:
-            raise ComputeError("Mounting more than one network volume is not supported in runpod")
+            raise ComputeError("Mounting more than one volume is not supported in runpod")
         if len(volumes) == 1:
-            network_volume_id = volumes[0].volume_id
-            volume_mount_path = run.run_spec.configuration.volumes[0].path
+            if isinstance(volumes[0].configuration, RunpodGlobalVolumeConfiguration):
+                if not _is_secure_cloud(instance_offer.region):
+                    raise SkipOffer("Runpod global volumes require Secure Cloud")
+                global_volume_id = get_or_error(volumes[0].volume_id)
+                global_volume_mount_path = run.run_spec.configuration.volumes[0].path
+            else:
+                network_volume_id = volumes[0].volume_id
+                volume_mount_path = run.run_spec.configuration.volumes[0].path
 
         if instance_offer.instance.resources.spot:
             raise ComputeError("Runpod spot offers are not supported")
@@ -207,6 +216,8 @@ class RunpodCompute(
                 container_disk_in_gb=offer_disk_gib,
                 network_volume_id=network_volume_id,
                 volume_mount_path=volume_mount_path,
+                global_volume_id=global_volume_id,
+                global_volume_mount_path=global_volume_mount_path,
                 image_name=job.job_spec.image_name,
                 container_registry_credentials_id=container_registry_credentials_id,
                 entrypoint=["/bin/sh"],
@@ -285,6 +296,12 @@ class RunpodCompute(
         requirements: Requirements,
         extra_authorized_keys: list[str],
     ) -> ComputeGroupProvisioningData:
+        if any(
+            isinstance(volume.configuration, RunpodGlobalVolumeConfiguration)
+            for job_configuration in job_configurations
+            for volume in job_configuration.volumes
+        ):
+            raise SkipOffer("Runpod global volumes are not supported with Instant Clusters")
         master_job_configuration = job_configurations[0]
         master_job = master_job_configuration.job
         if master_job.job_spec.registry_auth is not None:
@@ -445,6 +462,18 @@ class RunpodCompute(
         self.api_client.terminate_pod(group.primary_id)
 
     def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        if isinstance(volume.configuration, RunpodGlobalVolumeConfiguration):
+            volume_id = get_or_error(volume.configuration.volume_id)
+            global_volume = self.api_client.get_global_volume(volume_id)
+            if global_volume is None:
+                raise ComputeError(f"Volume {volume_id} not found")
+            return VolumeProvisioningData(
+                backend=BackendType.RUNPOD,
+                volume_id=global_volume["id"],
+                size_gb=None,
+                attachable=False,
+                detachable=False,
+            )
         assert isinstance(volume.configuration, RunpodVolumeConfiguration)
         volume_id = get_or_error(volume.configuration.volume_id)
         network_volume = self.api_client.get_network_volume(volume_id)
@@ -461,8 +490,17 @@ class RunpodCompute(
         )
 
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
-        assert isinstance(volume.configuration, RunpodVolumeConfiguration)
         volume_name = generate_unique_volume_name(volume, max_length=MAX_RESOURCE_NAME_LEN)
+        if isinstance(volume.configuration, RunpodGlobalVolumeConfiguration):
+            global_volume = self.api_client.create_global_volume(name=volume_name)
+            return VolumeProvisioningData(
+                backend=BackendType.RUNPOD,
+                volume_id=global_volume["id"],
+                size_gb=None,
+                attachable=False,
+                detachable=False,
+            )
+        assert isinstance(volume.configuration, RunpodVolumeConfiguration)
         size_gb = volume.configuration.size_gb
         # Runpod regions must be uppercase.
         # Lowercase regions are accepted in the API but they break Runpod in several ways.
@@ -484,7 +522,10 @@ class RunpodCompute(
     def delete_volume(self, volume: Volume):
         if volume.volume_id is None:
             return
-        deleted = self.api_client.delete_network_volume(volume.volume_id)
+        if isinstance(volume.configuration, RunpodGlobalVolumeConfiguration):
+            deleted = self.api_client.delete_global_volume(volume.volume_id)
+        else:
+            deleted = self.api_client.delete_network_volume(volume.volume_id)
         if not deleted:
             logger.debug("The volume %s not found. Skipping deletion.", volume.volume_id)
 

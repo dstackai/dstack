@@ -23,7 +23,10 @@ from dstack._internal.core.models.profiles import (
     Profile,
 )
 from dstack._internal.core.models.runs import JobStatus
-from dstack._internal.core.models.volumes import DaytonaVolumeConfiguration
+from dstack._internal.core.models.volumes import (
+    DaytonaVolumeConfiguration,
+    RunpodGlobalVolumeConfiguration,
+)
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.schemas.runner import TaskListItem, TaskListResponse, TaskStatus
 from dstack._internal.server.services.runner.client import ShimClient
@@ -127,7 +130,11 @@ class TestFilterInstances:
 
         assert result == ([instance] if matches else [])
 
-    def test_global_volume_matches_cpu_and_gpu_regions(self):
+    @pytest.mark.parametrize(
+        "configuration",
+        [DaytonaVolumeConfiguration(), RunpodGlobalVolumeConfiguration(global_=True)],
+    )
+    def test_global_volume_matches_cpu_and_gpu_regions(self, configuration):
         instances = [
             InstanceModel(
                 unreachable=False,
@@ -138,8 +145,8 @@ class TestFilterInstances:
                 ).model_dump_json(),
             )
             for backend, region, gpu_count in [
-                (BackendType.DAYTONA, "us", 0),
-                (BackendType.DAYTONA, "earth", 1),
+                (configuration.backend, "us", 0),
+                (configuration.backend, "earth", 1),
                 (BackendType.AWS, "us", 0),
             ]
         ]
@@ -147,7 +154,7 @@ class TestFilterInstances:
         result = instances_services.filter_instances(
             instances=instances,
             profile=Profile(),
-            volumes=[[get_volume(configuration=DaytonaVolumeConfiguration())]],
+            volumes=[[get_volume(configuration=configuration)]],
         )
 
         assert result == instances[:2]

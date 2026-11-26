@@ -6,6 +6,8 @@ from pydantic import ValidationError
 from dstack._internal.core.models.volumes import (
     DaytonaVolumeConfiguration,
     InstanceMountPoint,
+    RunpodGlobalVolumeConfiguration,
+    RunpodVolumeConfiguration,
     VolumeConfiguration,
     VolumeConfigurationWithSize,
     VolumeMountPoint,
@@ -13,6 +15,48 @@ from dstack._internal.core.models.volumes import (
     VolumeSpec,
     parse_mount_point,
 )
+from dstack._internal.server.testing.common import get_volume
+
+
+class TestRunpodVolumeConfiguration:
+    def test_schema_requires_explicit_global_opt_in(self):
+        schema = VolumeSpec.model_json_schema()
+        global_schema = schema["$defs"]["RunpodGlobalVolumeConfiguration"]
+        assert "global" in global_schema["required"]
+        assert global_schema["properties"]["global"]["const"] is True
+
+    @pytest.mark.parametrize("volume_id", [None, "existing-global"])
+    def test_global_volume_roundtrip_and_location(self, volume_id):
+        spec = VolumeSpec.model_validate(
+            {"configuration": {"backend": "runpod", "global": True, "volume_id": volume_id}}
+        )
+        assert isinstance(spec.configuration, RunpodGlobalVolumeConfiguration)
+        assert spec.configuration.is_external == (volume_id is not None)
+        assert "region" not in spec.configuration.model_dump()
+        assert "size" not in spec.configuration.model_dump()
+        assert spec.configuration.model_dump()["global"] is True
+        assert VolumeSpec.model_validate_json(spec.model_dump_json()) == spec
+        volume = get_volume(configuration=spec.configuration)
+        assert volume.get_region() == ""
+        assert volume.matches_location(spec.configuration.backend, "EU-CZ-1")
+        assert volume.matches_location(spec.configuration.backend, "US-MD-1")
+
+    @pytest.mark.parametrize(("field", "value"), [("size", 100), ("region", "EU-CZ-1")])
+    def test_global_volume_rejects_size_and_region(self, field, value):
+        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+            VolumeConfiguration.model_validate({"backend": "runpod", "global": True, field: value})
+
+    @pytest.mark.parametrize("global_fields", [{}, {"global": False}])
+    def test_network_volume_still_requires_region(self, global_fields):
+        with pytest.raises(ValidationError, match="region"):
+            VolumeConfiguration.model_validate({"backend": "runpod", **global_fields})
+        config = VolumeConfiguration.model_validate(
+            {"backend": "runpod", "region": "EU-CZ-1", **global_fields}
+        ).root
+        assert isinstance(config, RunpodVolumeConfiguration)
+        volume = get_volume(configuration=config)
+        assert volume.matches_location(config.backend, "eu-cz-1")
+        assert not volume.matches_location(config.backend, "US-MD-1")
 
 
 @pytest.mark.parametrize("backend", ["aws", "gcp", "runpod", "kubernetes"])

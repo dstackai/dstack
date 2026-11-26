@@ -66,7 +66,8 @@ class TestRunpodApiClientCreatePod:
             "env": {"RUNPOD_POD_USER": "0"},
         }
 
-    def test_cpu_pod(self, requests_mock):
+    @pytest.mark.parametrize("global_volume_id", [None, "global-1"])
+    def test_cpu_pod(self, requests_mock, global_volume_id):
         requests_mock.post(f"{API_V2_URL}/pods", status_code=201, json={"id": "pod-1"})
 
         _client().create_pod(
@@ -75,12 +76,14 @@ class TestRunpodApiClientCreatePod:
             cpu_type_id="cpu3c",
             cpu_count=4,
             container_disk_in_gb=20,
+            global_volume_id=global_volume_id,
+            global_volume_mount_path="/models" if global_volume_id else None,
             image_name="dstackai/base:latest",
             entrypoint=["/bin/sh"],
             cmd=["-c", "echo hi"],
         )
 
-        assert requests_mock.last_request.json() == {
+        expected = {
             "name": "test-pod",
             "cloud": "SECURE",
             "cpu": {"id": "cpu3c", "vcpuCount": 4},
@@ -89,6 +92,9 @@ class TestRunpodApiClientCreatePod:
             "entrypoint": ["/bin/sh"],
             "cmd": ["-c", "echo hi"],
         }
+        if global_volume_id:
+            expected["mounts"] = {"global": [{"volumeId": global_volume_id, "path": "/models"}]}
+        assert requests_mock.last_request.json() == expected
 
     def test_rejects_both_gpu_and_cpu(self):
         with pytest.raises(ValueError, match="Exactly one"):
@@ -185,6 +191,20 @@ class TestRunpodApiClientNotFound:
 
         assert _client().delete_network_volume("vol-1") is False
 
+    def test_get_global_volume(self, requests_mock):
+        requests_mock.get(
+            f"{API_V2_URL}/global-volumes/vol-1", status_code=404, json=_error(404, "-")
+        )
+
+        assert _client().get_global_volume("vol-1") is None
+
+    def test_delete_global_volume(self, requests_mock):
+        requests_mock.delete(
+            f"{API_V2_URL}/global-volumes/vol-1", status_code=404, json=_error(404, "-")
+        )
+
+        assert _client().delete_global_volume("vol-1") is False
+
     def test_other_errors_are_raised(self, requests_mock):
         requests_mock.delete(
             f"{API_V2_URL}/pods/pod-1",
@@ -194,6 +214,35 @@ class TestRunpodApiClientNotFound:
 
         with pytest.raises(RunpodV2ClientError):
             _client().terminate_pod("pod-1")
+
+
+class TestRunpodApiClientGlobalVolumes:
+    def test_create_get_and_delete(self, requests_mock):
+        volume = {
+            "id": "global-1",
+            "name": "models",
+            "createdAt": "2026-11-25T10:00:00Z",
+            "createdByUserId": None,
+        }
+        create = requests_mock.post(f"{API_V2_URL}/global-volumes", status_code=201, json=volume)
+        requests_mock.get(f"{API_V2_URL}/global-volumes/global-1", json=volume)
+        requests_mock.delete(f"{API_V2_URL}/global-volumes/global-1", status_code=204)
+        client = _client()
+
+        assert client.create_global_volume(name="models") == volume
+        assert create.last_request.json() == {"name": "models"}
+        assert client.get_global_volume("global-1") == volume
+        assert client.delete_global_volume("global-1") is True
+
+    def test_delete_preserves_in_use_error(self, requests_mock):
+        requests_mock.delete(
+            f"{API_V2_URL}/global-volumes/global-1",
+            status_code=409,
+            json=_error(409, "Volume is in use"),
+        )
+
+        with pytest.raises(RunpodV2ClientError, match="Volume is in use"):
+            _client().delete_global_volume("global-1")
 
 
 class TestRunpodApiClientListPods:

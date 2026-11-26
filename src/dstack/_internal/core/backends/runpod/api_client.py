@@ -45,7 +45,7 @@ class V2Pod(TypedDict):
     name: str
     status: Literal["PROVISIONING", "STARTING", "RUNNING", "EXITED", "ERROR", "TERMINATED"]
     runtime: Optional["V2PodRuntime"]
-    mounts: "V2Mounts"
+    mounts: "V2PodMounts"
     cluster: NotRequired["V2PodCluster"]
     createdAt: str
     dataCenterId: Optional[str]
@@ -87,6 +87,21 @@ class V2NetworkMount(TypedDict):
     path: str
 
 
+class V2GlobalMount(TypedDict):
+    volumeId: str
+    path: str
+
+
+# `global` is a Python keyword, so this TypedDict uses the functional syntax.
+V2PodMounts = TypedDict(
+    "V2PodMounts",
+    {
+        "network": NotRequired[list[V2NetworkMount]],
+        "global": NotRequired[list[V2GlobalMount]],
+    },
+)
+
+
 class V2CreatePodRequest(TypedDict):
     """
     Request body for creating a pod. Exactly one of `gpu` or `cpu` must be set.
@@ -105,7 +120,7 @@ class V2CreatePodRequest(TypedDict):
     the same container settings you could otherwise spread into this body."""
     disk: NotRequired[int]
     """Container disk in GB (ephemeral, wiped on restart)"""
-    mounts: NotRequired["V2Mounts"]
+    mounts: NotRequired[V2PodMounts]
     image: NotRequired[str]
     """`image` is required unless `templateId` is set"""
     registry: NotRequired[Optional[str]]
@@ -228,6 +243,17 @@ class V2CreateNetworkVolumeRequest(TypedDict):
     storage tier."""
 
 
+class V2GlobalVolume(TypedDict):
+    id: str
+    name: str
+    createdAt: str
+    createdByUserId: Optional[str]
+
+
+class V2CreateGlobalVolumeRequest(TypedDict):
+    name: str
+
+
 class RunpodGraphqlClientError(BackendError):
     errors: List[Dict]
 
@@ -284,6 +310,8 @@ class RunpodApiClient:
         container_disk_in_gb: int,
         network_volume_id: Optional[str] = None,
         volume_mount_path: Optional[str] = None,
+        global_volume_id: Optional[str] = None,
+        global_volume_mount_path: Optional[str] = None,
         image_name: str,
         container_registry_credentials_id: Optional[str] = None,
         entrypoint: list[str],
@@ -326,8 +354,17 @@ class RunpodApiClient:
             }
             body["cpu"] = cpu_config
 
-        mounts = _build_v2_mounts(network_volume_id, volume_mount_path)
-        if mounts is not None:
+        mounts: V2PodMounts = {}
+        network_mounts = _build_v2_mounts(network_volume_id, volume_mount_path)
+        if network_mounts is not None and "network" in network_mounts:
+            mounts["network"] = network_mounts["network"]
+        if global_volume_id is not None:
+            if global_volume_mount_path is None:
+                raise ValueError("global_volume_mount_path must be set if global_volume_id is set")
+            mounts["global"] = [{"volumeId": global_volume_id, "path": global_volume_mount_path}]
+        elif global_volume_mount_path is not None:
+            raise ValueError("global_volume_mount_path requires global_volume_id")
+        if mounts:
             body["mounts"] = mounts
 
         if data_center_ids is not None:
@@ -470,6 +507,29 @@ class RunpodApiClient:
     def delete_network_volume(self, volume_id: str) -> bool:
         try:
             self._make_v2_request("DELETE", "network-volumes", volume_id)
+        except RunpodV2ClientError as e:
+            if e.status == HTTPStatus.NOT_FOUND:
+                return False
+            raise
+        return True
+
+    def get_global_volume(self, volume_id: str) -> Optional[V2GlobalVolume]:
+        try:
+            response = self._make_v2_request("GET", "global-volumes", volume_id)
+        except RunpodV2ClientError as e:
+            if e.status == HTTPStatus.NOT_FOUND:
+                return None
+            raise
+        return response.json()
+
+    def create_global_volume(self, *, name: str) -> V2GlobalVolume:
+        body: V2CreateGlobalVolumeRequest = {"name": name}
+        response = self._make_v2_request("POST", "global-volumes", json=body)
+        return response.json()
+
+    def delete_global_volume(self, volume_id: str) -> bool:
+        try:
+            self._make_v2_request("DELETE", "global-volumes", volume_id)
         except RunpodV2ClientError as e:
             if e.status == HTTPStatus.NOT_FOUND:
                 return False

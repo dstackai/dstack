@@ -1,6 +1,7 @@
 from dstack._internal.core.models.common import IncludeExcludeStrDictType
 from dstack._internal.core.models.volumes import (
     AnyVolumeConfiguration,
+    RunpodVolumeConfiguration,
     VolumeSpec,
 )
 
@@ -31,4 +32,6 @@ def _get_volume_configuration_excludes(
     configuration: AnyVolumeConfiguration,
 ) -> IncludeExcludeStrDictType:
     configuration_excludes: IncludeExcludeStrDictType = {}
+    if isinstance(configuration, RunpodVolumeConfiguration):
+        configuration_excludes["global_"] = True
     return configuration_excludes

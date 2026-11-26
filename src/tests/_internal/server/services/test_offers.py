@@ -6,7 +6,10 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements
-from dstack._internal.core.models.volumes import DaytonaVolumeConfiguration
+from dstack._internal.core.models.volumes import (
+    DaytonaVolumeConfiguration,
+    RunpodGlobalVolumeConfiguration,
+)
 from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.testing.common import (
     get_instance_offer_with_availability,
@@ -124,25 +127,31 @@ class TestGetOffersByRequirements:
         assert res == [(runpod_backend_mock, runpod_offer2)]
 
     @pytest.mark.asyncio
-    async def test_global_volume_matches_cpu_and_gpu_regions(self):
-        daytona_backend = Mock(TYPE=BackendType.DAYTONA)
-        cpu_offer = get_instance_offer_with_availability(backend=BackendType.DAYTONA, region="us")
-        gpu_offer = get_instance_offer_with_availability(
-            backend=BackendType.DAYTONA, region="earth", gpu_count=1
+    @pytest.mark.parametrize(
+        "configuration",
+        [DaytonaVolumeConfiguration(), RunpodGlobalVolumeConfiguration(global_=True)],
+    )
+    async def test_global_volume_matches_cpu_and_gpu_regions(self, configuration):
+        volume_backend = Mock(TYPE=configuration.backend)
+        cpu_offer = get_instance_offer_with_availability(
+            backend=configuration.backend, region="us"
         )
-        daytona_backend.compute.return_value.get_offers.return_value = [cpu_offer, gpu_offer]
+        gpu_offer = get_instance_offer_with_availability(
+            backend=configuration.backend, region="earth", gpu_count=1
+        )
+        volume_backend.compute.return_value.get_offers.return_value = [cpu_offer, gpu_offer]
         aws_backend = Mock(TYPE=BackendType.AWS)
         aws_offer = get_instance_offer_with_availability(backend=BackendType.AWS, region="us")
         aws_backend.compute.return_value.get_offers.return_value = [aws_offer]
 
         offers = await get_offers_by_requirements(
-            backends=[daytona_backend, aws_backend],
+            backends=[volume_backend, aws_backend],
             profile=Profile(),
             requirements=Requirements(resources=ResourcesSpec()),
-            volumes=[[get_volume(configuration=DaytonaVolumeConfiguration())]],
+            volumes=[[get_volume(configuration=configuration)]],
         )
 
-        assert offers == [(daytona_backend, cpu_offer), (daytona_backend, gpu_offer)]
+        assert offers == [(volume_backend, cpu_offer), (volume_backend, gpu_offer)]
 
     @pytest.mark.asyncio
     async def test_returns_volume_offers_without_region(self):
