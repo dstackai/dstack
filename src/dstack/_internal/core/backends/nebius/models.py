@@ -145,7 +145,7 @@ class NebiusBackendConfig(CoreModel):
         Field(
             description="Use Nebius Capacity Advisor to check quota and capacity when collecting offers"
         ),
-    ] = False
+    ] = True
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(

@@ -62,7 +62,6 @@ CAPACITY_DATA_STATES = CapacityAvailability.DataState
 def make_compute(resource_advice_cache: Optional[ComputeTTLCache] = None) -> NebiusCompute:
     return NebiusCompute(
         NebiusConfig(
-            capacity_advisor=True,
             creds=NebiusServiceAccountCreds(
                 service_account_id="service-account-id",
                 public_key_id="public-key-id",
@@ -229,14 +228,16 @@ class TestGetAllOffersWithAvailability:
             compute_module.resources, "list_resource_advice", return_value=[]
         )
 
-    def test_capacity_advisor_disabled_by_default(self, mocker, mock_capacity_advice):
+    def test_capacity_advisor_can_be_disabled(self, mocker, mock_capacity_advice):
         mocker.patch.object(
             compute_module,
             "get_catalog_offers",
             return_value=[make_offer(1, spot=False, is_preemptible_flat_rate=False)],
         )
         compute = make_compute()
-        compute.config = NebiusConfig(creds=compute.config.creds, fabrics=["fabric-2"])
+        compute.config = NebiusConfig(
+            creds=compute.config.creds, fabrics=["fabric-2"], capacity_advisor=False
+        )
 
         offers = compute.get_all_offers_with_availability(unallocated_resources=False)
 

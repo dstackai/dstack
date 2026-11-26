@@ -870,13 +870,16 @@ projects:
 
 
 ??? info "Capacity advisor"
-    By default, dstack does not check GPU availability or quota. To show these statuses in
-    offers and skip unavailable offers or those with no quota, enable
+    By default, dstack uses
     [Nebius Capacity Advisor](https://docs.nebius.com/compute/virtual-machines/capacity-advisor)
-    with `capacity_advisor: true`.
+    to check GPU availability and quota. This shows availability statuses in offers and
+    lets dstack skip offers that are unavailable or have no quota.
 
-    Fetching availability and quota adds roughly 1–3 seconds to getting offers.
-    Both are cached for 10 minutes.
+    Set `capacity_advisor: false` in the Nebius backend configuration to disable these checks.
+
+    Advice is cached for 10 minutes. Fetching fresh advice can increase the total offer-response
+    time when Nebius is the last backend to finish. If advice is missing or the API request
+    fails, offers remain eligible with unknown availability.
 
 ### Crusoe
 
