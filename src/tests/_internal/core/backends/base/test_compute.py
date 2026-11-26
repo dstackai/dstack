@@ -7,6 +7,7 @@ import pytest
 from dstack._internal import settings
 from dstack._internal.core.backends.base.compute import (
     ComputeWithAllOffersCached,
+    ComputeWithFilteredOffersCached,
     GoArchType,
     generate_unique_backend_name,
     generate_unique_gateway_instance_name,
@@ -87,6 +88,34 @@ class TestComputeWithAllOffersCachedGetOffers:
         offers = list(compute.get_offers(requirements, False, False))
 
         assert [o.instance.name for o in offers] == ["configurable"]
+
+
+class _ComputeWithFilteredOffers(ComputeWithFilteredOffersCached):
+    def __init__(self, offers: list[InstanceOfferWithAvailability]) -> None:
+        super().__init__()
+        self.offers = offers
+        self.calls = 0
+
+    def get_offers_by_requirements(
+        self, requirements: Requirements, full_offers: bool, unallocated_resources: bool
+    ) -> list[InstanceOfferWithAvailability]:
+        self.calls += 1
+        return self.offers
+
+
+class TestComputeWithFilteredOffersCachedGetOffers:
+    def test_matches_offers_against_requirements(self):
+        gpu_offer = get_instance_offer_with_availability(instance_type="gpu", gpu_count=1)
+        cpu_offer = get_instance_offer_with_availability(instance_type="cpu", gpu_count=0)
+        compute = _ComputeWithFilteredOffers([gpu_offer, cpu_offer])
+        requirements = Requirements(resources=ResourcesSpec.model_validate({"gpu": 1}))
+
+        first = list(compute.get_offers(requirements, False, False))
+        second = list(compute.get_offers(requirements, False, False))
+
+        assert [o.instance.name for o in first] == ["gpu"]
+        assert [o.instance.name for o in second] == ["gpu"]
+        assert compute.calls == 1
 
 
 class TestGenerateUniqueInstanceName:

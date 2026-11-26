@@ -124,10 +124,8 @@ def test_get_offers_marks_only_creatable_as_available():
             return_value={("ECS1GPU6", "it-fr2")},
         ),
     ):
-        offers = SeewebCompute(_config()).get_offers_by_requirements(
-            requirements=Requirements(resources=ResourcesSpec()),
-            full_offers=False,
-            unallocated_resources=False,
+        offers = SeewebCompute(_config()).get_all_offers_with_availability(
+            unallocated_resources=False
         )
 
     by_name = {offer.instance.name: offer for offer in offers}
@@ -152,13 +150,42 @@ def test_get_offers_filters_configured_regions():
             return_value={("ECS1GPU7", "it-fr2"), ("ECS1GPU7", "it-mi2")},
         ),
     ):
-        offers = SeewebCompute(_config(["it-mi2"])).get_offers_by_requirements(
-            requirements=Requirements(resources=ResourcesSpec()),
-            full_offers=False,
-            unallocated_resources=False,
+        offers = SeewebCompute(_config(["it-mi2"])).get_all_offers_with_availability(
+            unallocated_resources=False
         )
 
     assert [offer.region for offer in offers] == ["it-mi2"]
+
+
+def test_get_offers_fetches_offers_once_and_matches_requirements():
+    raws = [_raw("ECS1GPU6", "L4"), _raw("ECS1GPU11", "A30")]
+    with (
+        patch(
+            "dstack._internal.core.backends.seeweb.compute.SeewebProvider.get",
+            return_value=raws,
+        ) as provider_get,
+        patch(
+            "dstack._internal.core.backends.seeweb.api_client.SeewebApiClient"
+            ".get_available_plan_regions",
+            return_value={("ECS1GPU6", "it-fr2"), ("ECS1GPU11", "it-fr2")},
+        ) as get_available_plan_regions,
+    ):
+        compute = SeewebCompute(_config())
+        l4_offers = list(
+            compute.get_offers(
+                Requirements(resources=ResourcesSpec.model_validate({"gpu": "L4"})), False, False
+            )
+        )
+        a30_offers = list(
+            compute.get_offers(
+                Requirements(resources=ResourcesSpec.model_validate({"gpu": "A30"})), False, False
+            )
+        )
+
+    assert [offer.instance.name for offer in l4_offers] == ["ECS1GPU6"]
+    assert [offer.instance.name for offer in a30_offers] == ["ECS1GPU11"]
+    provider_get.assert_called_once()
+    get_available_plan_regions.assert_called_once()
 
 
 def test_select_image_prefers_uefi_image():

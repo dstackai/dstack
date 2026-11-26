@@ -53,6 +53,13 @@ def get_catalog_offers(
     catalog_item_filter: Optional[Callable[[gpuhunt.CatalogItem], bool]] = None,
 ) -> List[InstanceOffer]:
     """
+    Returns offers from the `gpuhunt` catalog for the given `backend`.
+
+    Note: historically, `gpuhunt` was responsible for filtering offers by `requirements`.
+    The same filtering is now also done in `dstack` by `OfferMatcher` to avoid converting offers to `gpuhunt` items.
+    Double filtering is not on a hot path (offers from `gpuhunt` are cached),
+    but we should eventually drop it to avoid keeping matching logic in sync.
+
     Args:
         configurable_disk_size: disk sizes the backend can provision. Used for catalog items
         without a fixed disk size: the offer's disk is set to the smallest size within both

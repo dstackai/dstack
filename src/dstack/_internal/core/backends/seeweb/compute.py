@@ -7,8 +7,8 @@ from gpuhunt.providers.seeweb import SeewebProvider
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     DEFAULT_PRIVATE_SUBNETS,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
-    ComputeWithFilteredOffersCached,
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPrivilegedSupport,
@@ -33,7 +33,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.placement import PlacementGroup
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -56,7 +56,7 @@ CPU_IMAGE_PREFERENCE = ("ubuntu-2204",)
 
 class SeewebCompute(
     ComputeWithCreateInstanceSupport,
-    ComputeWithFilteredOffersCached,
+    ComputeWithAllOffersCached,
     ComputeWithPrivilegedSupport,
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
@@ -74,13 +74,12 @@ class SeewebCompute(
         catalog.add_provider(SeewebProvider(token=self.config.creds.api_token))
         return catalog
 
-    def get_offers_by_requirements(
-        self, requirements: Requirements, full_offers: bool, unallocated_resources: bool
+    def get_all_offers_with_availability(
+        self, unallocated_resources: bool
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.SEEWEB,
             locations=self.config.regions or None,
-            requirements=requirements,
             catalog=self._make_catalog(),
         )
         # A plan can be in the catalog but sold out: mark only currently-creatable

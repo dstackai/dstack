@@ -14,7 +14,7 @@ from dstack._internal.core.backends.base.authorized_keys import (
 )
 from dstack._internal.core.backends.base.compute import (
     Compute,
-    ComputeWithFilteredOffersCached,
+    ComputeWithAllOffersCached,
     ComputeWithVolumeSupport,
     generate_unique_instance_name_for_job,
     generate_unique_volume_name,
@@ -78,7 +78,7 @@ NO_CAPACITY_CODES = {
 }
 
 
-class LiumCompute(ComputeWithFilteredOffersCached, ComputeWithVolumeSupport, Compute):
+class LiumCompute(ComputeWithAllOffersCached, ComputeWithVolumeSupport, Compute):
     def __init__(self, config: LiumConfig):
         super().__init__()
         self.config = config
@@ -86,13 +86,12 @@ class LiumCompute(ComputeWithFilteredOffersCached, ComputeWithVolumeSupport, Com
         self._catalog = gpuhunt.Catalog(balance_resources=False, auto_reload=False)
         self._catalog.add_provider(LiumProvider())
 
-    def get_offers_by_requirements(
-        self, requirements: Requirements, full_offers: bool, unallocated_resources: bool
+    def get_all_offers_with_availability(
+        self, unallocated_resources: bool
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.LIUM,
             locations=self.config.regions or None,
-            requirements=requirements,
             catalog=self._catalog,
         )
         return [

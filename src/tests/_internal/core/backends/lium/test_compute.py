@@ -97,11 +97,7 @@ def _item():
 
 def _offer(compute):
     with patch.object(compute._catalog, "query", return_value=[_item()]):
-        return compute.get_offers_by_requirements(
-            Requirements(resources=ResourcesSpec()),
-            full_offers=False,
-            unallocated_resources=False,
-        )[0]
+        return compute.get_all_offers_with_availability(unallocated_resources=False)[0]
 
 
 def _run_job(compute, **overrides):
@@ -140,6 +136,24 @@ def _update(compute, data):
 
 def _terminate(compute, data):
     compute.terminate_instance(data.instance_id, data.region, data.backend_data)
+
+
+class TestGetOffers:
+    def test_queries_catalog_once_and_matches_requirements(self, compute):
+        def get_offers(gpu: str):
+            requirements = Requirements(resources=ResourcesSpec.model_validate({"gpu": gpu}))
+            return list(compute.get_offers(requirements, False, False))
+
+        with patch.object(compute._catalog, "query", return_value=[_item()]) as query:
+            matching = get_offers("A6000")
+            not_matching = get_offers("H100")
+
+        assert [offer.instance.name for offer in matching] == ["executor-id"]
+        assert matching[0].availability == InstanceAvailability.AVAILABLE
+        assert matching[0].instance_runtime == InstanceRuntime.RUNNER
+        assert not_matching == []
+        query.assert_called_once()
+        assert query.call_args.kwargs["gpu_name"] is None
 
 
 class TestRunJob:

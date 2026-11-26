@@ -373,7 +373,11 @@ class ComputeWithFilteredOffersCached(ABC):
         unallocated_resources: bool,
     ) -> List[InstanceOfferWithAvailability]:
         """
-        Returns backend offers with availability matching requirements.
+        Returns backend offers with availability for requirements.
+
+        The offers are matched against `requirements` with `OfferMatcher` afterwards, so this
+        method may use `requirements` only to narrow down or shape the offers, e.g. to query
+        the provider or to size offers.
 
         See `Compute.get_offers()` for the `full_offers` argument description.
         Set the class variable `full_offers_argument_has_effect` to `True` if the `full_offers`
@@ -388,7 +392,9 @@ class ComputeWithFilteredOffersCached(ABC):
     def get_offers(
         self, requirements: Requirements, full_offers: bool, unallocated_resources: bool
     ) -> Iterator[InstanceOfferWithAvailability]:
-        return iter(self._get_offers_cached(requirements, full_offers, unallocated_resources))
+        offers = self._get_offers_cached(requirements, full_offers, unallocated_resources)
+        matcher = OfferMatcher(requirements)
+        return (o for o in offers if matcher.matches(o))
 
     def _get_offers_cached_key(
         self, requirements: Requirements, full_offers: bool, unallocated_resources: bool
