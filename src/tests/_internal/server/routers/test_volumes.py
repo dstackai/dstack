@@ -303,7 +303,7 @@ class TestGetVolume:
 class TestCreateVolume:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.parametrize("client_version", [None, "0.22.8"])
+    @pytest.mark.parametrize("client_version", [None, "0.22.9"])
     async def test_global_volume_and_legacy_read_responses(
         self, test_db, session: AsyncSession, client: AsyncClient, client_version
     ):

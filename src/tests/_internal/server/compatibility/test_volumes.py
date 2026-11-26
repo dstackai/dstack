@@ -17,7 +17,7 @@ class TestPatchVolume:
         [
             (Version("0.22.1"), False),
             (Version("0.22.2"), True),
-            (Version("0.22.9"), True),
+            (Version("0.22.10"), True),
             (None, True),
         ],
     )

@@ -10,7 +10,7 @@ from dstack._internal.core.models.volumes import (
 
 
 def patch_volume(volume: Volume, client_version: Optional[Version]) -> None:
-    if client_version is None or client_version >= Version("0.22.9"):
+    if client_version is None or client_version >= Version("0.22.10"):
         return
     if isinstance(volume.configuration, RunpodGlobalVolumeConfiguration):
         if client_version < Version("0.22.2"):
