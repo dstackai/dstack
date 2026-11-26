@@ -82,7 +82,7 @@ _DEFAULT_MAX_OFFERS = 50
 # they grow linearly with the number of fleets.
 _PER_FLEET_MAX_OFFERS = 100
 
-_FleetOfferQueryKey = tuple[uuid.UUID, str, str, Optional[str]]
+_FleetOfferQueryKey = tuple[uuid.UUID, Hashable, Hashable, Hashable]
 
 
 async def get_job_plans(
@@ -808,9 +808,9 @@ async def _get_backend_offers_in_fleet(
         # All other query parameters are fixed for this job's fleet offer collection.
         query_key = (
             fleet_model.project_id,
-            profile.model_dump_json(),
-            requirements.model_dump_json(),
-            master_instance_provisioning_data.model_dump_json()
+            _freeze_offer_identity_value(profile.model_dump()),
+            _freeze_offer_identity_value(requirements.model_dump()),
+            _freeze_offer_identity_value(master_instance_provisioning_data.model_dump())
             if master_instance_provisioning_data is not None
             else None,
         )
@@ -973,22 +973,6 @@ async def get_backend_offers_in_run_candidate_fleets(
     return offers
 
 
-def _merge_backend_offers(
-    offers: list[InstanceOfferWithAvailability],
-    offers_from_fleet: list[InstanceOfferWithAvailability],
-    seen_offer_identities: set[Hashable],
-) -> list[InstanceOfferWithAvailability]:
-    unique_offers = []
-    for offer in offers_from_fleet:
-        offer_identity = _get_backend_offer_identity(offer)
-        if offer_identity not in seen_offer_identities:
-            unique_offers.append(offer)
-            seen_offer_identities.add(offer_identity)
-    if not unique_offers:
-        return offers
-    return list(heapq.merge(offers, unique_offers, key=lambda offer: offer.price))
-
-
 async def get_offers_in_run_candidate_fleets(
     session: AsyncSession,
     project: ProjectModel,
@@ -1033,11 +1017,8 @@ async def get_offers_in_run_candidate_fleets(
     if skip_backend_offers:
         backend_offers = []
     else:
-        # TODO: Intentionally pass `max_offers_per_fleet=None` here. `dstack offer --fleet ...`
-        # is expected to return the exact `total_offers`, so capping backend offers per selected
-        # fleet would make that total approximate. We already deduplicate identical backend offers
-        # while merging selected fleets via `_get_backend_offer_identity()`. Revisit adding a cap
-        # only if this path causes real performance or memory problems.
+        # `dstack offer --fleet ...` needs the exact number of unique offers. Keep each query
+        # uncapped so `_get_job_plan()` can calculate the total before limiting the returned list.
         backend_offers = await get_backend_offers_in_run_candidate_fleets(
             session=session,
             project=project,
@@ -1049,6 +1030,22 @@ async def get_offers_in_run_candidate_fleets(
             unallocated_resources=unallocated_resources,
         )
     return instance_offers, backend_offers
+
+
+def _merge_backend_offers(
+    offers: list[InstanceOfferWithAvailability],
+    offers_from_fleet: list[InstanceOfferWithAvailability],
+    seen_offer_identities: set[Hashable],
+) -> list[InstanceOfferWithAvailability]:
+    unique_offers = []
+    for offer in offers_from_fleet:
+        offer_identity = _get_backend_offer_identity(offer)
+        if offer_identity not in seen_offer_identities:
+            unique_offers.append(offer)
+            seen_offer_identities.add(offer_identity)
+    if not unique_offers:
+        return offers
+    return list(heapq.merge(offers, unique_offers, key=lambda offer: offer.price))
 
 
 def _get_backend_offer_identity(offer: InstanceOfferWithAvailability) -> Hashable:
