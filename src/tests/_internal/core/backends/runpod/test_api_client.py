@@ -171,13 +171,6 @@ class TestRunpodApiClientNotFound:
 
         assert _client().terminate_pod("pod-1") is False
 
-    def test_delete_cluster(self, requests_mock):
-        requests_mock.delete(
-            f"{API_V2_URL}/clusters/cluster-1", status_code=404, json=_error(404, "-")
-        )
-
-        assert _client().delete_cluster("cluster-1") is False
-
     def test_delete_network_volume(self, requests_mock):
         requests_mock.delete(
             f"{API_V2_URL}/network-volumes/vol-1", status_code=404, json=_error(404, "-")

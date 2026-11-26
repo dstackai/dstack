@@ -2426,7 +2426,7 @@ class TestJobSubmittedWorker:
             waiting_master_job=True,
         )
 
-        offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
+        offer = get_instance_offer_with_availability(backend=BackendType.SLURM)
         backend_mock = Mock()
         with patch(
             "dstack._internal.server.services.backends.cache.lease_project_backends",
@@ -2434,12 +2434,12 @@ class TestJobSubmittedWorker:
         ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value = compute_mock
-            backend_mock.TYPE = BackendType.RUNPOD
+            backend_mock.TYPE = BackendType.SLURM
             compute_mock.get_offers.return_value = [offer]
             compute_mock.run_jobs.return_value = get_compute_group_provisioning_data(
                 job_provisioning_datas=[
-                    get_job_provisioning_data(dockerized=True, backend=BackendType.RUNPOD),
-                    get_job_provisioning_data(dockerized=True, backend=BackendType.RUNPOD),
+                    get_job_provisioning_data(dockerized=True, backend=BackendType.SLURM),
+                    get_job_provisioning_data(dockerized=True, backend=BackendType.SLURM),
                 ]
             )
 
@@ -2461,7 +2461,7 @@ class TestJobSubmittedWorker:
     ):
         """1-node hetero groups use run_job (not run_jobs).
 
-        RunPod Instant Clusters reject pod_count=1; Slurm gets node_count=1 from run_job.
+        Slurm gets node_count=1 from run_job.
         """
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -2498,7 +2498,7 @@ class TestJobSubmittedWorker:
             waiting_master_job=True,
         )
 
-        offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
+        offer = get_instance_offer_with_availability(backend=BackendType.SLURM)
         backend_mock = Mock()
         with patch(
             "dstack._internal.server.services.backends.cache.lease_project_backends",
@@ -2506,10 +2506,10 @@ class TestJobSubmittedWorker:
         ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value = compute_mock
-            backend_mock.TYPE = BackendType.RUNPOD
+            backend_mock.TYPE = BackendType.SLURM
             compute_mock.get_offers.return_value = [offer]
             compute_mock.run_job.return_value = get_job_provisioning_data(
-                dockerized=True, backend=BackendType.RUNPOD
+                dockerized=True, backend=BackendType.SLURM
             )
 
             await _process_job(session=session, worker=worker, job_model=job0)
@@ -3090,7 +3090,7 @@ class TestJobSubmittedWorker:
             waiting_master_job=True,
         )
 
-        offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
+        offer = get_instance_offer_with_availability(backend=BackendType.SLURM)
         backend_mock = Mock()
         with patch(
             "dstack._internal.server.services.backends.cache.lease_project_backends",
@@ -3098,12 +3098,12 @@ class TestJobSubmittedWorker:
         ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value = compute_mock
-            backend_mock.TYPE = BackendType.RUNPOD
+            backend_mock.TYPE = BackendType.SLURM
             compute_mock.get_offers.return_value = [offer]
             compute_mock.run_jobs.return_value = get_compute_group_provisioning_data(
                 job_provisioning_datas=[
-                    get_job_provisioning_data(dockerized=False, backend=BackendType.RUNPOD),
-                    get_job_provisioning_data(dockerized=False, backend=BackendType.RUNPOD),
+                    get_job_provisioning_data(dockerized=False, backend=BackendType.SLURM),
+                    get_job_provisioning_data(dockerized=False, backend=BackendType.SLURM),
                 ]
             )
 

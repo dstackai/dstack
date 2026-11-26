@@ -27,8 +27,6 @@ SUPPORTED_GPUHUNT_FLAGS = [
     "gcp-a4",
     "gcp-g4",
     "gcp-dws-calendar-mode",
-    "runpod-cpu",
-    "runpod-cluster",
     "hotaisle-bm",
 ]
 
@@ -51,6 +49,7 @@ def get_catalog_offers(
     extra_filter: Optional[Callable[[InstanceOffer], bool]] = None,
     catalog: Optional[gpuhunt.Catalog] = None,
     catalog_item_filter: Optional[Callable[[gpuhunt.CatalogItem], bool]] = None,
+    check_disk: bool = True,
 ) -> List[InstanceOffer]:
     """
     Returns offers from the `gpuhunt` catalog for the given `backend`.
@@ -68,6 +67,8 @@ def get_catalog_offers(
         catalog_item_filter: applied to raw catalog items before the conversion to
         `InstanceOffer` models. Use it for filtering that can be done on raw catalog fields
         to avoid expensive model construction for items that will be discarded.
+        check_disk: filter catalog items by the required disk size. Set to `False` if the
+        backend fits offer disks to requirements itself, e.g. with `OfferDiskFitter`.
     """
     provider = backend.value
     if backend == BackendType.DATACRUNCH:
@@ -78,6 +79,9 @@ def get_catalog_offers(
         provider = "digitalocean"
     q = requirements_to_query_filter(requirements)
     q.provider = [provider]
+    if not check_disk:
+        q.min_disk_size = None
+        q.max_disk_size = None
     offers = []
 
     catalog = catalog if catalog is not None else gpuhunt.default_catalog()
