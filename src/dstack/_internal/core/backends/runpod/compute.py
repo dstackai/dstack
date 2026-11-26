@@ -57,6 +57,10 @@ CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 24 hour
 # GPU pods do not seem to have any limits on the container disk size.
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("1GB"), max=None)
 
+# The API does not expose storage prices. The docs (https://docs.runpod.io/pods/pricing) list
+# $0.10/GB/month, which the console converts to an hourly price assuming 30-day months.
+CONTAINER_DISK_PRICE_PER_GB_PER_HOUR = 0.10 / (30 * 24)
+
 # gpuhunt builds CPU instance type names as
 # {CPU flavor (aka type) identifier}-{vCPU count}-{memory in GB}, e.g., cpu3c-2-4
 # REST API v2 accepts separate `id` and `vcpuCount` fields (memory is inferred)
@@ -97,7 +101,7 @@ class RunpodCompute(
             offer = offer.with_availability(availability=InstanceAvailability.AVAILABLE)
             fitted_offer = disk_fitter.fit(offer, _get_offer_disk_size_range(offer))
             if fitted_offer is not None:
-                offers_with_availability.append(fitted_offer)
+                offers_with_availability.append(_add_container_disk_price(fitted_offer))
         return offers_with_availability
 
     def run_job(
@@ -140,7 +144,7 @@ class RunpodCompute(
         offer_gpu_count = len(instance_offer.instance.resources.gpus)
         offer_cpu_count = instance_offer.instance.resources.cpus
         offer_memory_gib = round(instance_offer.instance.resources.memory_mib / 1024)
-        offer_disk_gib = round(instance_offer.instance.resources.disk.size_mib / 1024)
+        offer_disk_gib = _get_offer_container_disk_gib(instance_offer)
 
         gpu_type_id: Optional[str] = None
         gpu_count: Optional[int] = None
@@ -349,6 +353,18 @@ def _get_offer_disk_size_range(offer: InstanceOfferWithAvailability) -> Range[Me
         min=Memory.parse("1GB"),
         max=Memory(offer.instance.resources.disk.size_mib / 1024),
     )
+
+
+def _add_container_disk_price(
+    offer: InstanceOfferWithAvailability,
+) -> InstanceOfferWithAvailability:
+    # Catalog prices only include compute
+    disk_price = _get_offer_container_disk_gib(offer) * CONTAINER_DISK_PRICE_PER_GB_PER_HOUR
+    return offer.model_copy(update={"price": offer.price + disk_price})
+
+
+def _get_offer_container_disk_gib(offer: InstanceOfferWithAvailability) -> int:
+    return round(offer.instance.resources.disk.size_mib / 1024)
 
 
 def _get_volume_price(size: int) -> float:
