@@ -121,6 +121,13 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.core.backends.massedcompute.configurator import MassedComputeConfigurator
+
+    _CONFIGURATOR_CLASSES.append(MassedComputeConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.core.backends.nebius.configurator import (
         NebiusConfigurator,
     )

@@ -20,6 +20,7 @@ class BackendType(str, enum.Enum):
         KUBERNETES (BackendType): Kubernetes
         LAMBDA (BackendType): Lambda Cloud
         LIUM (BackendType): Lium
+        MASSEDCOMPUTE (BackendType): MassedCompute
         NEBIUS (BackendType): Nebius AI Cloud
         OCI (BackendType): Oracle Cloud Infrastructure
         RUNPOD (BackendType): Runpod Cloud
@@ -48,6 +49,7 @@ class BackendType(str, enum.Enum):
     KUBERNETES = "kubernetes"
     LAMBDA = "lambda"
     LIUM = "lium"
+    MASSEDCOMPUTE = "massedcompute"
     REMOTE = "remote"
     NEBIUS = "nebius"
     OCI = "oci"
