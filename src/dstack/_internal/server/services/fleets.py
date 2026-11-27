@@ -56,6 +56,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.core.services.diff import ModelDiff, copy_model, diff_models
+from dstack._internal.server import settings
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite, sqlite_commit
 from dstack._internal.server.models import (
     ExportedFleetModel,
@@ -1053,6 +1054,22 @@ def new_instances_in_fleet_require_create_instance_support(
     return fleet_model.project_id != job_project_id
 
 
+async def _check_fleets_per_project_limit(session: AsyncSession, project: ProjectModel):
+    limit = settings.SERVER_FLEETS_PER_PROJECT_LIMIT
+    if limit is None:
+        return
+    res = await session.execute(
+        select(func.count(FleetModel.id)).where(
+            FleetModel.project_id == project.id,
+            FleetModel.deleted == False,
+        )
+    )
+    if res.scalar_one() >= limit:
+        raise ServerClientError(
+            f"Project fleet limit reached ({limit}). Delete unused fleets to create new ones."
+        )
+
+
 async def _create_fleet(
     session: AsyncSession,
     project: ProjectModel,
@@ -1070,6 +1087,7 @@ async def _create_fleet(
         )
     lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
     async with lock:
+        await _check_fleets_per_project_limit(session=session, project=project)
         if spec.configuration.name is not None:
             fleet_model = await get_project_fleet_model_by_name(
                 session=session,
