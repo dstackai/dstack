@@ -5,11 +5,12 @@ from pydantic import Field, model_validator
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
 
-JUMP_POD_DEFAULT_IMAGE = "testcontainers/sshd:1.3.0@sha256:c50c0f59554dcdb2d9e5e705112144428ae9d04ac0af6322b365a18e24213a6a"
+JUMP_POD_DEFAULT_IMAGE = "testcontainers/sshd:1.4.0@sha256:bdae17f702908bee93c877ab3e97eddd782e2fb5bdd23a9f29869b9a87b30acd"
 
-# Measured with the default jump pod image (OpenSSH 9.9). The container takes ~9 MiB plus ~1.6 MiB
-# per tunneled SSH session (two sshd-session processes), so 1Gi fits ~600 sessions. Each running
-# job holds one or more sessions per server replica. At 500m, it tunnels ~130-180 MiB/s.
+# Measured with the default jump pod image (OpenSSH 10.2). The container takes ~6 MiB plus ~1.9 MiB
+# per tunneled SSH session (two sshd-session processes), so 1Gi fits ~500 sessions. Each running
+# job holds one or more sessions per server replica. At 500m, it tunnels ~130-180 MiB/s (measured
+# with OpenSSH 9.9; 10.2 is no slower).
 JUMP_POD_DEFAULT_CPU = "500m"
 JUMP_POD_DEFAULT_MEMORY = "1Gi"
 
