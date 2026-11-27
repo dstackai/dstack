@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, cast
 from unittest.mock import Mock, patch
 
 import gpuhunt
@@ -268,7 +268,7 @@ class TestCloudProvisioning:
         assert instance.status == InstanceStatus.PENDING
         assert backend_mock.compute.return_value.create_instance.call_count == 0
         assert fleet.skip_min_processing_interval
-        worker._pipeline_hinter.hint_fetch.assert_called_with(FleetModel.__name__)
+        cast(Mock, worker._pipeline_hinter.hint_fetch).assert_called_with(FleetModel.__name__)
 
     async def test_waits_for_current_master_to_determine_cluster_placement(
         self,
@@ -374,7 +374,7 @@ class TestCloudProvisioning:
         assert sibling_instance.status == InstanceStatus.PENDING
         assert backend_mock.compute.return_value.create_instance.call_count == 0
         assert fleet.skip_min_processing_interval
-        worker._pipeline_hinter.hint_fetch.assert_called_with(FleetModel.__name__)
+        cast(Mock, worker._pipeline_hinter.hint_fetch).assert_called_with(FleetModel.__name__)
 
     async def test_failed_master_does_not_provision_stale_sibling_until_fleet_reassigns_it(
         self,

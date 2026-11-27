@@ -1,6 +1,6 @@
 import datetime as dt
 from contextlib import contextmanager
-from typing import Optional
+from typing import Optional, cast
 from unittest.mock import Mock, patch
 
 import pytest
@@ -103,7 +103,7 @@ class TestTermination:
         await session.refresh(fleet)
         assert instance.deleted is True
         assert fleet.skip_min_processing_interval
-        worker._pipeline_hinter.hint_fetch.assert_called_with(FleetModel.__name__)
+        cast(Mock, worker._pipeline_hinter.hint_fetch).assert_called_with(FleetModel.__name__)
 
     async def test_terminates_terminating_deleted_instance(
         self,
