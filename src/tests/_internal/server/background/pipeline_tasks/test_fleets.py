@@ -1249,6 +1249,42 @@ class TestFleetWorker:
         assert fleet.consolidation_attempt == 1
         assert not fleet.deleted
 
+    async def test_consolidated_fleet_replaces_lost_instance_without_delay(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        spec = get_fleet_spec()
+        spec.configuration.nodes = FleetNodesSpec(min=2, target=2, max=2)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=spec,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=0,
+        )
+        fleet.consolidation_attempt = 0
+        fleet.last_consolidated_at = datetime.now(timezone.utc)
+        fleet.lock_token = uuid.uuid4()
+        fleet.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        res = await session.execute(
+            select(InstanceModel).where(
+                InstanceModel.fleet_id == fleet.id,
+                InstanceModel.deleted == False,
+            )
+        )
+        assert len(res.scalars().all()) == 2
+        assert fleet.consolidation_attempt == 1
+
     async def test_consolidation_attempt_resets_when_no_changes(
         self, test_db, session: AsyncSession, worker: FleetWorker
     ):

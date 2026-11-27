@@ -614,8 +614,10 @@ _MAX_CONSOLIDATION_ATTEMPTS = 15
 # We use exponentially increasing consolidation retry delays so that
 # consolidation does not happen too often. In particular, this prevents
 # retrying instance provisioning constantly in case of no offers.
+# A consolidated fleet (attempt 0) has nothing to retry, so its consolidation is not delayed
+# and a fleet woken up by a lost instance replaces it right away.
 _CONSOLIDATION_RETRY_DELAYS = [
-    timedelta(minutes=1),
+    timedelta(0),
     timedelta(minutes=2),
     timedelta(minutes=5),
     timedelta(minutes=10),
