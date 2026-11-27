@@ -23,7 +23,10 @@ from dstack._internal.core.models.profiles import (
     Profile,
 )
 from dstack._internal.core.models.runs import JobStatus
-from dstack._internal.core.models.volumes import DaytonaVolumeConfiguration
+from dstack._internal.core.models.volumes import (
+    DaytonaVolumeConfiguration,
+    MassedComputeVolumeConfiguration,
+)
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.schemas.runner import TaskListItem, TaskListResponse, TaskStatus
 from dstack._internal.server.services.runner.client import ShimClient
@@ -126,6 +129,32 @@ class TestFilterInstances:
         )
 
         assert result == ([instance] if matches else [])
+
+    def test_provider_mounted_volumes_on_reused_instances(self):
+        backend = BackendType.MASSEDCOMPUTE
+        jpd = get_job_provisioning_data(backend=backend, region="any")
+        vpd = get_volume_provisioning_data(backend=backend)
+        vpd.mount_on_instance = True
+        volume = get_volume(
+            configuration=MassedComputeVolumeConfiguration(), provisioning_data=vpd
+        )
+        alias = volume.model_copy(update={"id": uuid.uuid4()})
+        jpd.volume_mounts = {volume.id: "/persistent/data"}
+        instance = InstanceModel(
+            unreachable=False,
+            health=HealthStatus.HEALTHY,
+            total_blocks=1,
+            job_provisioning_data=jpd.model_dump_json(),
+        )
+
+        def matches(groups):
+            return bool(instances_services.filter_instances([instance], Profile(), volumes=groups))
+
+        assert matches([[alias, volume]])
+        assert not matches([[volume], [alias]])
+        jpd.volume_mounts = None
+        instance.job_provisioning_data = jpd.model_dump_json()
+        assert not matches([[volume]])
 
     def test_global_volume_matches_cpu_and_gpu_regions(self):
         instances = [

@@ -25,7 +25,7 @@ func TestHealthcheck(t *testing.T) {
 		t.Errorf("Want status '%d', got '%d'", 200, responseRecorder.Code)
 	}
 
-	expected := "{\"service\":\"dstack-shim\",\"version\":\"0.0.1.dev2\"}"
+	expected := "{\"service\":\"dstack-shim\",\"version\":\"0.0.1.dev2\",\"supports_volume_mount_path\":true}"
 
 	if strings.TrimSpace(responseRecorder.Body.String()) != expected {
 		t.Errorf("Want '%s', got '%s'", expected, responseRecorder.Body.String())

@@ -59,6 +59,7 @@ from dstack._internal.server.services.instances import (
 )
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runner import client as runner_client
+from dstack._internal.server.services.runner.pool import instance_connection_pool
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.utils.common import get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
@@ -357,6 +358,20 @@ async def _process_wait_for_instance_provisioning_data(
                 instance_model.project.ssh_public_key,
                 instance_model.project.ssh_private_key,
             )
+            if job_provisioning_data.hostname and job_provisioning_data.volume_mounts:
+                # Publishing the SSH address admits jobs. Keep it unset while any mount is
+                # missing so a VM that times out before admission can be deleted without a flush.
+                conn = await run_async(
+                    instance_connection_pool.get_or_open,
+                    get_instance_ssh_private_keys(instance_model),
+                    job_provisioning_data,
+                    None,
+                )
+                if conn is None:
+                    return result
+                if not await conn.has_volume_mounts(job_provisioning_data.volume_mounts.values()):
+                    await run_async(instance_connection_pool.drop_by_jpd, job_provisioning_data)
+                    return result
             result.instance_update_map["job_provisioning_data"] = (
                 job_provisioning_data.model_dump_json()
             )

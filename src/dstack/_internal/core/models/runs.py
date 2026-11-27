@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Annotated, Any, Dict, List, Literal, Optional, Self
 from urllib.parse import urlparse
+from uuid import UUID
 
 from pydantic import UUID4, ConfigDict, Field, model_validator
 
@@ -45,7 +46,7 @@ from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import Memory, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel
 from dstack._internal.core.models.unix import UnixUser
-from dstack._internal.core.models.volumes import MountPoint
+from dstack._internal.core.models.volumes import MountPoint, Volume
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.common import format_pretty_duration
 
@@ -352,12 +353,30 @@ class JobProvisioningData(CoreModel):
     ssh_proxy: Optional[SSHConnectionParams] = None
     backend_data: Optional[str] = None
     """`backend_data` stores backend-specific data in JSON."""
+    volume_mounts: Optional[dict[UUID, str]] = Field(default=None, exclude_if=lambda v: v is None)
+    """Host mount paths by dstack volume ID. The backend confirms them before publishing hostname."""
     gpu_driver: Optional[GpuDriverInfo] = None
     """`gpu_driver` is the accelerator driver installed on the host, when known.
     Detected via the shim for VM-based backends and SSH fleets; taken from the
     provider API or node labels for some container-based backends. May be set
     after provisioning.
     """
+
+    def can_mount_volume(self, volume: Volume) -> bool:
+        """Whether the volume can be used by a job on this instance."""
+        zone = volume.get_availability_zone()
+        return (
+            volume.matches_location(self.get_base_backend(), self.region)
+            and (
+                zone is None
+                or self.availability_zone is None
+                or zone.lower() == self.availability_zone.lower()
+            )
+            and (
+                not volume.mount_on_instance
+                or bool(self.volume_mounts and volume.id in self.volume_mounts)
+            )
+        )
 
     def get_base_backend(self) -> BackendType:
         if self.base_backend is not None:

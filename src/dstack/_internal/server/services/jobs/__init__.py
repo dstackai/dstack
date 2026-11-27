@@ -600,17 +600,8 @@ def _get_job_mount_point_attached_volume(
     Returns the volume attached to the job among the list of possible mount point volumes.
     """
     for volume in volumes:
-        if not volume.matches_location(
-            job_provisioning_data.get_base_backend(), job_provisioning_data.region
-        ):
-            continue
-        if (
-            (volume_availability_zone := volume.get_availability_zone()) is not None
-            and job_provisioning_data.availability_zone is not None
-            and volume_availability_zone.lower() != job_provisioning_data.availability_zone.lower()
-        ):
-            continue
-        return volume
+        if job_provisioning_data.can_mount_volume(volume):
+            return volume
     raise ServerClientError("Failed to find an eligible volume for the mount point")
 
 

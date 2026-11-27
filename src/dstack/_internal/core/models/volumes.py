@@ -18,9 +18,7 @@ from dstack._internal.utils.tags import tags_validator
 class VolumeStatus(str, Enum):
     SUBMITTED = "submitted"
     PROVISIONING = "provisioning"
-    """`PROVISIONING` is currently not used because on all backends supporting volumes,
-    volumes become `ACTIVE` almost immediately after provisioning.
-    """
+    """A provider create may have started. Reconcile it before deleting the volume."""
     ACTIVE = "active"
     FAILED = "failed"
 
@@ -187,6 +185,24 @@ class DaytonaVolumeConfiguration(VolumeConfigurationWithVolumeID):
     )
 
 
+class MassedComputeVolumeConfiguration(VolumeConfigurationWithVolumeID):
+    backend: Annotated[
+        Literal[BackendType.MASSEDCOMPUTE], Field(description="The volume backend")
+    ] = BackendType.MASSEDCOMPUTE
+    auto_cleanup_duration: Annotated[
+        OptionalIdleDuration,
+        Field(description="MassedCompute volumes require manual deletion. Omit or set to `off`"),
+    ] = None
+    tags: Annotated[Optional[Dict[str, str]], Field(description="The dstack volume tags")] = None
+
+    @field_validator("auto_cleanup_duration")
+    @classmethod
+    def _validate_auto_cleanup_duration(cls, value: Optional[int]) -> Optional[int]:
+        if value is not None and value > 0:
+            raise ValueError("MassedCompute volumes do not support automatic cleanup")
+        return value
+
+
 class LiumVolumeConfiguration(VolumeConfigurationWithVolumeID):
     backend: Annotated[Literal[BackendType.LIUM], Field(description="The volume backend")] = (
         BackendType.LIUM
@@ -200,6 +216,7 @@ AnyVolumeConfiguration = Union[
     KubernetesVolumeConfiguration,
     DaytonaVolumeConfiguration,
     LiumVolumeConfiguration,
+    MassedComputeVolumeConfiguration,
 ]
 
 
@@ -232,6 +249,8 @@ class VolumeProvisioningData(CoreModel):
     attachable: bool = True
     """`attachable` shows whether the volume should be attached and detached manually."""
     detachable: bool = True
+    mount_on_instance: bool = Field(default=False, exclude_if=lambda v: not v)
+    """The provider mounts this filesystem on the instance before a job starts."""
     backend_data: Optional[str] = None
     """`backend_data` stores backend-specific data in JSON."""
 
@@ -282,6 +301,10 @@ class Volume(CoreModel):
                     return attachment.attachment_data
         # volume was attached before attachments were introduced
         return self.attachment_data
+
+    @property
+    def mount_on_instance(self) -> bool:
+        return self.provisioning_data is not None and self.provisioning_data.mount_on_instance
 
     def get_backend(self) -> BackendType:
         return self.configuration.backend

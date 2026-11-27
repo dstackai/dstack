@@ -1,13 +1,18 @@
 import datetime as dt
 from contextlib import contextmanager
 from typing import Optional, cast
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 import time_machine
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import BackendError, NotYetTerminated
+from dstack._internal.core.errors import (
+    BackendError,
+    NotYetTerminated,
+    SSHError,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import OrphanCleanupMode
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
@@ -16,12 +21,20 @@ from dstack._internal.server.background.pipeline_tasks.instances import Instance
 from dstack._internal.server.background.pipeline_tasks.instances import (
     termination as instances_termination,
 )
-from dstack._internal.server.models import FleetModel, InstanceModel
+from dstack._internal.server.models import (
+    FleetModel,
+    InstanceModel,
+    VolumeAttachmentModel,
+)
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_fleet,
     create_instance,
     create_project,
+    create_user,
+    create_volume,
     get_job_provisioning_data,
+    get_volume_configuration,
     list_events,
     mock_lease,
 )
@@ -139,7 +152,12 @@ class TestTermination:
         assert instance.finished_at is not None
 
     @pytest.mark.parametrize(
-        "error", [BackendError("err"), RuntimeError("err"), NotYetTerminated("")]
+        "error",
+        [
+            BackendError("err"),
+            RuntimeError("err"),
+            NotYetTerminated(""),
+        ],
     )
     async def test_terminate_retry(
         self,
@@ -252,6 +270,73 @@ class TestTermination:
             mock.assert_called_once()
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATED
+
+    async def test_flushes_and_releases_vm_volume_attachments(
+        self, test_db, session: AsyncSession, worker: InstanceWorker
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        volume = await create_volume(session, project, user)
+        other_volume = await create_volume(
+            session, project, user, configuration=get_volume_configuration(name="other")
+        )
+        jpd = get_job_provisioning_data(backend=BackendType.MASSEDCOMPUTE)
+        jpd.volume_mounts = {volume.id: "/persistent/checkpoints"}
+        instance = await create_instance(
+            session,
+            project,
+            status=InstanceStatus.TERMINATING,
+            volumes=[volume, other_volume],
+            job_provisioning_data=jpd,
+        )
+        now = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
+        instance.first_termination_retry_at = now - dt.timedelta(minutes=16)
+        instance.last_termination_retry_at = instance.first_termination_retry_at
+        instance.termination_reason = InstanceTerminationReason.IDLE_TIMEOUT
+        await session.commit()
+
+        compute = Mock(spec=ComputeMockSpec)
+        compute.get_volume_mounts_to_sync.side_effect = [
+            ["/persistent/checkpoints"],
+            ["/persistent/checkpoints"],
+            None,
+        ]
+        compute.terminate_instance.side_effect = NotYetTerminated("Deletion submitted")
+        backend = Mock()
+        backend.compute.return_value = compute
+        conn = AsyncMock()
+        conn.sync_volume_mounts.side_effect = [SSHError("flush failed"), None]
+        with (
+            patch(
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+                mock_lease(backend),
+            ),
+            patch.object(
+                instances_termination.instance_connection_pool, "get_or_open", return_value=conn
+            ),
+        ):
+            with time_machine.travel(now, tick=False):
+                await process_instance(session, worker, instance)
+            compute.terminate_instance.assert_not_called()
+            await session.refresh(instance)
+            assert instance.status == InstanceStatus.TERMINATING
+            attachment = select(VolumeAttachmentModel.volume_id).where(
+                VolumeAttachmentModel.instance_id == instance.id
+            )
+            assert set(await session.scalars(attachment)) == {volume.id, other_volume.id}
+            assert any(
+                "Volume attachments retained" in e.message for e in await list_events(session)
+            )
+            with time_machine.travel(now + dt.timedelta(minutes=1), tick=False):
+                await process_instance(session, worker, instance)
+            compute.terminate_instance.assert_called_once()
+            with time_machine.travel(now + dt.timedelta(minutes=2), tick=False):
+                await process_instance(session, worker, instance)
+            compute.terminate_instance.assert_called_once()
+            assert conn.sync_volume_mounts.await_count == 2
+            assert list(await session.scalars(attachment)) == [other_volume.id]
+            await session.refresh(instance)
+            assert instance.status == InstanceStatus.TERMINATED
 
     async def test_emits_event_if_all_termination_attempts_failed(
         self,

@@ -40,6 +40,7 @@ from dstack._internal.core.models.resources import CPUSpec, Memory, Range, Resou
 from dstack._internal.core.models.runs import JobRuntimeData, JobStatus, JobTerminationReason
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
+    MassedComputeVolumeConfiguration,
     VolumeAttachmentData,
     VolumeMountPoint,
     VolumeStatus,
@@ -2819,6 +2820,63 @@ class TestJobSubmittedWorker:
             (EventTargetType.INSTANCE, instance.id),
             (EventTargetType.JOB, job.id),
         }
+
+    async def test_releases_volume_lock_when_retry_uses_another_backend(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session, project_id=project.id)
+        fleet = await create_fleet(session, project)
+        aws_volume = await create_volume(
+            session,
+            project,
+            user,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(backend=BackendType.AWS),
+        )
+        backend = BackendType.MASSEDCOMPUTE
+        data = get_volume_provisioning_data(backend=backend)
+        data.mount_on_instance = True
+        data.attachable = data.detachable = False
+        volume = await create_volume(
+            session,
+            project,
+            user,
+            configuration=MassedComputeVolumeConfiguration(name="checkpoints"),
+            volume_provisioning_data=data,
+            status=VolumeStatus.ACTIVE,
+        )
+        jpd = get_job_provisioning_data(backend=backend, region="any", dockerized=True)
+        jpd.volume_mounts = {volume.id: "/persistent/checkpoints"}
+        instance = await create_instance(
+            session, project, fleet, backend=backend, region="any", job_provisioning_data=jpd
+        )
+        spec = get_run_spec(repo_id=repo.name)
+        spec.configuration.volumes = [
+            VolumeMountPoint(name=[aws_volume.name, volume.name], path="/data")
+        ]
+        run = await create_run(session, project, repo, user, run_spec=spec)
+        job = await create_job(session, run, instance=instance, instance_assigned=True)
+        aws_volume.lock_owner = f"{JobSubmittedPipeline.__name__}:{job.id}"
+        aws_volume.lock_token = uuid.uuid4()
+        aws_volume.lock_expires_at = get_current_datetime() - timedelta(seconds=1)
+        backend_mock = Mock(TYPE=backend)
+        backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
+            await _process_job(session, worker, job)
+
+        await session.refresh(job)
+        await session.refresh(aws_volume)
+        assert job.status == JobStatus.PROVISIONING
+        assert JobRuntimeData.model_validate_json(
+            get_or_error(job.job_runtime_data)
+        ).volume_names == [volume.name]
+        assert aws_volume.lock_owner is None
+        backend_mock.compute.return_value.attach_volume.assert_not_called()
 
     async def test_terminates_job_when_volume_is_locked_for_processing(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker

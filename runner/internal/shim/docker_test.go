@@ -213,10 +213,15 @@ func TestVolumesFromMounts(t *testing.T) {
 		{Source: "/root/.dstack/runners/task-0-0-1234abcd/runner", Destination: consts.RunnerTempDir},
 		{Source: "/mnt/disks/dstack-volumes/volume-1", Destination: "/volume"},
 		{Source: "/home/dstack/data", Destination: "/instance-data"},
+		{Source: taskVolumeMountPointDir + "/task-1/checkpoints", Destination: "/data"},
+		{Source: taskVolumeMountPointDir + "/other-task/wrong", Destination: "/other"},
 	}
 
-	assert.Equal(t, []VolumeInfo{{Name: "volume-1"}}, volumesFromMounts(mounts))
-	assert.Nil(t, volumesFromMounts(nil))
+	assert.Equal(t, []VolumeInfo{
+		{Name: "volume-1"},
+		{Name: "checkpoints", MountPath: taskVolumeMountPointDir + "/task-1/checkpoints"},
+	}, volumesFromMounts("task-1", mounts))
+	assert.Nil(t, volumesFromMounts("task-1", nil))
 }
 
 func TestConfigureGpus_Nvidia(t *testing.T) {

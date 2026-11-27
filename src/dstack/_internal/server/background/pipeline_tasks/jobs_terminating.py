@@ -59,6 +59,7 @@ from dstack._internal.server.services.gateways import (
 )
 from dstack._internal.server.services.instances import (
     emit_instance_status_change_event,
+    get_instance_provisioning_data,
     get_instance_ssh_private_keys,
     is_placeholder_instance,
 )
@@ -432,6 +433,11 @@ async def _load_job_volume_models(
     if instance_model is None:
         return []
     jrd = get_job_runtime_data(job_model)
+    if jrd is not None and jrd.volume_names == [] and instance_model.volume_attachments:
+        instance_data = get_instance_provisioning_data(instance_model)
+        if instance_data is not None and instance_data.volume_mounts:
+            # This job used no network volumes. Keep the VM's own attachments idle.
+            return []
     volume_names = (
         jrd.volume_names
         if jrd and jrd.volume_names
@@ -974,6 +980,13 @@ async def _detach_job_volumes(
     if job_provisioning_data is None:
         return volume_update_rows, _VolumeDetachResult(all_detached=True)
 
+    if job_provisioning_data.volume_mounts:
+        # These attachments belong to the VM and survive individual jobs.
+        volume_models = [
+            v for v in volume_models if v.id not in job_provisioning_data.volume_mounts
+        ]
+        if not volume_models:
+            return volume_update_rows, _VolumeDetachResult(all_detached=True)
     logger.info("Detaching volumes: %s", [v.name for v in volume_models])
     detach_result = await _detach_volumes_from_job_instance(
         job_model=job_model,

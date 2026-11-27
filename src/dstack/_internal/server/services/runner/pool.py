@@ -1,4 +1,5 @@
 import os
+import shlex
 import shutil
 import threading
 import time
@@ -237,6 +238,25 @@ class InstanceConnection:
             self._real_control_socket_path.unlink(missing_ok=True)
         self._tunnel.open()
         self._last_verified_at = time.monotonic()
+
+    async def has_volume_mounts(self, paths: Collection[str]) -> bool:
+        """Check whether the host has mounted all requested filesystems."""
+        try:
+            await self._tunnel.aexec(
+                " && ".join(f"mountpoint -q -- {shlex.quote(p)}" for p in paths)
+            )
+        except SSHError:
+            return False
+        return True
+
+    async def sync_volume_mounts(self, paths: Collection[str]) -> None:
+        """Request a flush on each mounted filesystem before releasing its VM."""
+        commands = [
+            # Keep a reference to the directory across the check and fsync.
+            f"(cd -P -- {shlex.quote(path)} && mountpoint -q -- . && sync -- .)"
+            for path in paths
+        ]
+        await self._tunnel.aexec(" && ".join(commands), timeout=60)
 
     def is_alive(self) -> bool:
         """

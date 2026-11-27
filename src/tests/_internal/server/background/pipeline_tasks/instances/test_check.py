@@ -1,7 +1,8 @@
 import datetime as dt
 import logging
+import uuid
 from typing import ClassVar, Optional
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 import pytest_asyncio
@@ -179,6 +180,56 @@ class TestCheckInstance:
             backend.compute.assert_not_called()
         else:
             backend.compute().update_provisioning_data.assert_called_once()
+
+    async def test_deletes_vm_if_volume_never_mounts(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        project = await create_project(session)
+        data = get_job_provisioning_data(
+            backend=BackendType.MASSEDCOMPUTE, hostname=None, dockerized=True
+        )
+        data.volume_mounts = {uuid.uuid4(): "/persistent/checkpoints"}
+        instance = await create_instance(
+            session, project, status=InstanceStatus.PROVISIONING, job_provisioning_data=data
+        )
+        instance.started_at = get_current_datetime()
+        backend = Mock()
+
+        def set_hostname(data: JobProvisioningData, *args) -> None:
+            data.hostname = "192.0.2.1"
+
+        backend.compute.return_value.update_provisioning_data.side_effect = set_hostname
+        monkeypatch.setattr(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend),
+        )
+        conn = AsyncMock()
+        conn.has_volume_mounts.return_value = False
+        monkeypatch.setattr(
+            instances_check.instance_connection_pool, "get_or_open", lambda *_: conn
+        )
+        await process_instance(session, worker, instance)
+        await session.refresh(instance)
+        conn.has_volume_mounts.assert_awaited_once()
+        assert instance.job_provisioning_data is not None
+        assert (
+            JobProvisioningData.model_validate_json(instance.job_provisioning_data).hostname
+            is None
+        )
+
+        instance.started_at = get_current_datetime() - dt.timedelta(hours=1)
+        await process_instance(session, worker, instance)
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATING
+        await process_instance(session, worker, instance)
+        await session.refresh(instance)
+        backend.compute.return_value.terminate_instance.assert_called_once()
+        conn.sync_volume_mounts.assert_not_awaited()
+        assert instance.status == InstanceStatus.TERMINATED
 
     async def test_check_shim_transitions_provisioning_on_busy(
         self,
