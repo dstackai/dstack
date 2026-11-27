@@ -1,7 +1,7 @@
 import logging
 import uuid
 from collections.abc import Generator
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from unittest.mock import MagicMock, Mock, patch
 
@@ -41,6 +41,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.resources import GPUSpec, ResourcesSpec
 from dstack._internal.core.models.runs import Requirements
+from dstack._internal.utils.common import get_current_datetime
 
 
 def _compute() -> KubernetesCompute:
@@ -158,8 +159,16 @@ def _make_pod(
     node_name: Optional[str] = "node-a",
     terminating: bool = False,
     unschedulable_message: Optional[str] = None,
+    ready_since: Optional[datetime] = None,
+    container_statuses: Optional[list[client.V1ContainerStatus]] = None,
 ) -> client.V1Pod:
-    conditions = [client.V1PodCondition(type="Ready", status="True" if ready else "False")]
+    conditions = [
+        client.V1PodCondition(
+            type="Ready",
+            status="True" if ready else "False",
+            last_transition_time=ready_since,
+        )
+    ]
     if unschedulable_message is not None:
         conditions.append(
             client.V1PodCondition(
@@ -178,7 +187,39 @@ def _make_pod(
             ),
         ),
         spec=client.V1PodSpec(containers=[], node_name=node_name),
-        status=client.V1PodStatus(phase=phase, conditions=conditions),
+        status=client.V1PodStatus(
+            phase=phase, conditions=conditions, container_statuses=container_statuses
+        ),
+    )
+
+
+def _make_waiting_container_status(
+    reason: str,
+    message: Optional[str] = None,
+    last_terminated: Optional[client.V1ContainerStateTerminated] = None,
+) -> client.V1ContainerStatus:
+    return client.V1ContainerStatus(
+        name=f"{JUMP_POD_NAME}-container",
+        image="sshd",
+        image_id="",
+        ready=False,
+        restart_count=0 if last_terminated is None else 3,
+        state=client.V1ContainerState(
+            waiting=client.V1ContainerStateWaiting(reason=reason, message=message)
+        ),
+        last_state=client.V1ContainerState(terminated=last_terminated),
+    )
+
+
+def _make_replica_set(
+    conditions: Optional[list[client.V1ReplicaSetCondition]] = None,
+) -> client.V1ReplicaSet:
+    return client.V1ReplicaSet(
+        metadata=client.V1ObjectMeta(name=JUMP_POD_NAME),
+        spec=client.V1ReplicaSetSpec(
+            selector=client.V1LabelSelector(match_labels=JUMP_POD_SELECTOR),
+        ),
+        status=client.V1ReplicaSetStatus(replicas=0, conditions=conditions),
     )
 
 
@@ -281,6 +322,7 @@ class TestCreateJumpPodServiceIfNotExists:
         # Root regardless of the image's USER
         assert container.security_context.run_as_user == 0
         assert container.security_context.run_as_group == 0
+        assert container.termination_message_policy == "FallbackToLogsOnError"
         resources = container.resources
         # Equal CPU and memory requests and limits for the Guaranteed QoS class, and
         # an ephemeral-storage request without a limit
@@ -416,11 +458,7 @@ class TestCreateJumpPodServiceIfNotExists:
 
     def test_does_nothing_if_replica_set_and_service_exist(self):
         api, apps_api = self.make_apis(
-            replica_set=client.V1ReplicaSet(
-                spec=client.V1ReplicaSetSpec(
-                    selector=client.V1LabelSelector(match_labels=JUMP_POD_SELECTOR),
-                ),
-            ),
+            replica_set=_make_replica_set(),
             service=_make_service(JUMP_POD_SELECTOR, node_port=30022),
         )
 
@@ -535,9 +573,15 @@ class TestCheckAndConfigureJumpPodService:
         )
         return api
 
-    def call(self, api: Mock) -> Optional[SSHConnectionParams]:
+    def make_apps_api(self, *, replica_set: Optional[client.V1ReplicaSet] = None) -> Mock:
+        apps_api = Mock(spec=client.AppsV1Api)
+        _mock_read(apps_api.read_namespaced_replica_set, replica_set)
+        return apps_api
+
+    def call(self, api: Mock, apps_api: Optional[Mock] = None) -> Optional[SSHConnectionParams]:
         return _check_and_configure_jump_pod_service(
             api=api,
+            apps_api=apps_api if apps_api is not None else self.make_apps_api(),
             namespace=NAMESPACE,
             jump_pod_name=JUMP_POD_NAME,
             jump_pod_service_name=JUMP_POD_SERVICE_NAME,
@@ -570,6 +614,14 @@ class TestCheckAndConfigureJumpPodService:
             pytest.param(_make_pod(phase="Pending", ready=False, node_name=None), id="pending"),
             pytest.param(_make_pod(phase="Failed", ready=False), id="evicted"),
             pytest.param(_make_pod(terminating=True), id="terminating"),
+            pytest.param(
+                _make_pod(
+                    phase="Pending",
+                    ready=False,
+                    container_statuses=[_make_waiting_container_status("ContainerCreating")],
+                ),
+                id="container-creating",
+            ),
         ],
     )
     def test_waits_if_no_pod_is_ready(
@@ -581,7 +633,7 @@ class TestCheckAndConfigureJumpPodService:
         assert self.call(api) is None
         api.read_namespaced_pod.assert_not_called()
         run_ssh_command_mock.assert_not_called()
-        assert "cannot be scheduled" not in caplog.text
+        assert "Jump pod" not in caplog.text
 
     def test_warns_if_pod_cannot_be_scheduled(
         self, caplog: pytest.LogCaptureFixture, run_ssh_command_mock: Mock
@@ -606,13 +658,140 @@ class TestCheckAndConfigureJumpPodService:
             " 0/3 nodes are available: 3 Insufficient memory."
         ) in caplog.text
 
-    def test_waits_if_no_pods(self, run_ssh_command_mock: Mock):
-        # E.g., the ReplicaSet has not created a pod yet.
-        api = self.make_api(pods=[])
+    @pytest.mark.parametrize(
+        ["container_status", "expected_warning"],
+        [
+            pytest.param(
+                _make_waiting_container_status(
+                    "ImagePullBackOff", 'Back-off pulling image "registry.example.com/sshd:1"'
+                ),
+                "Jump pod failing cannot start: ImagePullBackOff:"
+                ' Back-off pulling image "registry.example.com/sshd:1"',
+                id="image-pull",
+            ),
+            pytest.param(
+                _make_waiting_container_status(
+                    "CrashLoopBackOff",
+                    "back-off 40s restarting failed container",
+                    last_terminated=client.V1ContainerStateTerminated(
+                        exit_code=255,
+                        reason="Error",
+                        message="Missing privilege separation directory: /run/sshd\n",
+                    ),
+                ),
+                "Jump pod failing cannot start: CrashLoopBackOff:"
+                " back-off 40s restarting failed container; last exit code: 255, last output:\n"
+                "Missing privilege separation directory: /run/sshd",
+                id="crash-loop",
+            ),
+        ],
+    )
+    def test_warns_if_container_cannot_start(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        run_ssh_command_mock: Mock,
+        container_status: client.V1ContainerStatus,
+        expected_warning: str,
+    ):
+        caplog.set_level(logging.WARNING)
+        api = self.make_api(
+            pods=[
+                _make_pod(
+                    name="failing",
+                    phase="Pending",
+                    ready=False,
+                    container_statuses=[container_status],
+                ),
+            ]
+        )
 
         assert self.call(api) is None
-        api.read_namespaced_pod.assert_called_once_with(namespace=NAMESPACE, name=JUMP_POD_NAME)
         run_ssh_command_mock.assert_not_called()
+        assert expected_warning in caplog.text
+
+    @pytest.mark.parametrize(
+        "replica_set",
+        [
+            pytest.param(None, id="no-replica-set"),
+            pytest.param(
+                _make_replica_set(conditions=[]),
+                id="no-conditions",
+            ),
+        ],
+    )
+    def test_waits_if_no_pods(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        run_ssh_command_mock: Mock,
+        replica_set: Optional[client.V1ReplicaSet],
+    ):
+        # E.g., the ReplicaSet has not created a pod yet.
+        caplog.set_level(logging.WARNING)
+        api = self.make_api(pods=[])
+        apps_api = self.make_apps_api(replica_set=replica_set)
+
+        assert self.call(api, apps_api) is None
+        api.read_namespaced_pod.assert_called_once_with(namespace=NAMESPACE, name=JUMP_POD_NAME)
+        apps_api.read_namespaced_replica_set.assert_called_once_with(
+            name=JUMP_POD_NAME, namespace=NAMESPACE
+        )
+        run_ssh_command_mock.assert_not_called()
+        assert "Jump pod" not in caplog.text
+
+    def test_warns_if_replica_set_cannot_create_pod(
+        self, caplog: pytest.LogCaptureFixture, run_ssh_command_mock: Mock
+    ):
+        caplog.set_level(logging.WARNING)
+        api = self.make_api(pods=[])
+        apps_api = self.make_apps_api(
+            replica_set=_make_replica_set(
+                conditions=[
+                    client.V1ReplicaSetCondition(
+                        type="ReplicaFailure",
+                        status="True",
+                        reason="FailedCreate",
+                        message='pods "dstack-main-ssh-jump-pod-x7k2p" is forbidden',
+                    )
+                ],
+            )
+        )
+
+        assert self.call(api, apps_api) is None
+        run_ssh_command_mock.assert_not_called()
+        assert (
+            f"Jump pod {JUMP_POD_NAME} cannot be created: FailedCreate:"
+            ' pods "dstack-main-ssh-jump-pod-x7k2p" is forbidden'
+        ) in caplog.text
+
+    @pytest.mark.parametrize(
+        ["ready_for", "warns"],
+        [
+            pytest.param(timedelta(minutes=2), True, id="after-grace-period"),
+            pytest.param(timedelta(seconds=10), False, id="within-grace-period"),
+            pytest.param(None, False, id="unknown"),
+        ],
+    )
+    def test_warns_if_ssh_fails_after_grace_period(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        run_ssh_command_mock: Mock,
+        ready_for: Optional[timedelta],
+        warns: bool,
+    ):
+        caplog.set_level(logging.WARNING)
+        run_ssh_command_mock.return_value = (
+            255,
+            b"ssh: connect to host 203.0.113.1 port 30022: Connection timed out\r\n",
+        )
+        ready_since = get_current_datetime() - ready_for if ready_for is not None else None
+        api = self.make_api(pods=[_make_pod(name="ready", ready_since=ready_since)])
+
+        assert self.call(api) is None
+        warning = (
+            "Jump pod ready @ 203.0.113.1:30022, SSH command failed, exit status: 255, output:"
+            " ssh: connect to host 203.0.113.1 port 30022: Connection timed out"
+        )
+        assert (warning in caplog.text) is warns
 
     def test_returns_ssh_proxy_if_pre_3891_pod_is_ready(self):
         api = self.make_api(
