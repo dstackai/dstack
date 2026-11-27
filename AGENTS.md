@@ -16,7 +16,7 @@ These principles must be followed when implementing or changing anything in this
 5. We aim to keep the codebase small or at least keep it from exploding in size.
 6. We constantly try to remove tests that are not needed, tests that overlap, or tests that are not for the most essential cases. Add only the tests that are essential and actually needed, never tests for their own sake.
 7. Clear and simple contracts are a top priority (again, learn from the codebase). Never mess up a contract, whether of a method or of a component. If a contract becomes weak or is changed during the implementation, this must be explicitly escalated.
-8. We aim at organizing the code so its components are cohesive, avoiding coupling.
+8. We aim at organizing the code to avoid strong coupling between components, while keeping them cohesive.
 9. We aim at using strong types, and it's one of the pillars (along with simple and clear contracts). Untyped structures or weak contracts significantly hurt the codebase.
 10. The agent should not speak or introduce new "terms" (or "concepts") that are not conventional to dstack unless it's required to improve the codebase or design; in this case, this must be explicitly escalated.
 11. If there is an issue in the design or implementation, it must be escalated explicitly and never hidden.
