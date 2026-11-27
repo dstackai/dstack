@@ -176,6 +176,23 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
         type:
             required: true
 
+##### `projects[n].backends[type=massedcompute]` { #massedcompute data-toc-label="massedcompute" }
+
+#SCHEMA# dstack._internal.core.backends.massedcompute.models.MassedComputeBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: massedcompute-
+
+###### `projects[n].backends[type=massedcompute].creds` { #massedcompute-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.massedcompute.models.MassedComputeAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
 ##### `projects[n].backends[type=nebius]` { #nebius data-toc-label="nebius" }
 
 #SCHEMA# dstack._internal.core.backends.nebius.models.NebiusBackendFileConfigWithCreds

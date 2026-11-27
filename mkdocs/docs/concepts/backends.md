@@ -1090,6 +1090,28 @@ projects:
 
 </div>
 
+### MassedCompute
+
+Create a full-access API key in [MassedCompute settings](https://vm-docs.massedcompute.com/docs/settings/api-settings)
+and configure the backend in the server configuration.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: massedcompute
+        creds:
+          type: api_key
+          api_key: YOUR_MASSEDCOMPUTE_API_KEY
+```
+
+</div>
+
+The backend supports single-node, on-demand CPU and GPU VMs.
+MassedCompute chooses the region for each VM.
+
 ### Vultr
 
 Log into your [Vultr](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find the `Personal Access Token` panel and click the `Enable API` button. In the `Access Control` panel, allow API requests from all addresses or from the subnet where your `dstack` server is deployed.
