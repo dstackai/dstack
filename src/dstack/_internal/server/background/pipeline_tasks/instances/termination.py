@@ -84,6 +84,8 @@ async def terminate_instance(instance_model: InstanceModel) -> ProcessResult:
         instance_model=instance_model,
         new_status=InstanceStatus.TERMINATED,
     )
+    # The fleet may have become empty and ready to be deleted.
+    result.wake_fleet_id = instance_model.fleet_id
     return result
 
 

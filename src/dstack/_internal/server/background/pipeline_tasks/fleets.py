@@ -71,7 +71,10 @@ class FleetPipeline(Pipeline[PipelineItem]):
         workers_num: int = 10,
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
-        min_processing_interval: timedelta = timedelta(seconds=15),
+        # Most fleets are steady and their processing changes nothing, so the interval is long to
+        # avoid wasted processing. Changes that need a prompt fleet pass (master election, fleet
+        # deletion, etc.) set `FleetModel.skip_min_processing_interval` and hint the pipeline.
+        min_processing_interval: timedelta = timedelta(seconds=60),
         lock_timeout: timedelta = timedelta(seconds=20),
         heartbeat_trigger: timedelta = timedelta(seconds=10),
         *,
@@ -155,6 +158,7 @@ class FleetFetcher(Fetcher[PipelineItem]):
                         or_(
                             FleetModel.last_processed_at <= now - self._min_processing_interval,
                             FleetModel.last_processed_at == FleetModel.created_at,
+                            FleetModel.skip_min_processing_interval == True,
                         ),
                         or_(
                             FleetModel.lock_expires_at.is_(None),
@@ -173,6 +177,7 @@ class FleetFetcher(Fetcher[PipelineItem]):
                             FleetModel.id,
                             FleetModel.lock_token,
                             FleetModel.lock_expires_at,
+                            FleetModel.skip_min_processing_interval,
                         )
                     )
                 )
@@ -185,6 +190,7 @@ class FleetFetcher(Fetcher[PipelineItem]):
                     fleet_model.lock_expires_at = lock_expires_at
                     fleet_model.lock_token = lock_token
                     fleet_model.lock_owner = FleetPipeline.__name__
+                    fleet_model.skip_min_processing_interval = False
                     items.append(
                         PipelineItem(
                             __tablename__=FleetModel.__tablename__,

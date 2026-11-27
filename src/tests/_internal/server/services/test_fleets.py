@@ -459,3 +459,61 @@ class TestGetFleetMasterInstanceProvisioningData:
         )
 
         assert master_provisioning_data is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_current_master_provisioning_data(
+        self, test_db, session: AsyncSession
+    ) -> None:
+        project = await create_project(session=session)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=1, max=2)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        master = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+            job_provisioning_data=get_job_provisioning_data(region="eu-west-1"),
+        )
+        fleet.current_master_instance_id = master.id
+        await session.commit()
+        await session.refresh(fleet, attribute_names=["current_master_instance_id", "instances"])
+
+        master_provisioning_data = get_fleet_master_instance_provisioning_data(
+            fleet_model=fleet,
+            fleet_spec=fleet_spec,
+        )
+
+        assert master_provisioning_data is not None
+        assert master_provisioning_data.region == "eu-west-1"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("status", [InstanceStatus.TERMINATING, InstanceStatus.TERMINATED])
+    async def test_returns_none_for_finished_current_master(
+        self, test_db, session: AsyncSession, status: InstanceStatus
+    ) -> None:
+        project = await create_project(session=session)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=1, max=2)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        master = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=status,
+            job_provisioning_data=get_job_provisioning_data(region="eu-west-1"),
+        )
+        fleet.current_master_instance_id = master.id
+        await session.commit()
+        await session.refresh(fleet, attribute_names=["current_master_instance_id", "instances"])
+
+        master_provisioning_data = get_fleet_master_instance_provisioning_data(
+            fleet_model=fleet,
+            fleet_spec=fleet_spec,
+        )
+
+        assert master_provisioning_data is None

@@ -16,8 +16,9 @@ from dstack._internal.server.background.pipeline_tasks.instances import Instance
 from dstack._internal.server.background.pipeline_tasks.instances import (
     termination as instances_termination,
 )
-from dstack._internal.server.models import InstanceModel
+from dstack._internal.server.models import FleetModel, InstanceModel
 from dstack._internal.server.testing.common import (
+    create_fleet,
     create_instance,
     create_project,
     get_job_provisioning_data,
@@ -77,6 +78,32 @@ class TestTermination:
         assert instance.deleted is True
         assert instance.deleted_at is not None
         assert instance.finished_at is not None
+
+    async def test_terminate_wakes_fleet(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+    ):
+        project = await create_project(session=session)
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.TERMINATING,
+        )
+        instance.termination_reason = InstanceTerminationReason.IDLE_TIMEOUT
+        await session.commit()
+
+        with self.mock_terminate_in_backend():
+            await process_instance(session, worker, instance)
+
+        await session.refresh(instance)
+        await session.refresh(fleet)
+        assert instance.deleted is True
+        assert fleet.skip_min_processing_interval
+        worker._pipeline_hinter.hint_fetch.assert_called_with(FleetModel.__name__)
 
     async def test_terminates_terminating_deleted_instance(
         self,
