@@ -5,9 +5,11 @@ from pydantic import Field, model_validator
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
 
-# Measured with the jump pod image (OpenSSH 9.9). The container takes ~9 MiB plus ~1.6 MiB per
-# tunneled SSH session (two sshd-session processes), so 1Gi fits ~600 sessions. Each running job
-# holds one or more sessions per server replica. At 500m, it tunnels ~130-180 MiB/s.
+JUMP_POD_DEFAULT_IMAGE = "testcontainers/sshd:1.3.0@sha256:c50c0f59554dcdb2d9e5e705112144428ae9d04ac0af6322b365a18e24213a6a"
+
+# Measured with the default jump pod image (OpenSSH 9.9). The container takes ~9 MiB plus ~1.6 MiB
+# per tunneled SSH session (two sshd-session processes), so 1Gi fits ~600 sessions. Each running
+# job holds one or more sessions per server replica. At 500m, it tunnels ~130-180 MiB/s.
 JUMP_POD_DEFAULT_CPU = "500m"
 JUMP_POD_DEFAULT_MEMORY = "1Gi"
 
@@ -18,6 +20,15 @@ class KubernetesProxyJumpConfig(CoreModel):
     ] = None
     port: Annotated[
         Optional[int], Field(description="Any port accessible outside of the cluster")
+    ] = None
+    image: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The jump pod's image, with OpenSSH `sshd`."
+                f" Defaults to `{JUMP_POD_DEFAULT_IMAGE}`"
+            )
+        ),
     ] = None
     cpu: Annotated[
         Optional[str],

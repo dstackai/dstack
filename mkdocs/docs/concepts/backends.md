@@ -1279,7 +1279,7 @@ projects:
         memory: 2Gi
     ```
 
-    Each SSH session through the jump pod takes about 2 MiB of memory. Each `dstack` server replica keeps at least one session open per running job, and each `dstack attach` adds one more. If the jump pod exceeds its memory limit, Kubernetes restarts it.
+    With the default image, each SSH session through the jump pod takes about 2 MiB of memory. Each `dstack` server replica keeps at least one session open per running job, and each `dstack attach` adds one more. If the jump pod exceeds its memory limit, Kubernetes restarts it.
 
     When the jump pod restarts or is recreated, its SSH sessions drop. The `dstack` server reconnects automatically, but `dstack attach` may fail for runs submitted before that. If reliable SSH access to runs is important, deploy [`dstack-sshproxy`](../guides/server-deployment.md#ssh-proxy).
 
@@ -1299,13 +1299,33 @@ projects:
 
     Each `tolerations` item is `key[=value][:effect]`, the `kubectl taint` format, so a taint added with `kubectl taint` can be copied as is. Without `=value`, any value is tolerated; without `:effect`, any effect. If `tolerations` isn't set, `dstack` tolerates the GPU node taints when every node is tainted, but not if `node_selector` is set.
 
-    !!! warning "Changing `cpu`, `memory`, `node_selector`, and `tolerations`"
+    By default, the jump pod runs `testcontainers/sshd`. To run your own image instead, e.g., one built on your organization's base image, scanned by your registry, or with your SSH policy, set `proxy_jump.image`:
+
+    ```yaml
+    contexts:
+    - name: gpu-cluster-a
+      proxy_jump:
+        image: registry.example.com/sshd:1.0@sha256:...
+    ```
+
+    `dstack` runs the jump pod's container as root, writes root's authorized keys, regenerates the host keys with `ssh-keygen -A`, and starts `sshd` with `PermitRootLogin`, `PasswordAuthentication`, and `AllowTcpForwarding` overridden. The server then connects as root and runs a shell script that adds users' keys. Other `sshd_config` settings, e.g., ciphers and MACs, apply as set in the image. The image must provide:
+
+    - a `root` user with a POSIX login shell, e.g., `sh` or `bash`
+    - OpenSSH `sshd` at `/usr/sbin/sshd`
+    - `/bin/sh`, `ssh-keygen`, `mkdir`, `chmod`, `rm`, `touch`, `tail`, and `grep`
+
+    `dstack` doesn't pass registry credentials for the jump pod's image, so a private image can be pulled only if the nodes have credentials for the registry or the namespace's `default` service account has `imagePullSecrets`.
+
+    !!! warning "Changing `image`, `cpu`, `memory`, `node_selector`, and `tolerations`"
         New values don't apply to an existing jump pod. To apply them, update the jump pod's ReplicaSet in the context's namespace and delete the pod so that Kubernetes recreates it:
 
         ```shell
         # cpu and memory
         kubectl -n <namespace> set resources replicaset dstack-<project>-ssh-jump-pod \
           --requests=cpu=1,memory=2Gi --limits=cpu=1,memory=2Gi
+        # image
+        kubectl -n <namespace> set image replicaset dstack-<project>-ssh-jump-pod \
+          dstack-<project>-ssh-jump-pod-container=registry.example.com/sshd:1.0@sha256:...
         # node_selector and tolerations: edit spec.template.spec.affinity and .tolerations
         kubectl -n <namespace> edit replicaset dstack-<project>-ssh-jump-pod
         # Recreate the pod

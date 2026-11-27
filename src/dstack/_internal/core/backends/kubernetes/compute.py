@@ -46,6 +46,7 @@ from dstack._internal.core.backends.kubernetes.api_client import API_CLIENT_EXCE
 from dstack._internal.core.backends.kubernetes.features import resource_groups
 from dstack._internal.core.backends.kubernetes.models import (
     JUMP_POD_DEFAULT_CPU,
+    JUMP_POD_DEFAULT_IMAGE,
     JUMP_POD_DEFAULT_MEMORY,
     KubernetesConfig,
 )
@@ -137,7 +138,6 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-JUMP_POD_IMAGE = "testcontainers/sshd:1.3.0@sha256:c50c0f59554dcdb2d9e5e705112144428ae9d04ac0af6322b365a18e24213a6a"
 JUMP_POD_SSH_PORT = 22
 JUMP_POD_USER = "root"
 # Under disk pressure, the kubelet first evicts pods whose disk usage exceeds their
@@ -271,6 +271,7 @@ class KubernetesCompute(
             jump_pod_service_name=jump_pod_service_name,
             jump_pod_port=cluster.proxy_jump.port,
             authorized_keys=project_authorized_keys,
+            image=cluster.proxy_jump.image or JUMP_POD_DEFAULT_IMAGE,
             cpu_request_limit=cluster.proxy_jump.cpu or JUMP_POD_DEFAULT_CPU,
             memory_request_limit=cluster.proxy_jump.memory or JUMP_POD_DEFAULT_MEMORY,
             node_selector=cluster.proxy_jump.node_selector,
@@ -949,6 +950,7 @@ def _create_jump_pod_service_if_not_exists(
     jump_pod_service_name: str,
     jump_pod_port: Optional[int],
     authorized_keys: list[str],
+    image: str,
     cpu_request_limit: str,
     memory_request_limit: str,
     node_selector: Optional[list[str]],
@@ -1064,7 +1066,7 @@ def _create_jump_pod_service_if_not_exists(
                         containers=[
                             client.V1Container(
                                 name=f"{jump_pod_name}-container",
-                                image=JUMP_POD_IMAGE,
+                                image=image,
                                 command=["/bin/sh"],
                                 args=["-c", " && ".join(commands)],
                                 ports=[
@@ -1075,6 +1077,11 @@ def _create_jump_pod_service_if_not_exists(
                                 resources=client.V1ResourceRequirements(
                                     requests=requests,
                                     limits=limits,
+                                ),
+                                # sshd must run as root, whatever the image's USER is
+                                security_context=client.V1SecurityContext(
+                                    run_as_user=0,
+                                    run_as_group=0,
                                 ),
                             )
                         ],
@@ -1327,10 +1334,12 @@ def _get_jump_pod_tolerations_from_node_taints(
 def _get_jump_pod_commands(authorized_keys: list[str]) -> list[str]:
     authorized_keys_content = "\n".join(authorized_keys)
     commands = [
-        "mkdir -p ~/.ssh",
-        "chmod 700 ~/.ssh",
-        f"echo {shlex.quote(authorized_keys_content)} > ~/.ssh/authorized_keys",
-        "chmod 600 ~/.ssh/authorized_keys",
+        # Not ~, which follows HOME, and the image may set HOME for its own user. sshd looks up
+        # authorized_keys in root's home directory from the user database, as ~root does
+        "mkdir -p ~root/.ssh",
+        "chmod 700 ~root/.ssh",
+        f"echo {shlex.quote(authorized_keys_content)} > ~root/.ssh/authorized_keys",
+        "chmod 600 ~root/.ssh/authorized_keys",
         # regenerate host keys
         "rm -rf /etc/ssh/ssh_host_*",
         "ssh-keygen -A > /dev/null",
@@ -1338,6 +1347,8 @@ def _get_jump_pod_commands(authorized_keys: list[str]) -> list[str]:
         (
             f"/usr/sbin/sshd -D -e -p {JUMP_POD_SSH_PORT}"
             " -o LogLevel=ERROR"
+            # The image's sshd_config may forbid root login, and clients log in as root
+            " -o PermitRootLogin=prohibit-password"
             " -o PasswordAuthentication=no"
             " -o AllowTcpForwarding=local"
         ),

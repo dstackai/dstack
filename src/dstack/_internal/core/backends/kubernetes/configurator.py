@@ -26,13 +26,14 @@ from dstack._internal.core.backends.kubernetes.utils import (
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
+from dstack._internal.utils.docker import validate_image_name
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-# Sanity floors that catch unit mistakes, e.g., `memory: 512` (bytes). Measured with the jump pod
-# image: below 100m, SSH handshakes through the jump pod slow down sharply (~0.5s at 50m, ~2s at
-# 10m); 32Mi fits the container (~9Mi) and a few sessions (~1.6Mi each).
+# Sanity floors that catch unit mistakes, e.g., `memory: 512` (bytes). Measured with the default
+# jump pod image: below 100m, SSH handshakes through the jump pod slow down sharply (~0.5s at 50m,
+# ~2s at 10m); 32Mi fits the container (~9Mi) and a few sessions (~1.6Mi each).
 _JUMP_POD_MIN_CPU = "100m"
 _JUMP_POD_MIN_MEMORY = "32Mi"
 
@@ -118,6 +119,13 @@ class KubernetesConfigurator(
         self, proxy_jump: KubernetesProxyJumpConfig, *, context_name: Optional[str] = None
     ):
         in_context = f" in context {context_name!r}" if context_name is not None else ""
+        if proxy_jump.image is not None:
+            try:
+                validate_image_name(proxy_jump.image)
+            except ValueError as e:
+                raise ServerClientError(
+                    f"invalid proxy_jump.image value {proxy_jump.image!r}{in_context}: {e}"
+                )
         for field, quantity, min_quantity in [
             ("cpu", proxy_jump.cpu, _JUMP_POD_MIN_CPU),
             ("memory", proxy_jump.memory, _JUMP_POD_MIN_MEMORY),
