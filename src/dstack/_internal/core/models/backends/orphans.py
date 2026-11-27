@@ -32,6 +32,8 @@ class ListedResourceGroup(CoreModel):
     """Provider's id of the owner resource (e.g.`JobProvisioningData.instance_id` for the instances).
     `None` if the group has only internal resources left.
     """
+    primary_name: Optional[str] = None
+    """Exact provider name if the backend can return it as a provisional instance_id."""
     region: Optional[str]
     created_at: Optional[datetime]
     """Provider's creation time of the owner resource or, if it's gone, the earliest internal resource.

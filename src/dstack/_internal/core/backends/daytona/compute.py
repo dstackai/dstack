@@ -184,6 +184,7 @@ class DaytonaCompute(ComputeWithFilteredOffersCached, ComputeWithVolumeSupport, 
             backend_data.registry_id = self._create_registry(
                 f"{instance_name}-registry", get_or_error(registry), job.job_spec.registry_auth
             )
+        # TODO: Implement orphan cleanup and report the sandbox name as primary_name.
         instance_id = instance_name
         try:
             sandbox = self.api_client.create_sandbox(payload)

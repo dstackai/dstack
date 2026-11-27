@@ -785,6 +785,14 @@ class ComputeWithVolumeSupport(ABC):
         """
         raise NotImplementedError()
 
+    def get_volume_mounts_to_sync(self, provisioning_data: JobProvisioningData) -> list[str]:
+        """Return host mounts to flush before terminating the instance.
+
+        Called only for VMs with provider-mounted filesystems and an SSH address.
+        Exclude mounts when the provider confirms the VM is already stopped or gone.
+        """
+        return list((provisioning_data.volume_mounts or {}).values())
+
     def attach_volume(
         self, volume: Volume, provisioning_data: JobProvisioningData
     ) -> VolumeAttachmentData:

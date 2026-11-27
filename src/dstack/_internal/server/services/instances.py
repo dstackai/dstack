@@ -671,6 +671,12 @@ def filter_instances(
             continue
         if volumes_locations is not None:
             jpd = get_instance_provisioning_data(instance)
+            if (
+                jpd is None
+                and volumes
+                and any(all(v.exclusive_at_launch for v in candidates) for candidates in volumes)
+            ):
+                continue
             # instance_matches_constraints() also skips filtering if JPD is not set
             if jpd is not None:
                 instance_backend = jpd.get_base_backend()
@@ -683,6 +689,10 @@ def filter_instances(
                 if (
                     instance_location not in volumes_locations
                     and regionless_location not in volumes_locations
+                ):
+                    continue
+                if volumes and any(
+                    not any(jpd.can_mount_volume(v) for v in candidates) for candidates in volumes
                 ):
                     continue
         filtered_instances.append(instance)

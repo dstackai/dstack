@@ -16,7 +16,7 @@ Useful as a cache for cloud fleets or for persistent storage with SSH fleets.
 
 ## Network volumes
 
-> Network volumes are currently supported for the `aws`, `gcp`, `runpod`, `kubernetes`, `daytona`, and `lium` backends.
+> Network volumes are currently supported for the `aws`, `gcp`, `runpod`, `kubernetes`, `daytona`, `lium`, and `massedcompute` backends.
 
 ### Apply a configuration
 
@@ -63,6 +63,17 @@ If you use this configuration, `dstack` will create a new volume based on the sp
     ```
 
     > Files on Lium volumes are owned by root and accessible to all users in the container.
+
+??? info "MassedCompute"
+    Network volumes are experimental. See MassedCompute's [storage limitations](https://vm-docs.massedcompute.com/docs/persistent-storage/limitations).
+    Enable Persistent Storage in your MassedCompute account and omit `size` and `region`.
+    A VM can attach up to eight volumes at launch. Another VM can use a volume once the first VM terminates.
+
+    ```yaml
+    type: volume
+    backend: massedcompute
+    name: my-volume
+    ```
 
 ??? info "Kubernetes"
     Set `region` to a kubeconfig context name enabled in the [backend configuration](backends.md#kubernetes).
@@ -228,7 +239,7 @@ and its contents will persist across runs.
 
 ### Detach a volume { #detach-network-volume }
 
-`dstack` automatically detaches volumes from instances when a run stops.
+`dstack` handles volume detachment automatically.
 
 !!! info "Force detach"
     In some clouds such as AWS a volume may stuck in the detaching state.

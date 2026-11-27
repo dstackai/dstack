@@ -846,12 +846,14 @@ def _volume_to_shim_volume_info(volume: Volume, instance_id: str) -> ShimVolumeI
     attachment_data = volume.get_attachment_data_for_instance(instance_id)
     if attachment_data is not None:
         device_name = attachment_data.device_name
+    mount_path = volume.provisioning_data.mount_path if volume.provisioning_data else None
     return ShimVolumeInfo(
         backend=volume.configuration.backend.value,
         name=volume.name,
         volume_id=get_or_error(volume.volume_id),
-        init_fs=not volume.external,
+        init_fs=not volume.external and mount_path is None,
         device_name=device_name,
+        mount_path=mount_path,
     )
 
 

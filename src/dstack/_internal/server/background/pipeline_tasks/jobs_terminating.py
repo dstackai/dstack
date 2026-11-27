@@ -435,7 +435,11 @@ async def _load_job_volume_models(
     volume_names = (
         jrd.volume_names
         if jrd and jrd.volume_names
-        else [va.volume.name for va in instance_model.volume_attachments]
+        else [
+            va.volume.name
+            for va in instance_model.volume_attachments
+            if va.exclusive_volume_id is None or jrd is None or jrd.volume_names is None
+        ]
     )
     if len(volume_names) == 0:
         return []
@@ -535,6 +539,19 @@ async def _apply_process_result(
             await skip_gateway_replicas_min_processing_interval(session, job_model.run.gateway_id)
 
         if instance_model is not None and result.delete_instance:
+            # Release a failed launch's reservations before removing its placeholder.
+            await session.execute(
+                delete(VolumeAttachmentModel).where(
+                    VolumeAttachmentModel.exclusive_volume_id.is_not(None),
+                    VolumeAttachmentModel.instance_id.in_(
+                        select(InstanceModel.id).where(
+                            InstanceModel.id == instance_model.id,
+                            InstanceModel.lock_token == item.lock_token,
+                            InstanceModel.lock_owner == related_instance_lock_owner,
+                        )
+                    ),
+                )
+            )
             res = await session.execute(
                 delete(InstanceModel)
                 .where(
@@ -974,7 +991,6 @@ async def _detach_job_volumes(
     if job_provisioning_data is None:
         return volume_update_rows, _VolumeDetachResult(all_detached=True)
 
-    logger.info("Detaching volumes: %s", [v.name for v in volume_models])
     detach_result = await _detach_volumes_from_job_instance(
         job_model=job_model,
         instance_model=instance_model,
@@ -1073,6 +1089,23 @@ async def _detach_volumes_from_job_instance(
     jpd: JobProvisioningData,
     run_termination_reason: Optional[RunTerminationReason],
 ) -> _VolumeDetachResult:
+    # Launch-time attachments belong to the VM until termination. The job only releases
+    # its assignment, including when its backend is no longer configured.
+    volumes_to_detach = [
+        v
+        for v in volume_models
+        if not any(
+            a.instance_id == instance_model.id and a.exclusive_volume_id is not None
+            for a in v.attachments
+        )
+    ]
+    result = _VolumeDetachResult(
+        all_detached=True, set_volumes_detached_at=job_model.volumes_detached_at is None
+    )
+    if not volumes_to_detach:
+        return result
+
+    logger.info("Detaching volumes: %s", [v.name for v in volumes_to_detach])
     job_spec = get_job_spec(job_model)
     async with backends_cache.lease_project_backend_by_type(
         project=instance_model.project,
@@ -1084,9 +1117,7 @@ async def _detach_volumes_from_job_instance(
             )
             return _VolumeDetachResult(all_detached=False)
 
-        detached_volumes = []
-        all_detached = True
-        for volume_model in volume_models:
+        for volume_model in volumes_to_detach:
             detached = await _detach_volume_from_job_instance(
                 backend=backend,
                 job_model=job_model,
@@ -1097,15 +1128,11 @@ async def _detach_volumes_from_job_instance(
                 run_termination_reason=run_termination_reason,
             )
             if detached:
-                detached_volumes.append(volume_model)
+                result.detached_volumes.append(volume_model)
             else:
-                all_detached = False
+                result.all_detached = False
 
-    return _VolumeDetachResult(
-        all_detached=all_detached,
-        detached_volumes=detached_volumes,
-        set_volumes_detached_at=job_model.volumes_detached_at is None,
-    )
+    return result
 
 
 async def _detach_volume_from_job_instance(

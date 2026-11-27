@@ -23,7 +23,12 @@ from dstack._internal.core.models.profiles import (
     Profile,
 )
 from dstack._internal.core.models.runs import JobStatus
-from dstack._internal.core.models.volumes import DaytonaVolumeConfiguration
+from dstack._internal.core.models.volumes import (
+    DaytonaVolumeConfiguration,
+    MassedComputeVolumeConfiguration,
+    VolumeAttachment,
+    VolumeInstance,
+)
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.schemas.runner import TaskListItem, TaskListResponse, TaskStatus
 from dstack._internal.server.services.runner.client import ShimClient
@@ -126,6 +131,41 @@ class TestFilterInstances:
         )
 
         assert result == ([instance] if matches else [])
+
+    def test_exclusive_volume_reuses_only_its_instance(self):
+        backend = BackendType.MASSEDCOMPUTE
+        jpd = get_job_provisioning_data(backend=backend, region="any")
+        vpd = get_volume_provisioning_data(backend=backend)
+        vpd.exclusive_at_launch = True
+        attached = get_volume(
+            configuration=MassedComputeVolumeConfiguration(),
+            volume_id=vpd.volume_id,
+            provisioning_data=vpd,
+            attachments=[
+                VolumeAttachment(
+                    instance=VolumeInstance(
+                        name="worker", instance_num=0, instance_id=jpd.instance_id
+                    )
+                )
+            ],
+        )
+        alias = attached.model_copy(update={"attachments": []})
+        jpd.volume_mounts = {vpd.volume_id: "/persistent/data"}
+        instance = InstanceModel(
+            unreachable=False,
+            health=HealthStatus.HEALTHY,
+            total_blocks=1,
+            job_provisioning_data=jpd.model_dump_json(),
+        )
+        assert instances_services.filter_instances([instance], Profile(), volumes=[[alias]]) == []
+        assert instances_services.filter_instances(
+            [instance], Profile(), volumes=[[alias, attached]]
+        ) == [instance]
+        jpd.instance_id = "different-vm"
+        instance.job_provisioning_data = jpd.model_dump_json()
+        assert (
+            instances_services.filter_instances([instance], Profile(), volumes=[[attached]]) == []
+        )
 
     def test_global_volume_matches_cpu_and_gpu_regions(self):
         instances = [

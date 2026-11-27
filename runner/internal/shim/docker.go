@@ -979,7 +979,7 @@ func (d *DockerRunner) createContainer(
 	if err != nil {
 		return fmt.Errorf("get docker mounts: %w", err)
 	}
-	volumeMounts, err := getVolumeMounts(task.config.VolumeMounts)
+	volumeMounts, err := getVolumeMounts(task.config)
 	if err != nil {
 		return fmt.Errorf("get volume mounts: %w", err)
 	}
@@ -1328,10 +1328,19 @@ func configureHpcNetworkingIfAvailable(hostConfig *container.HostConfig) {
 	}
 }
 
-func getVolumeMounts(mountPoints []VolumeMountPoint) ([]mount.Mount, error) {
+func getVolumeMounts(cfg TaskConfig) ([]mount.Mount, error) {
+	sources := make(map[string]string)
+	for _, volume := range cfg.Volumes {
+		if volume.MountPath != "" {
+			sources[volume.Name] = taskVolumeMountPoint(cfg.ID, volume)
+		}
+	}
 	mounts := []mount.Mount{}
-	for _, mountPoint := range mountPoints {
-		source := getVolumeMountPoint(mountPoint.Name)
+	for _, mountPoint := range cfg.VolumeMounts {
+		source, ok := sources[mountPoint.Name]
+		if !ok {
+			source = getVolumeMountPoint(mountPoint.Name)
+		}
 		mounts = append(mounts, mount.Mount{Type: mount.TypeBind, Source: source, Target: mountPoint.Path})
 	}
 	return mounts, nil

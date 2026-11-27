@@ -7,6 +7,7 @@ from datetime import timedelta
 from typing import Optional, Sequence, Union
 
 from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only, selectinload
 
@@ -52,7 +53,7 @@ from dstack._internal.core.models.runs import (
     Requirements,
     Run,
 )
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.volumes import Volume, VolumeStatus
 from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks.base import (
@@ -392,17 +393,18 @@ class _DeferSubmittedJobResult:
 
 
 @dataclass
-class _RetrySubmittedJobResult:
-    """Transient contention outcome that resets the main job lock for a quick retry later without clearing lock_owner."""
-
-    pass
-
-
-@dataclass
 class _PlacementGroupCleanup:
     fleet_id: uuid.UUID
     selected_placement_group_id: Optional[uuid.UUID]
     new_placement_group_models: list[PlacementGroupModel]
+
+
+@dataclass
+class _RetrySubmittedJobResult:
+    """Reset the job lock for another scheduling pass after related lock contention."""
+
+    locked_fleet_id: Optional[uuid.UUID] = None
+    placement_group_cleanup: Optional[_PlacementGroupCleanup] = None
 
 
 @dataclass
@@ -416,7 +418,8 @@ class _TerminateSubmittedJobResult:
 @dataclass
 class _VolumeAttachmentPayload:
     volume_model: VolumeModel
-    attachment_data: str
+    attachment_data: Optional[str]
+    """None when the attachment was already recorded at launch."""
 
 
 @dataclass
@@ -1334,7 +1337,12 @@ async def _apply_provisioning_result(
 ) -> None:
     async with get_session_ctx() as session:
         if isinstance(provisioning, _RetrySubmittedJobResult):
-            await _reset_job_lock_for_retry(session=session, item=item)
+            await _reset_job_lock_for_retry(
+                session=session,
+                item=item,
+                locked_fleet_id=provisioning.locked_fleet_id,
+                placement_group_cleanup=provisioning.placement_group_cleanup,
+            )
             return
 
         job_model = await _refetch_locked_job(session=session, item=item)
@@ -1364,16 +1372,9 @@ async def _apply_provisioning_result(
             return
 
         if isinstance(provisioning, _TerminateSubmittedJobResult):
-            if provisioning.placement_group_cleanup is not None:
-                cleanup_fleet_model = await _load_placement_group_cleanup_fleet(
-                    session=session,
-                    fleet_id=provisioning.placement_group_cleanup.fleet_id,
-                )
-                await _persist_placement_group_cleanup(
-                    session=session,
-                    fleet_model=cleanup_fleet_model,
-                    placement_group_cleanup=provisioning.placement_group_cleanup,
-                )
+            await _apply_failed_placement_group_cleanup(
+                session, provisioning.placement_group_cleanup
+            )
             await _unlock_related_fleet(
                 session=session,
                 item=item,
@@ -1519,6 +1520,9 @@ async def _process_new_capacity_provisioning(
         volumes=preconditions.prepared_job_volumes.volumes,
     )
     if isinstance(provision_new_capacity_result, _TerminateSubmittedJobResult):
+        return provision_new_capacity_result
+    if isinstance(provision_new_capacity_result, _RetrySubmittedJobResult):
+        provision_new_capacity_result.locked_fleet_id = locked_fleet_id
         return provision_new_capacity_result
     if isinstance(provision_new_capacity_result, _FailedNewCapacityProvisioning):
         logger.debug("%s: provisioning failed", fmt(context.job_model))
@@ -1909,8 +1913,21 @@ async def _process_volume_attachments(
         compute = backend.compute()
         assert isinstance(compute, ComputeWithVolumeSupport)
 
+        volume_model_ids = prepared_job_volumes.volume_model_ids
+        if any(v.exclusive_at_launch for vs in prepared_job_volumes.volumes for v in vs):
+            # A candidate on another backend may still be locked by its volume pipeline.
+            volume_model_ids = [
+                [
+                    v.id
+                    for v in candidates
+                    if v.matches_location(
+                        job_provisioning_data.get_base_backend(), job_provisioning_data.region
+                    )
+                ]
+                for candidates in prepared_job_volumes.volumes
+            ]
         volume_models = await _lock_related_volume_models(
-            item=item, volume_model_ids=prepared_job_volumes.volume_model_ids
+            item=item, volume_model_ids=volume_model_ids
         )
         if volume_models is None:
             return _VolumeAttachmentResult(
@@ -1941,6 +1958,18 @@ async def _process_volume_attachments(
                         and volume_model.lock_owner != related_volume_lock_owner
                     ):
                         raise ServerClientError("Cannot attach a volume locked for processing")
+                    if volume.exclusive_at_launch:
+                        if any(
+                            a.instance_id == job_model.instance_id
+                            for a in volume_model.attachments
+                        ):
+                            attachments.append(
+                                _VolumeAttachmentPayload(
+                                    volume_model=volume_model, attachment_data=None
+                                )
+                            )
+                            break
+                        continue
                     if (
                         job_provisioning_data.get_base_backend() != volume.get_backend()
                         or job_provisioning_data.region.lower() != volume.get_region().lower()
@@ -2096,10 +2125,10 @@ def _get_locked_volume_ids_from_volume_attachment_result(
 def _get_locked_fleet_id_from_provisioning(
     provisioning: _ProvisioningResult,
 ) -> Optional[uuid.UUID]:
-    if isinstance(provisioning, _TerminateSubmittedJobResult):
-        return provisioning.locked_fleet_id
-
-    if isinstance(provisioning, _NewCapacityProvisioning):
+    if isinstance(
+        provisioning,
+        (_TerminateSubmittedJobResult, _NewCapacityProvisioning),
+    ):
         return provisioning.locked_fleet_id
 
     return None
@@ -2136,6 +2165,8 @@ async def _apply_volume_attachment_result(
             .values(last_job_processed_at=now)
         )
         for attachment in volume_attachment_result.attachments:
+            if attachment.attachment_data is None:
+                continue
             session.add(
                 VolumeAttachmentModel(
                     volume_id=attachment.volume_model.id,
@@ -2411,7 +2442,10 @@ async def _provision_new_capacity(
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[list[list[Volume]]] = None,
 ) -> Union[
-    _TerminateSubmittedJobResult, _FailedNewCapacityProvisioning, _ProvisionNewCapacityResult
+    _RetrySubmittedJobResult,
+    _TerminateSubmittedJobResult,
+    _FailedNewCapacityProvisioning,
+    _ProvisionNewCapacityResult,
 ]:
     secrets = await _load_project_secrets(project=project)
     jobs = copy.deepcopy(jobs)
@@ -2453,6 +2487,7 @@ async def _provision_new_capacity(
         fleet_model=fleet_model,
     )
     multinode = requirements.multinode or is_multinode_job(job)
+    has_exclusive_volumes = any(v.exclusive_at_launch for vs in volumes for v in vs)
     # New instances belong to the fleet's project, which differs from
     # the job's project if the fleet is imported.
     fleet_project = fleet_model.project
@@ -2478,6 +2513,7 @@ async def _provision_new_capacity(
         offers_iter = iter(offers)
         offers_tried = 0
         offers_taken = 0
+        volume_locked = False
         skip_reasons: list[str] = []
         offer_errors: list[_OfferAttemptError] = []
         while offers_tried < settings.MAX_OFFERS_TRIED:
@@ -2539,6 +2575,13 @@ async def _provision_new_capacity(
                 use_group_provisioning = (
                     offer.backend in BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT and len(jobs) > 1
                 )
+                if has_exclusive_volumes and job_model.instance_id is not None:
+                    if not await _reserve_launch_volumes(job_model, offer_volumes):
+                        volume_locked = True
+                        offers_tried -= 1
+                        continue
+                elif any(v.exclusive_at_launch for v in offer_volumes):
+                    raise SkipOffer("An exclusive volume requires an instance to reserve it")
                 if use_group_provisioning:
                     assert isinstance(compute, ComputeWithGroupProvisioningSupport)
                     compute_group_provisioning_data = await run_async(
@@ -2633,6 +2676,14 @@ async def _provision_new_capacity(
                     offer.region,
                 )
                 continue
+        cleanup = _build_placement_group_cleanup(
+            fleet_model=fleet_model,
+            offers_tried=offers_tried,
+            selected_placement_group_id=None,
+            new_placement_group_models=new_placement_group_models,
+        )
+        if volume_locked:
+            return _RetrySubmittedJobResult(placement_group_cleanup=cleanup)
         return _FailedNewCapacityProvisioning(
             message=_get_new_capacity_failure_message(
                 fleet_name=fleet_model.name,
@@ -2645,12 +2696,7 @@ async def _provision_new_capacity(
                     limit_reached=offers_taken < len(offers),
                 ),
             ),
-            placement_group_cleanup=_build_placement_group_cleanup(
-                fleet_model=fleet_model,
-                offers_tried=offers_tried,
-                selected_placement_group_id=None,
-                new_placement_group_models=new_placement_group_models,
-            ),
+            placement_group_cleanup=cleanup,
         )
 
 
@@ -2716,16 +2762,18 @@ def _build_placement_group_cleanup(
     )
 
 
-async def _load_placement_group_cleanup_fleet(
+async def _apply_failed_placement_group_cleanup(
     session: AsyncSession,
-    fleet_id: uuid.UUID,
-) -> FleetModel:
+    cleanup: Optional[_PlacementGroupCleanup],
+) -> None:
+    if cleanup is None:
+        return
     res = await session.execute(
         select(FleetModel)
-        .where(FleetModel.id == fleet_id)
+        .where(FleetModel.id == cleanup.fleet_id)
         .options(joinedload(FleetModel.project).load_only(ProjectModel.id, ProjectModel.name))
     )
-    return res.unique().scalar_one()
+    await _persist_placement_group_cleanup(session, res.unique().scalar_one(), cleanup)
 
 
 async def _persist_placement_group_cleanup(
@@ -2772,6 +2820,85 @@ def _get_effective_profile_and_requirements(
         return None
     # TODO: Respect fleet provisioning properties such as tags.
     return effective_profile, requirements
+
+
+async def _reserve_launch_volumes(job: JobModel, volumes: list[Volume]) -> bool:
+    """Reserve exclusive volumes on the job's placeholder before calling the cloud.
+
+    Retrying the same placement keeps its attachments. Trying another offer replaces them
+    atomically. Return False on temporary lock contention. Raise SkipOffer if another
+    instance holds the provider volume ID, including through a different registration.
+    """
+    selected = {v.id: v for v in volumes if v.exclusive_at_launch}
+    ids = sorted(selected)
+    locker = get_locker(get_db().dialect_name)
+    job_lock, _ = locker.get_lockset(JobModel.__tablename__)
+    volume_lock, locked_ids = locker.get_lockset(VolumeModel.__tablename__)
+    async with job_lock, volume_lock, get_session_ctx() as session:
+        if any(volume_id in locked_ids for volume_id in ids):
+            return False
+        # A worker whose lease was lost must not replace the successor's reservations.
+        owner = await session.scalar(
+            select(JobModel.instance_id)
+            .where(JobModel.id == job.id, JobModel.lock_token == job.lock_token)
+            .with_for_update(key_share=True)
+        )
+        if owner is None or owner != job.instance_id:
+            raise SkipOffer("The job no longer owns the instance for volume attachment")
+        rows = (
+            await session.execute(
+                select(VolumeModel.status, VolumeModel.deleted, VolumeModel.to_be_deleted)
+                .where(
+                    VolumeModel.id.in_(ids),
+                    or_(
+                        VolumeModel.lock_owner.is_(None),
+                        and_(
+                            VolumeModel.lock_owner == _get_related_volume_lock_owner(job.id),
+                            VolumeModel.lock_expires_at < get_current_datetime(),
+                        ),
+                    ),
+                )
+                .order_by(VolumeModel.id)
+                .with_for_update(skip_locked=True, key_share=True)
+            )
+        ).all()
+        if len(rows) != len(ids):
+            return False
+        if any(r.deleted or r.to_be_deleted or r.status != VolumeStatus.ACTIVE for r in rows):
+            raise SkipOffer("A requested volume is no longer available")
+        owned = await session.scalars(
+            select(VolumeAttachmentModel).where(
+                VolumeAttachmentModel.instance_id == owner,
+                VolumeAttachmentModel.exclusive_volume_id.is_not(None),
+            )
+        )
+        for attachment in owned:
+            if attachment.volume_id in selected:
+                del selected[attachment.volume_id]
+            else:
+                await session.delete(attachment)
+        await session.flush()
+        if selected:
+            # Acquire the unique keys in the same order even when jobs use different aliases.
+            keys = sorted(
+                (f"{v.get_backend().value}/{get_or_error(v.volume_id)}", v.id)
+                for v in selected.values()
+            )
+            insert = sqlite.insert if is_db_sqlite() else postgresql.insert
+            inserted = await session.scalars(
+                insert(VolumeAttachmentModel)
+                .values(
+                    [
+                        {"instance_id": owner, "volume_id": volume_id, "exclusive_volume_id": key}
+                        for key, volume_id in keys
+                    ]
+                )
+                .on_conflict_do_nothing(index_elements=[VolumeAttachmentModel.exclusive_volume_id])
+                .returning(VolumeAttachmentModel.volume_id)
+            )
+            if len(inserted.all()) != len(keys):
+                raise SkipOffer("A requested volume is already reserved by another instance")
+        return True
 
 
 def _get_offer_volumes(
@@ -2831,6 +2958,8 @@ async def _mark_job_processed(session: AsyncSession, job_model: JobModel) -> Non
 async def _reset_job_lock_for_retry(
     session: AsyncSession,
     item: JobSubmittedPipelineItem,
+    locked_fleet_id: Optional[uuid.UUID] = None,
+    placement_group_cleanup: Optional[_PlacementGroupCleanup] = None,
 ) -> None:
     res = await session.execute(
         update(JobModel)
@@ -2849,4 +2978,7 @@ async def _reset_job_lock_for_retry(
     )
     if res.scalar_one_or_none() is None:
         log_lock_token_changed_on_reset(logger)
+    else:
+        await _apply_failed_placement_group_cleanup(session, placement_group_cleanup)
+    await _unlock_related_fleet(session, item, locked_fleet_id)
     await session.commit()

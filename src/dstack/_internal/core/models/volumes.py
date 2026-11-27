@@ -187,6 +187,12 @@ class DaytonaVolumeConfiguration(VolumeConfigurationWithVolumeID):
     )
 
 
+class MassedComputeVolumeConfiguration(VolumeConfigurationWithVolumeID):
+    backend: Annotated[
+        Literal[BackendType.MASSEDCOMPUTE], Field(description="The volume backend")
+    ] = BackendType.MASSEDCOMPUTE
+
+
 class LiumVolumeConfiguration(VolumeConfigurationWithVolumeID):
     backend: Annotated[Literal[BackendType.LIUM], Field(description="The volume backend")] = (
         BackendType.LIUM
@@ -200,6 +206,7 @@ AnyVolumeConfiguration = Union[
     KubernetesVolumeConfiguration,
     DaytonaVolumeConfiguration,
     LiumVolumeConfiguration,
+    MassedComputeVolumeConfiguration,
 ]
 
 
@@ -232,6 +239,10 @@ class VolumeProvisioningData(CoreModel):
     attachable: bool = True
     """`attachable` shows whether the volume should be attached and detached manually."""
     detachable: bool = True
+    exclusive_at_launch: bool = False
+    """Reserve the volume for one instance before launch and hold it until instance termination."""
+    mount_path: Optional[str] = None
+    """Host path of a filesystem already mounted by the provider."""
     backend_data: Optional[str] = None
     """`backend_data` stores backend-specific data in JSON."""
 
@@ -282,6 +293,10 @@ class Volume(CoreModel):
                     return attachment.attachment_data
         # volume was attached before attachments were introduced
         return self.attachment_data
+
+    @property
+    def exclusive_at_launch(self) -> bool:
+        return self.provisioning_data is not None and self.provisioning_data.exclusive_at_launch
 
     def get_backend(self) -> BackendType:
         return self.configuration.backend

@@ -164,6 +164,16 @@ class TestGetResourceGroupDecision:
         decision = _get_decision(_get_resource_group(), instance_model=instance_model)
         assert decision == _ResourceGroupDecision.TRACKED
 
+    def test_tracks_provisional_name_after_listing_margin(self):
+        instance = _get_instance_model(
+            InstanceStatus.PROVISIONING, started_at=LISTED_AT - timedelta(hours=1)
+        )
+        group = _get_resource_group(primary_id="provider-uuid")
+        group.primary_name = "instance_id"
+        assert _get_decision(group, instance) == _ResourceGroupDecision.TRACKED
+        group.primary_name = "other-attempt"
+        assert _get_decision(group, instance) == _ResourceGroupDecision.ORPHAN
+
     def test_orphans_group_with_other_primary_id_of_active_instance(self):
         instance_model = _get_instance_model(InstanceStatus.BUSY)
         resource_group = _get_resource_group(primary_id="other_instance_id")

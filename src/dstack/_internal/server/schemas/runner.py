@@ -2,7 +2,7 @@ from base64 import b64decode
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
 from dstack._internal.core.models.common import CoreModel, NetworkMode
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
@@ -198,6 +198,7 @@ class ShimVolumeInfo(CoreModel):
     volume_id: str
     init_fs: bool
     device_name: Optional[str] = None
+    mount_path: Optional[str] = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class PortMapping(CoreModel):

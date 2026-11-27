@@ -728,7 +728,8 @@ def _get_instance_group_decision(
         return _ResourceGroupDecision.IGNORE
     if (
         provisioning_data.get_base_backend() != resource_group.backend
-        or provisioning_data.instance_id != resource_group.primary_id
+        or provisioning_data.instance_id
+        not in (resource_group.primary_id, resource_group.primary_name)
     ):
         # The listing may predate the provisioning: the instance may be missing from it
         # while its internal resources created earlier are listed.

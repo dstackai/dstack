@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import BackendError
+from dstack._internal.core.errors import BackendError, VolumeProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.volumes import VolumeProvisioningData, VolumeStatus
 from dstack._internal.server.background.pipeline_tasks import volumes as volumes_pipeline
@@ -314,8 +314,9 @@ class TestVolumeWorkerSubmitted:
             == "Volume status changed SUBMITTED -> FAILED (Backend not available)"
         )
 
+    @pytest.mark.parametrize("allocated_volume_id", [None, "allocated-volume"])
     async def test_marks_volume_failed_if_backend_returns_error(
-        self, test_db, session: AsyncSession, worker: VolumeWorker
+        self, test_db, session: AsyncSession, worker: VolumeWorker, allocated_volume_id
     ):
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -335,8 +336,10 @@ class TestVolumeWorkerSubmitted:
             mock_lease(backend_mock),
         ) as get_backend_mock:
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            backend_mock.compute.return_value.create_volume.side_effect = BackendError(
-                "Some error"
+            backend_mock.compute.return_value.create_volume.side_effect = (
+                BackendError("Some error")
+                if allocated_volume_id is None
+                else VolumeProvisioningError("Some error", allocated_volume_id)
             )
 
             await worker.process(_volume_to_pipeline_item(volume))
@@ -347,6 +350,14 @@ class TestVolumeWorkerSubmitted:
         await session.refresh(volume)
         assert volume.status == VolumeStatus.FAILED
         assert volume.status_message == "Some error"
+        if allocated_volume_id is not None:
+            assert volume.volume_provisioning_data is not None
+            assert (
+                VolumeProvisioningData.model_validate_json(
+                    volume.volume_provisioning_data
+                ).volume_id
+                == allocated_volume_id
+            )
         events = await list_events(session)
         assert len(events) == 1
         assert events[0].message == "Volume status changed SUBMITTED -> FAILED (Some error)"

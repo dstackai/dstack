@@ -189,6 +189,7 @@ class LiumCompute(ComputeWithAllOffersCached, ComputeWithVolumeSupport, Compute)
         return JobProvisioningData(
             backend=BackendType.LIUM,
             instance_type=instance_offer.instance,
+            # TODO: Implement orphan cleanup and report the pod name as primary_name.
             instance_id=pod_id or instance_name,
             region=instance_offer.region,
             price=instance_offer.price,

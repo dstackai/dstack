@@ -63,6 +63,10 @@ from dstack._internal.core.backends.lium.models import (
     LiumBackendConfig,
     LiumBackendConfigWithCreds,
 )
+from dstack._internal.core.backends.massedcompute.models import (
+    MassedComputeBackendConfig,
+    MassedComputeBackendConfigWithCreds,
+)
 from dstack._internal.core.backends.nebius.models import (
     NebiusBackendConfig,
     NebiusBackendConfigWithCreds,
@@ -118,6 +122,7 @@ AnyBackendConfigWithoutCreds = Union[
     KubernetesBackendConfig,
     LambdaBackendConfig,
     LiumBackendConfig,
+    MassedComputeBackendConfig,
     NebiusBackendConfig,
     OCIBackendConfig,
     RunpodBackendConfig,
@@ -149,6 +154,7 @@ AnyBackendConfigWithCreds = Union[
     KubernetesBackendConfigWithCreds,
     LambdaBackendConfigWithCreds,
     LiumBackendConfigWithCreds,
+    MassedComputeBackendConfigWithCreds,
     OCIBackendConfigWithCreds,
     NebiusBackendConfigWithCreds,
     RunpodBackendConfigWithCreds,
@@ -195,6 +201,7 @@ AnyBackendFileConfigWithCreds = Union[
     KubernetesBackendFileConfigWithCreds,
     LambdaBackendConfigWithCreds,
     LiumBackendConfigWithCreds,
+    MassedComputeBackendConfigWithCreds,
     OCIBackendConfigWithCreds,
     NebiusBackendFileConfigWithCreds,
     RunpodBackendConfigWithCreds,

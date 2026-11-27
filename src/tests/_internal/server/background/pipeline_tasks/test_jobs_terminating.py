@@ -20,7 +20,7 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     RunTerminationReason,
 )
-from dstack._internal.core.models.volumes import VolumeStatus
+from dstack._internal.core.models.volumes import MassedComputeVolumeConfiguration, VolumeStatus
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel
 from dstack._internal.server.background.pipeline_tasks.jobs_terminating import (
     JobTerminatingFetcher,
@@ -1155,6 +1155,58 @@ class TestJobTerminatingWorker:
         assert job.status == JobStatus.TERMINATED
         await session.refresh(volume)
         assert volume.last_job_processed_at is not None
+
+    async def test_finishes_job_with_exclusive_volume_without_backend(
+        self, test_db, session: AsyncSession, worker: JobTerminatingWorker
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        volume = await create_volume(
+            session,
+            project,
+            user,
+            status=VolumeStatus.ACTIVE,
+            configuration=MassedComputeVolumeConfiguration(name="checkpoints"),
+        )
+        instance = await create_instance(
+            session,
+            project,
+            status=InstanceStatus.BUSY,
+            busy_blocks=1,
+            volumes=[volume],
+            backend=BackendType.MASSEDCOMPUTE,
+        )
+        attachment = instance.volume_attachments[0]
+        attachment.exclusive_volume_id = "massedcompute/provider-id"
+        repo = await create_repo(session, project_id=project.id)
+        run = await create_run(session, project=project, repo=repo, user=user)
+        job = await create_job(
+            session,
+            run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.ABORTED_BY_USER,
+            job_provisioning_data=get_job_provisioning_data(
+                backend=BackendType.MASSEDCOMPUTE, dockerized=True, hostname=None
+            ),
+            job_runtime_data=get_job_runtime_data(volume_names=[volume.name]),
+            instance=instance,
+        )
+        _lock_job(job)
+        await session.commit()
+
+        await worker.process(_job_to_pipeline_item(job))
+
+        await session.refresh(job)
+        await session.refresh(instance)
+        await session.refresh(volume)
+        await session.refresh(attachment)
+        assert job.status == JobStatus.ABORTED
+        assert job.instance_id is None
+        assert job.volumes_detached_at is not None
+        assert instance.busy_blocks == 0
+        assert volume.last_job_processed_at is not None
+        assert attachment.instance_id == instance.id
+        assert attachment.exclusive_volume_id == "massedcompute/provider-id"
 
     async def test_force_detaches_job_volumes(
         self, test_db, session: AsyncSession, worker: JobTerminatingWorker

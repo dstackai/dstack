@@ -71,6 +71,7 @@ type VolumeInfo struct {
 	VolumeId   string `json:"volume_id"`
 	InitFs     bool   `json:"init_fs"`
 	DeviceName string `json:"device_name"`
+	MountPath  string `json:"mount_path,omitempty"`
 }
 
 type PortMapping struct {

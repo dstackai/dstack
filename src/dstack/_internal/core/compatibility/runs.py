@@ -134,7 +134,8 @@ def get_job_submission_excludes(job_submissions: list[JobSubmission]) -> Include
     # `Resources.description` is deprecated and never set since 0.21. Not sending it lets 0.22
     # drop the field without breaking 0.21 clients.
     submission_excludes["job_provisioning_data"] = {
-        "instance_type": {"resources": {"description": True}}
+        "instance_type": {"resources": {"description": True}},
+        "volume_mounts": True,  # Server-owned host paths are not part of a run apply request.
     }
     submission_excludes["provider_ref"] = True
     return submission_excludes

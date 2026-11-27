@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.errors import BackendError
+from dstack._internal.core.errors import BackendError, SkipOffer
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
     EntityReference,
@@ -40,6 +40,7 @@ from dstack._internal.core.models.resources import CPUSpec, Memory, Range, Resou
 from dstack._internal.core.models.runs import JobRuntimeData, JobStatus, JobTerminationReason
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
+    MassedComputeVolumeConfiguration,
     VolumeAttachmentData,
     VolumeMountPoint,
     VolumeStatus,
@@ -52,9 +53,11 @@ from dstack._internal.server.background.pipeline_tasks.jobs_submitted import (
     JobSubmittedWorker,
     _get_new_capacity_failure_message,
     _load_submitted_job_context,
+    _lock_related_volume_models,
     _NewCapacityAttempts,
     _OfferAttemptError,
     _release_replica_jobs_from_master_wait,
+    _reserve_launch_volumes,
 )
 from dstack._internal.server.models import (
     ComputeGroupModel,
@@ -88,6 +91,8 @@ from dstack._internal.server.testing.common import (
     get_remote_connection_info,
     get_run_spec,
     get_ssh_fleet_configuration,
+    get_volume,
+    get_volume_configuration,
     get_volume_provisioning_data,
     list_events,
     mock_lease,
@@ -111,6 +116,49 @@ def fetcher() -> JobSubmittedFetcher:
 @pytest.fixture
 def worker() -> JobSubmittedWorker:
     return JobSubmittedWorker(queue=Mock(), heartbeater=Mock(), pipeline_hinter=Mock())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestReserveLaunchVolumes:
+    async def test_aliases_compete_for_one_attachment(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        vpd = get_volume_provisioning_data(backend=BackendType.MASSEDCOMPUTE)
+        vpd.exclusive_at_launch = True
+        jobs = []
+        volumes = []
+        for name in ("first", "second"):
+            config = MassedComputeVolumeConfiguration(name=name, volume_id=vpd.volume_id)
+            model = await create_volume(
+                session,
+                project,
+                user,
+                configuration=config,
+                status=VolumeStatus.ACTIVE,
+                volume_provisioning_data=vpd,
+            )
+            volumes.append(
+                get_volume(
+                    id_=model.id,
+                    configuration=config,
+                    volume_id=vpd.volume_id,
+                    provisioning_data=vpd,
+                )
+            )
+            run = await create_run(session, project, repo, user)
+            instance = await create_instance(session, project)
+            job = await create_job(session, run, instance=instance)
+            job.lock_token = uuid.uuid4()
+            await session.commit()
+            jobs.append(job)
+        await _reserve_launch_volumes(jobs[0], [volumes[0]])
+        await _reserve_launch_volumes(jobs[0], [volumes[0]])
+        with pytest.raises(SkipOffer, match="reserved"):
+            await _reserve_launch_volumes(jobs[1], [volumes[1]])
+        await _reserve_launch_volumes(jobs[0], [])
+        await _reserve_launch_volumes(jobs[1], [volumes[1]])
 
 
 def _lock_job_foreign(job_model: JobModel) -> None:
@@ -368,6 +416,15 @@ class TestJobSubmittedFetcher:
         )
         _lock_job_expired_same_owner(expired_same_owner)
         await session.commit()
+        expired_item = _job_to_pipeline_item(expired_same_owner)
+        volumes = [
+            await create_volume(
+                session, project, user, configuration=get_volume_configuration(name)
+            )
+            for name in ("first", "second")
+        ]
+        volume_ids = [[v.id for v in volumes]]
+        assert await _lock_related_volume_models(expired_item, volume_ids) is not None
 
         items = await fetcher.fetch(limit=2)
 
@@ -377,6 +434,9 @@ class TestJobSubmittedFetcher:
         assert expired_same_owner.lock_owner == JobSubmittedPipeline.__name__
         assert expired_same_owner.lock_token is not None
         assert expired_same_owner.lock_expires_at is not None
+        # Another job must not issue an attachment while the first call may still be in flight.
+        assert await _lock_related_volume_models(items[0], volume_ids) is None
+        assert await _lock_related_volume_models(items[1], volume_ids) is not None
 
         await session.refresh(newest)
         assert newest.lock_owner is None
@@ -2991,6 +3051,73 @@ class TestJobSubmittedWorker:
         assert volume.lock_token is None
         assert volume.lock_expires_at is None
         backend_mock.compute.return_value.attach_volume.assert_called_once()
+
+    async def test_launch_records_exclusive_volume_attachment(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session, project_id=project.id)
+        spec = get_fleet_spec()
+        spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
+        await create_fleet(session, project, spec=spec)
+        data = get_volume_provisioning_data(backend=BackendType.MASSEDCOMPUTE)
+        data.exclusive_at_launch = True
+        volume = await create_volume(
+            session,
+            project,
+            user,
+            status=VolumeStatus.ACTIVE,
+            configuration=MassedComputeVolumeConfiguration(name="checkpoints"),
+            volume_provisioning_data=data,
+        )
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration.volumes = [VolumeMountPoint(name=volume.name, path="/checkpoints")]
+        run = await create_run(session, project, repo, user, run_spec=run_spec)
+        job = await create_job(session, run)
+        backend = Mock()
+        backend.TYPE = BackendType.MASSEDCOMPUTE
+        compute = backend.compute.return_value = Mock(spec=ComputeMockSpec)
+        compute.get_offers.return_value = [
+            get_instance_offer_with_availability(backend=backend.TYPE, region="any")
+        ]
+        compute.run_job.return_value = get_job_provisioning_data(
+            backend=backend.TYPE, region="any"
+        )
+        with (
+            patch(
+                "dstack._internal.server.services.backends.cache.lease_project_backends",
+                mock_lease([backend]),
+            ),
+            patch(
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+                mock_lease(backend),
+            ),
+        ):
+            await _process_job(session, worker, job)
+            await session.refresh(job)
+            volume.lock_owner = "VolumePipeline"
+            volume.lock_token = uuid.uuid4()
+            volume.lock_expires_at = get_current_datetime() + timedelta(minutes=1)
+            await session.commit()
+            await _process_job(session, worker, job)
+            await session.refresh(job)
+            assert job.status == JobStatus.SUBMITTED
+            assert job.lock_owner == JobSubmittedPipeline.__name__
+            assert job.lock_token is None and job.lock_expires_at is None
+            compute.run_job.assert_not_called()
+
+            volume.lock_owner = volume.lock_token = volume.lock_expires_at = None
+            await session.commit()
+            await _process_job(session, worker, job)
+
+        compute.run_job.assert_called_once()
+        await session.refresh(job)
+        assert job.status == JobStatus.PROVISIONING
+        attachment = (await session.scalars(select(VolumeAttachmentModel))).one()
+        assert attachment.volume_id == volume.id
+        assert attachment.instance_id == job.instance_id
+        assert attachment.exclusive_volume_id == f"massedcompute/{data.volume_id}"
 
     async def test_run_job_uses_server_default_registry(
         self,

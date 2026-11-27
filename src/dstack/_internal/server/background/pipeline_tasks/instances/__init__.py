@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, Sequence
 
-from sqlalchemy import and_, not_, or_, select, update
+from sqlalchemy import Select, and_, delete, not_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
 
@@ -45,6 +45,7 @@ from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
     ProjectModel,
+    VolumeAttachmentModel,
 )
 from dstack._internal.server.services import events
 from dstack._internal.server.services.fleets import skip_fleet_min_processing_interval
@@ -320,10 +321,8 @@ class _ProcessContext:
 
 async def _process_pending_item(item: InstancePipelineItem) -> Optional[_ProcessContext]:
     async with get_session_ctx() as session:
-        instance_model = await _refetch_locked_instance_for_pending_or_terminating(
-            session=session,
-            item=item,
-        )
+        res = await session.execute(_select_pending_or_terminating_instance(item))
+        instance_model = res.unique().scalar_one_or_none()
         if instance_model is None:
             log_lock_token_mismatch(logger, item)
             return None
@@ -372,21 +371,26 @@ async def _process_busy_item(item: InstancePipelineItem) -> Optional[_ProcessCon
 
 async def _process_terminating_item(item: InstancePipelineItem) -> Optional[_ProcessContext]:
     async with get_session_ctx() as session:
-        instance_model = await _refetch_locked_instance_for_pending_or_terminating(
-            session=session,
-            item=item,
+        res = await session.execute(
+            _select_pending_or_terminating_instance(item).add_columns(
+                InstanceModel.volume_attachments.any(
+                    VolumeAttachmentModel.exclusive_volume_id.is_not(None)
+                )
+            )
         )
-        if instance_model is None:
+        row = res.unique().one_or_none()
+        if row is None:
             log_lock_token_mismatch(logger, item)
             return None
-    result = await terminate_instance(instance_model)
+        instance_model, has_exclusive_volumes = row
+    result = await terminate_instance(instance_model, has_exclusive_volumes)
     return _ProcessContext(instance_model=instance_model, result=result)
 
 
-async def _refetch_locked_instance_for_pending_or_terminating(
-    session: AsyncSession, item: InstancePipelineItem
-) -> Optional[InstanceModel]:
-    res = await session.execute(
+def _select_pending_or_terminating_instance(
+    item: InstancePipelineItem,
+) -> Select[InstanceModel]:
+    return (
         select(InstanceModel)
         .where(
             InstanceModel.id == item.id,
@@ -396,7 +400,6 @@ async def _refetch_locked_instance_for_pending_or_terminating(
         .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
         .options(joinedload(InstanceModel.fleet))
     )
-    return res.unique().scalar_one_or_none()
 
 
 async def _refetch_locked_instance_for_idle(
@@ -485,6 +488,13 @@ async def _apply_process_result(
                 ),
             )
 
+        if result.release_volume_attachments:
+            await session.execute(
+                delete(VolumeAttachmentModel).where(
+                    VolumeAttachmentModel.instance_id == instance_model.id,
+                    VolumeAttachmentModel.exclusive_volume_id.is_not(None),
+                )
+            )
         emit_instance_status_change_event(
             session=session,
             instance_model=instance_model,

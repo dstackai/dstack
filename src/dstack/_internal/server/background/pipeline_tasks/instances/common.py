@@ -67,6 +67,7 @@ class HealthCheckCreate(TypedDict):
 @dataclass
 class ProcessResult:
     instance_update_map: InstanceUpdateMap = field(default_factory=InstanceUpdateMap)
+    release_volume_attachments: bool = False
     health_check_create: Optional[HealthCheckCreate] = None
     new_placement_group_models: list[PlacementGroupModel] = field(default_factory=list)
     schedule_pg_deletion_fleet_id: Optional[uuid.UUID] = None

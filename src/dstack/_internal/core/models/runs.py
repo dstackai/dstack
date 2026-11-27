@@ -45,7 +45,7 @@ from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import Memory, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel
 from dstack._internal.core.models.unix import UnixUser
-from dstack._internal.core.models.volumes import MountPoint
+from dstack._internal.core.models.volumes import MountPoint, Volume
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.common import format_pretty_duration
 
@@ -352,12 +352,24 @@ class JobProvisioningData(CoreModel):
     ssh_proxy: Optional[SSHConnectionParams] = None
     backend_data: Optional[str] = None
     """`backend_data` stores backend-specific data in JSON."""
+    volume_mounts: Optional[dict[str, str]] = None
+    """Provider volume IDs and their verified host mount paths for volumes selected at launch."""
     gpu_driver: Optional[GpuDriverInfo] = None
     """`gpu_driver` is the accelerator driver installed on the host, when known.
     Detected via the shim for VM-based backends and SSH fleets; taken from the
     provider API or node labels for some container-based backends. May be set
     after provisioning.
     """
+
+    def can_mount_volume(self, volume: Volume) -> bool:
+        """Check the location and any volume that had to be attached when this VM was created."""
+        if not volume.matches_location(self.get_base_backend(), self.region):
+            return False
+        if volume.exclusive_at_launch:
+            return any(
+                a.instance.instance_id == self.instance_id for a in volume.attachments or []
+            )
+        return True
 
     def get_base_backend(self) -> BackendType:
         if self.base_backend is not None:

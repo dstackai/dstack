@@ -106,6 +106,18 @@ class ComputeResourceNotFoundError(ComputeError):
     pass
 
 
+class VolumeProvisioningError(ComputeError):
+    """Provisioning failed after the provider allocated a volume that still needs deletion."""
+
+    def __init__(self, message: str, volume_id: str):
+        super().__init__(message)
+        self.volume_id = volume_id
+
+
+class VolumeDeletionPending(ComputeError):
+    """The provider has not confirmed volume deletion. Retry without forgetting the volume."""
+
+
 class PlacementGroupInUseError(ComputeError):
     pass
 
@@ -120,12 +132,23 @@ class NotYetTerminated(ComputeError):
     and the method should be called again after some time to continue termination.
     """
 
-    def __init__(self, details: str) -> None:
+    def __init__(
+        self,
+        details: str,
+        *,
+        instance_id: Optional[str] = None,
+        backend_data: Optional[str] = None,
+    ) -> None:
         """
         Args:
             details: some details about the termination status
+            instance_id: if set, persist the confirmed provider ID and its backend_data
+                before retrying termination.
+            backend_data: backend data for the confirmed provider ID.
         """
-        return super().__init__(details)
+        super().__init__(details)
+        self.instance_id = instance_id
+        self.backend_data = backend_data
 
 
 class SkipOffer(ComputeError):

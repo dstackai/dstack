@@ -29,7 +29,7 @@ Processing a row:
     - Instance found:
         - `PENDING`, `TERMINATING`: skip, since the resources may be in flight. An error is logged if a pending instance's resources look stuck.
         - `TERMINATED`: orphan.
-        - `PROVISIONING`, `IDLE`, `BUSY`: tracked if the base backend and `primary_id` match the instance's provisioning data, orphan otherwise.
+        - `PROVISIONING`, `IDLE`, `BUSY`: tracked if the base backend matches and the saved `instance_id` equals the provider's instance ID (`primary_id`) or its reported instance name (`primary_name`). Otherwise the group is an orphan.
         - Without provisioning data: ignored with an error log.
     - Record found without an instance: orphan. The owner was deleted, e.g. a placeholder instance after a failed `run_job()`, so nothing can be creating its resources anymore.
     - No record: ignored. Resources of other servers and projects are never touched.

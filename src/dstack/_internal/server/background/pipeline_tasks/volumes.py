@@ -8,8 +8,12 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.orm import joinedload, load_only
 
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
-from dstack._internal.core.errors import BackendError
-from dstack._internal.core.models.volumes import VolumeStatus
+from dstack._internal.core.errors import (
+    BackendError,
+    VolumeDeletionPending,
+    VolumeProvisioningError,
+)
+from dstack._internal.core.models.volumes import VolumeProvisioningData, VolumeStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
     NOW_PLACEHOLDER,
     Fetcher,
@@ -274,7 +278,7 @@ async def _apply_process_result(
                 # TODO: Clean up volume.
                 pass
             return
-        if item.to_be_deleted:
+        if update_map.get("deleted"):
             events.emit(
                 session,
                 "Volume deleted",
@@ -338,6 +342,16 @@ async def _process_submitted_volume(volume_model: VolumeModel) -> _ProcessResult
                     compute.create_volume,
                     volume=volume,
                 )
+        except VolumeProvisioningError as e:
+            return _ProcessResult(
+                update_map={
+                    "status": VolumeStatus.FAILED,
+                    "status_message": str(e),
+                    "volume_provisioning_data": VolumeProvisioningData(
+                        backend=volume.get_backend(), volume_id=e.volume_id, size_gb=None
+                    ).model_dump_json(),
+                }
+            )
         except BackendError as e:
             logger.info("Failed to create volume %s: %s", volume_model.name, repr(e))
             status_message = f"Backend error: {repr(e)}"
@@ -399,6 +413,9 @@ async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _ProcessRe
                 compute.delete_volume,
                 volume=volume,
             )
+        except VolumeDeletionPending as e:
+            logger.info("Volume %s deletion pending: %s", volume.name, e)
+            return _ProcessResult(update_map={"status_message": str(e)})
         except Exception:
             # TODO: Retry deletion
             logger.exception(
