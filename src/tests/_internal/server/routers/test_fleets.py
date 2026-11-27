@@ -1748,6 +1748,8 @@ class TestDeleteFleets:
         await session.refresh(fleet)
         await session.refresh(instance)
         assert not fleet.deleted  # should not be deleted yet
+        assert fleet.status == FleetStatus.TERMINATING
+        assert fleet.skip_min_processing_interval
         assert instance.status == InstanceStatus.TERMINATING
 
     @pytest.mark.asyncio

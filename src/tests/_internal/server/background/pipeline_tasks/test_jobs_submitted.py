@@ -695,6 +695,8 @@ class TestJobSubmittedWorker:
         assert job.lock_owner is None
         assert job.lock_token is None
         assert job.lock_expires_at is None
+        await session.refresh(fleet)
+        assert fleet.skip_min_processing_interval
         hint_fetch = cast(Mock, worker._pipeline_hinter.hint_fetch)
         hint_fetch.assert_has_calls([call(FleetModel.__name__), call(JobModel.__name__)])
 

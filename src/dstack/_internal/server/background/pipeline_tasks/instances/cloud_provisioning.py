@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -66,6 +66,13 @@ class _ClusterMasterContext:
     master_job_provisioning_data: Optional[JobProvisioningData]
 
 
+@dataclass
+class _WaitingForClusterMaster:
+    """Provisioning can't proceed as it waits for the cluster master election or provisioning"""
+
+    requires_fleet_processing: bool
+
+
 async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
     result = ProcessResult()
 
@@ -95,8 +102,9 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
     master_job_provisioning_data = None
     if instance_model.fleet is not None and is_cloud_cluster(instance_model.fleet):
         cluster_context = await _get_cluster_master_context(instance_model)
-        if cluster_context is None:
-            # Waiting for the master
+        if isinstance(cluster_context, _WaitingForClusterMaster):
+            if cluster_context.requires_fleet_processing:
+                result.wake_fleet_id = instance_model.fleet_id
             return result
         placement_group_models, placement_group_model = await _get_cluster_placement_context(
             instance_model=instance_model,
@@ -252,7 +260,7 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
 
 async def _get_cluster_master_context(
     instance_model: InstanceModel,
-) -> Optional[_ClusterMasterContext]:
+) -> Union[_ClusterMasterContext, _WaitingForClusterMaster]:
     assert instance_model.fleet is not None and is_cloud_cluster(instance_model.fleet)
     assert instance_model.fleet_id is not None
     async with get_session_ctx() as session:
@@ -265,21 +273,21 @@ async def _get_cluster_master_context(
             "%s: waiting for fleet pipeline to elect current cluster master",
             fmt(instance_model),
         )
-        return None
+        return _WaitingForClusterMaster(requires_fleet_processing=True)
 
     is_current_instance_master = current_master_instance_model.id == instance_model.id
     master_job_provisioning_data = None
     if not is_current_instance_master:
         if (
             current_master_instance_model.deleted
-            or current_master_instance_model.status == InstanceStatus.TERMINATED
+            or current_master_instance_model.status in InstanceStatus.finished_statuses()
         ):
             logger.debug(
                 "%s: waiting for fleet pipeline to replace current master %s",
                 fmt(instance_model),
                 current_master_instance_model.id,
             )
-            return None
+            return _WaitingForClusterMaster(requires_fleet_processing=True)
         master_job_provisioning_data = get_instance_provisioning_data(
             current_master_instance_model
         )
@@ -289,7 +297,7 @@ async def _get_cluster_master_context(
                 fmt(instance_model),
                 current_master_instance_model.id,
             )
-            return None
+            return _WaitingForClusterMaster(requires_fleet_processing=False)
 
     return _ClusterMasterContext(
         current_master_instance_model=current_master_instance_model,

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, cast
 from unittest.mock import Mock, patch
 
 import gpuhunt
@@ -264,8 +264,11 @@ class TestCloudProvisioning:
             await process_instance(session, worker, instance)
 
         await session.refresh(instance)
+        await session.refresh(fleet)
         assert instance.status == InstanceStatus.PENDING
         assert backend_mock.compute.return_value.create_instance.call_count == 0
+        assert fleet.skip_min_processing_interval
+        cast(Mock, worker._pipeline_hinter.hint_fetch).assert_called_with(FleetModel.__name__)
 
     async def test_waits_for_current_master_to_determine_cluster_placement(
         self,
@@ -315,9 +318,63 @@ class TestCloudProvisioning:
 
         await session.refresh(master_instance)
         await session.refresh(sibling_instance)
+        await session.refresh(fleet)
         assert master_instance.status == InstanceStatus.PENDING
         assert sibling_instance.status == InstanceStatus.PENDING
         assert backend_mock.compute.return_value.create_instance.call_count == 0
+        # Only the master's provisioning can unblock the sibling, not the fleet pipeline.
+        assert not fleet.skip_min_processing_interval
+
+    async def test_waits_for_fleet_to_replace_terminating_master(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+    ):
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session,
+            project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=2, target=2, max=2),
+                )
+            ),
+        )
+        master_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.TERMINATING,
+            instance_num=0,
+        )
+        sibling_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            offer=None,
+            job_provisioning_data=None,
+            instance_num=1,
+        )
+        await _set_current_master_instance(session, fleet, master_instance)
+
+        backend_mock = Mock()
+        backend_mock.TYPE = BackendType.AWS
+        backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
+            await process_instance(session, worker, sibling_instance)
+
+        await session.refresh(sibling_instance)
+        await session.refresh(fleet)
+        assert sibling_instance.status == InstanceStatus.PENDING
+        assert backend_mock.compute.return_value.create_instance.call_count == 0
+        assert fleet.skip_min_processing_interval
+        cast(Mock, worker._pipeline_hinter.hint_fetch).assert_called_with(FleetModel.__name__)
 
     async def test_failed_master_does_not_provision_stale_sibling_until_fleet_reassigns_it(
         self,
@@ -405,7 +462,9 @@ class TestCloudProvisioning:
             await worker.process(sibling_item)
 
         await session.refresh(sibling_instance)
+        await session.refresh(fleet)
         assert sibling_instance.status == InstanceStatus.PENDING
+        assert fleet.skip_min_processing_interval
         assert gcp_mock.compute.return_value.get_offers.call_count == 0
         assert gcp_mock.compute.return_value.create_instance.call_count == 0
         assert aws_mock.compute.return_value.create_instance.call_count == 0

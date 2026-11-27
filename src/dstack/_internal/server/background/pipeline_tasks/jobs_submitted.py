@@ -93,6 +93,7 @@ from dstack._internal.server.services.fleets import (
     get_next_instance_num,
     is_cloud_cluster,
     new_instances_in_fleet_require_create_instance_support,
+    skip_fleet_min_processing_interval,
 )
 from dstack._internal.server.services.instances import (
     filter_non_placeholder_instances,
@@ -330,27 +331,27 @@ class JobSubmittedWorker(Worker[JobSubmittedPipelineItem]):
         if context.job_model.instance_assigned:
             logger.debug("%s: provisioning has started", fmt(context.job_model))
             provisioning = await _process_provisioning(item=item, context=context)
-            _hint_pipelines_fetch(
-                pipeline_hinter=self._pipeline_hinter,
-                result=provisioning,
-            )
             await _apply_provisioning_result(
                 item=item,
                 provisioning=provisioning,
+            )
+            _hint_pipelines_fetch(
+                pipeline_hinter=self._pipeline_hinter,
+                result=provisioning,
             )
             self._pipeline_hinter.hint_fetch(JobModel.__name__)
             return
 
         logger.debug("%s: assignment has started", fmt(context.job_model))
         assignment = await _process_assignment(context=context)
-        _hint_pipelines_fetch(
-            pipeline_hinter=self._pipeline_hinter,
-            result=assignment,
-        )
         await _apply_assignment_result(
             item=item,
             context=context,
             assignment=assignment,
+        )
+        _hint_pipelines_fetch(
+            pipeline_hinter=self._pipeline_hinter,
+            result=assignment,
         )
         self._pipeline_hinter.hint_fetch(JobModel.__name__)
 
@@ -386,7 +387,8 @@ class _DeferSubmittedJobResult:
     """The job is not ready yet, so apply should just mark it processed and unlock it."""
 
     log_message: str
-    hint_fleet_pipeline: bool = False
+    wake_fleet_id: Optional[uuid.UUID] = None
+    """The fleet for `FleetPipeline` to process ASAP, e.g. to elect the cluster master."""
 
 
 @dataclass
@@ -628,7 +630,7 @@ async def _apply_assignment_result(
             await _defer_submitted_job(
                 session=session,
                 job_model=job_model,
-                log_message=assignment.log_message,
+                result=assignment,
             )
             return
 
@@ -1357,7 +1359,7 @@ async def _apply_provisioning_result(
             await _defer_submitted_job(
                 session=session,
                 job_model=job_model,
-                log_message=provisioning.log_message,
+                result=provisioning,
             )
             return
 
@@ -1505,7 +1507,7 @@ async def _process_new_capacity_provisioning(
     ):
         return _DeferSubmittedJobResult(
             log_message="waiting for fleet master instance election",
-            hint_fleet_pipeline=True,
+            wake_fleet_id=fleet_model.id,
         )
     provision_new_capacity_result = await _provision_new_capacity(
         project=context.project,
@@ -2279,7 +2281,7 @@ def _hint_pipelines_fetch(
     if not isinstance(result, _DeferSubmittedJobResult):
         return
 
-    if result.hint_fleet_pipeline:
+    if result.wake_fleet_id is not None:
         pipeline_hinter.hint_fetch(FleetModel.__name__)
 
 
@@ -2796,9 +2798,12 @@ def _get_offer_mount_point_volume(
 async def _defer_submitted_job(
     session: AsyncSession,
     job_model: JobModel,
-    log_message: str,
+    result: _DeferSubmittedJobResult,
 ) -> None:
-    logger.debug("%s: %s", fmt(job_model), log_message)
+    logger.debug("%s: %s", fmt(job_model), result.log_message)
+    if result.wake_fleet_id is not None:
+        # Cross-pipeline write is ok: worst case the fleet is processed one extra time.
+        await skip_fleet_min_processing_interval(session, result.wake_fleet_id)
     await _mark_job_processed(session=session, job_model=job_model)
 
 

@@ -47,6 +47,7 @@ from dstack._internal.server.models import (
     ProjectModel,
 )
 from dstack._internal.server.services import events
+from dstack._internal.server.services.fleets import skip_fleet_min_processing_interval
 from dstack._internal.server.services.instances import (
     emit_instance_status_change_event,
     is_ssh_instance,
@@ -307,6 +308,8 @@ class InstanceWorker(Worker[InstancePipelineItem]):
             instance_model=process_context.instance_model,
             result=process_context.result,
         )
+        if process_context.result.wake_fleet_id is not None:
+            self._pipeline_hinter.hint_fetch(FleetModel.__name__)
 
 
 @dataclass
@@ -466,6 +469,10 @@ async def _apply_process_result(
             log_lock_token_changed_after_processing(logger, item)
             await session.rollback()
             return
+
+        if result.wake_fleet_id is not None:
+            # Cross-pipeline write is ok: worst case the fleet is processed one extra time.
+            await skip_fleet_min_processing_interval(session, result.wake_fleet_id)
 
         if result.schedule_pg_deletion_fleet_id is not None:
             await schedule_fleet_placement_groups_deletion(

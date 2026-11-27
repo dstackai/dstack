@@ -184,6 +184,37 @@ class TestFleetFetcher:
         assert middle.lock_owner == FleetPipeline.__name__
         assert newest.lock_owner is None
 
+    async def test_fetch_selects_recent_fleet_with_skip_min_processing_interval(
+        self, test_db, session: AsyncSession, fetcher: FleetFetcher
+    ):
+        project = await create_project(session)
+        now = get_current_datetime()
+        recent_skip = await create_fleet(
+            session=session,
+            project=project,
+            name="recent-skip",
+            created_at=now - timedelta(minutes=2),
+            last_processed_at=now,
+        )
+        recent_skip.skip_min_processing_interval = True
+        recent = await create_fleet(
+            session=session,
+            project=project,
+            name="recent",
+            created_at=now - timedelta(minutes=2),
+            last_processed_at=now,
+        )
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+
+        assert [item.id for item in items] == [recent_skip.id]
+        await session.refresh(recent_skip)
+        await session.refresh(recent)
+        assert recent_skip.lock_owner == FleetPipeline.__name__
+        assert not recent_skip.skip_min_processing_interval
+        assert recent.lock_owner is None
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -934,6 +965,22 @@ class TestFleetWorker:
         await session.refresh(fleet)
         assert not fleet.deleted
 
+    async def test_keeps_skip_min_processing_interval_set_after_fetch(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(session=session, project=project)
+        await _lock_fleet_for_processing(session, fleet)
+        # Set by another pipeline after the fleet is fetched, so the fleet must be processed again.
+        fleet.skip_min_processing_interval = True
+        await session.commit()
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        assert fleet.lock_token is None
+        assert fleet.skip_min_processing_interval
+
     async def test_does_not_delete_fleet_with_active_run(
         self, test_db, session: AsyncSession, worker: FleetWorker
     ):
@@ -1201,6 +1248,42 @@ class TestFleetWorker:
         assert len(instances) == 1
         assert fleet.consolidation_attempt == 1
         assert not fleet.deleted
+
+    async def test_consolidated_fleet_replaces_lost_instance_without_delay(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        spec = get_fleet_spec()
+        spec.configuration.nodes = FleetNodesSpec(min=2, target=2, max=2)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=spec,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=0,
+        )
+        fleet.consolidation_attempt = 0
+        fleet.last_consolidated_at = datetime.now(timezone.utc)
+        fleet.lock_token = uuid.uuid4()
+        fleet.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        res = await session.execute(
+            select(InstanceModel).where(
+                InstanceModel.fleet_id == fleet.id,
+                InstanceModel.deleted == False,
+            )
+        )
+        assert len(res.scalars().all()) == 2
+        assert fleet.consolidation_attempt == 1
 
     async def test_consolidation_attempt_resets_when_no_changes(
         self, test_db, session: AsyncSession, worker: FleetWorker

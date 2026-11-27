@@ -893,9 +893,14 @@ async def delete_fleets(
                     FleetStatus.TERMINATING,
                     actor=events.UserActor.from_user(user),
                 )
+                # Process the fleet ASAP so that an empty fleet is deleted without delay.
+                fleet_model.skip_min_processing_interval = True
         await session.commit()
-    if hint_instance_pipeline and pipeline_hinter is not None:
-        pipeline_hinter.hint_fetch(InstanceModel.__name__)
+    if pipeline_hinter is not None:
+        if hint_instance_pipeline:
+            pipeline_hinter.hint_fetch(InstanceModel.__name__)
+        if instance_nums is None:
+            pipeline_hinter.hint_fetch(FleetModel.__name__)
 
 
 def fleet_model_to_fleet(
@@ -997,6 +1002,8 @@ def get_fleet_master_instance_provisioning_data(
             if (
                 instance_model.id == fleet_model.current_master_instance_id
                 and not instance_model.deleted
+                # A terminating master is about to be replaced by `FleetPipeline`.
+                and instance_model.status not in InstanceStatus.finished_statuses()
                 and instance_model.job_provisioning_data is not None
             ):
                 return validate_json_extra_ignore(
@@ -1004,6 +1011,18 @@ def get_fleet_master_instance_provisioning_data(
                 )
 
     return None
+
+
+async def skip_fleet_min_processing_interval(session: AsyncSession, fleet_id: uuid.UUID) -> None:
+    """
+    Makes `FleetPipeline` process the fleet without waiting for `min_processing_interval`.
+    Callers should also hint `FleetPipeline` after commit.
+    """
+    await session.execute(
+        update(FleetModel)
+        .where(FleetModel.id == fleet_id)
+        .values(skip_min_processing_interval=True)
+    )
 
 
 def can_create_new_cloud_instance_in_fleet(fleet_model: FleetModel, fleet_spec: FleetSpec) -> bool:
