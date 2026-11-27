@@ -1,10 +1,12 @@
 import concurrent.futures
+import logging
 import random
 import shlex
 import subprocess
 import tempfile
 import time
 from contextlib import ExitStack
+from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import Enum
 from functools import partial
@@ -133,7 +135,7 @@ from dstack._internal.core.models.volumes import (
     VolumeMountPoint,
     VolumeProvisioningData,
 )
-from dstack._internal.utils.common import get_or_error
+from dstack._internal.utils.common import get_current_datetime, get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -144,6 +146,9 @@ JUMP_POD_USER = "root"
 # ephemeral-storage request. Covers the writable layer and the logs with the default log
 # rotation (5 x 10Mi).
 JUMP_POD_EPHEMERAL_STORAGE_REQUEST = "64Mi"
+# The jump pod is ready once its container starts, but sshd accepts connections only after the
+# startup commands, e.g., host key generation: ~0.5s at 500m, up to ~4s at 100m (the minimum)
+JUMP_POD_SSH_STARTUP_GRACE_PERIOD = timedelta(minutes=1)
 
 JOB_POD_SCHEDULING_TIMEOUT = 10
 
@@ -441,6 +446,7 @@ class KubernetesCompute(
                 extra_authorized_keys = [backend_data.user_ssh_public_key]
             ssh_proxy = _check_and_configure_jump_pod_service(
                 api=api,
+                apps_api=client.AppsV1Api(cluster.api_client),
                 namespace=namespace,
                 jump_pod_name=backend_data.jump_pod_name,
                 jump_pod_service_name=backend_data.jump_pod_service_name,
@@ -1078,6 +1084,9 @@ def _create_jump_pod_service_if_not_exists(
                                     requests=requests,
                                     limits=limits,
                                 ),
+                                # If the container fails, its last log lines become the
+                                # termination message, which the jump pod check reports
+                                termination_message_policy="FallbackToLogsOnError",
                                 # sshd must run as root, whatever the image's USER is
                                 security_context=client.V1SecurityContext(
                                     run_as_user=0,
@@ -1144,6 +1153,7 @@ def _create_jump_pod_service_if_not_exists(
 
 def _check_and_configure_jump_pod_service(
     api: client.CoreV1Api,
+    apps_api: client.AppsV1Api,
     namespace: str,
     jump_pod_name: str,
     jump_pod_service_name: str,
@@ -1171,23 +1181,18 @@ def _check_and_configure_jump_pod_service(
             if jump_pod_phase.is_finished():
                 raise ProvisioningError(f"Jump pod {jump_pod_name} is unexpectedly finished")
             jump_pods = [legacy_jump_pod]
-    # No pods at all is not an error -- the ReplicaSet may not have created a pod yet.
     for jump_pod in jump_pods:
         if _is_pod_ready(jump_pod):
             break
     else:
-        for jump_pod in jump_pods:
-            # E.g., no node has enough free resources or all nodes have untolerated taints.
-            # Provisioning waits for the jump pod, so without this warning, the only symptom is
-            # runs hitting the provisioning timeout.
-            condition = _get_pod_unscheduled_condition(jump_pod)
-            if condition is not None:
-                logger.warning(
-                    "Jump pod %s cannot be scheduled: %s: %s",
-                    get_object_name(jump_pod),
-                    condition.reason,
-                    condition.message,
-                )
+        # Provisioning waits for the jump pod, so without these warnings, the only symptom is
+        # runs hitting the provisioning timeout.
+        if jump_pods:
+            for jump_pod in jump_pods:
+                _warn_if_jump_pod_cannot_start(jump_pod)
+        else:
+            # Not an error by itself -- the ReplicaSet may not have created a pod yet.
+            _warn_if_jump_pod_cannot_be_created(apps_api, namespace, jump_pod_name)
         logger.debug("Jump pod %s is not ready yet", jump_pod_name)
         return None
 
@@ -1254,13 +1259,22 @@ def _check_and_configure_jump_pod_service(
         command=command,
     )
     if ssh_exit_status != 0:
-        logger.debug(
+        # E.g., the node address or the NodePort isn't reachable from the server
+        ready_since = _get_pod_ready_since(jump_pod)
+        log_level = logging.DEBUG
+        if (
+            ready_since is not None
+            and get_current_datetime() - ready_since > JUMP_POD_SSH_STARTUP_GRACE_PERIOD
+        ):
+            log_level = logging.WARNING
+        logger.log(
+            log_level,
             "Jump pod %s @ %s:%d, SSH command failed, exit status: %d, output: %s",
-            jump_pod_name,
+            get_object_name(jump_pod),
             jump_pod_hostname,
             jump_pod_port,
             ssh_exit_status,
-            ssh_output,
+            ssh_output.decode(errors="replace").strip(),
         )
         return None
 
@@ -1275,6 +1289,63 @@ def _check_and_configure_jump_pod_service(
         port=jump_pod_port,
         username=JUMP_POD_USER,
     )
+
+
+# Waiting reasons of a container that is starting normally
+_CONTAINER_STARTING_REASONS = frozenset(["ContainerCreating", "PodInitializing"])
+
+
+def _warn_if_jump_pod_cannot_start(jump_pod: client.V1Pod) -> None:
+    jump_pod_name = get_object_name(jump_pod)
+    # E.g., no node has enough free resources or all nodes have untolerated taints
+    condition = _get_pod_unscheduled_condition(jump_pod)
+    if condition is not None:
+        logger.warning(
+            "Jump pod %s cannot be scheduled: %s: %s",
+            jump_pod_name,
+            condition.reason,
+            condition.message,
+        )
+        return
+    if jump_pod.status is None:
+        return
+    for container_status in jump_pod.status.container_statuses or []:
+        # E.g., ImagePullBackOff or CrashLoopBackOff
+        waiting = container_status.state.waiting if container_status.state is not None else None
+        if waiting is None or waiting.reason is None:
+            continue
+        reason = waiting.reason
+        if reason in _CONTAINER_STARTING_REASONS:
+            continue
+        details = f"{reason}: {waiting.message}" if waiting.message else reason
+        last_state = container_status.last_state
+        if last_state is not None and (terminated := last_state.terminated) is not None:
+            details += f"; last exit code: {terminated.exit_code}"
+            if terminated.message:
+                details += f", last output:\n{terminated.message.strip()}"
+        logger.warning("Jump pod %s cannot start: %s", jump_pod_name, details)
+
+
+def _warn_if_jump_pod_cannot_be_created(
+    apps_api: client.AppsV1Api, namespace: str, jump_pod_name: str
+) -> None:
+    replica_set = call_api_method(
+        apps_api.read_namespaced_replica_set,
+        expected=404,
+        name=jump_pod_name,
+        namespace=namespace,
+    )
+    if replica_set is None or replica_set.status is None:
+        return
+    for condition in replica_set.status.conditions or []:
+        # E.g., an admission policy or a resource quota rejects the pod
+        if condition.type == "ReplicaFailure" and condition.status == "True":
+            logger.warning(
+                "Jump pod %s cannot be created: %s: %s",
+                jump_pod_name,
+                condition.reason,
+                condition.message,
+            )
 
 
 def _get_jump_pod_affinity(node_selector: list[str]) -> client.V1Affinity:
@@ -1626,6 +1697,15 @@ def _is_pod_ready(pod: client.V1Pod) -> bool:
     if pod.status is None:
         return False
     return any(c.type == "Ready" and c.status == "True" for c in (pod.status.conditions or []))
+
+
+def _get_pod_ready_since(pod: client.V1Pod) -> Optional[datetime]:
+    if pod.status is None:
+        return None
+    for condition in pod.status.conditions or []:
+        if condition.type == "Ready" and condition.status == "True":
+            return condition.last_transition_time
+    return None
 
 
 def _wait_for_load_balancer_address(
