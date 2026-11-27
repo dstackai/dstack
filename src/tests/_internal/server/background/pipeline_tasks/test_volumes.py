@@ -4,11 +4,21 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
 import pytest
+import time_machine
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import BackendError
+from dstack._internal.core.errors import (
+    BackendError,
+    VolumeDeletionPending,
+    VolumeProvisioningError,
+    VolumeProvisioningPending,
+)
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.volumes import VolumeProvisioningData, VolumeStatus
+from dstack._internal.core.models.volumes import (
+    MassedComputeVolumeConfiguration,
+    VolumeProvisioningData,
+    VolumeStatus,
+)
 from dstack._internal.server.background.pipeline_tasks import volumes as volumes_pipeline
 from dstack._internal.server.background.pipeline_tasks.volumes import (
     VolumeFetcher,
@@ -17,6 +27,7 @@ from dstack._internal.server.background.pipeline_tasks.volumes import (
     VolumeWorker,
 )
 from dstack._internal.server.models import VolumeModel
+from dstack._internal.server.services.volumes import delete_volumes
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_project,
@@ -351,6 +362,164 @@ class TestVolumeWorkerSubmitted:
         assert len(events) == 1
         assert events[0].message == "Volume status changed SUBMITTED -> FAILED (Some error)"
 
+    @pytest.mark.parametrize("external", [False, True])
+    async def test_reconciles_massedcompute_volume_until_ready(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: VolumeWorker,
+        fetcher: VolumeFetcher,
+        external,
+    ):
+        volume_id = str(uuid.uuid4())
+        volume = await create_volume(
+            session,
+            await create_project(session),
+            await create_user(session),
+            configuration=MassedComputeVolumeConfiguration(
+                name="data", volume_id=volume_id if external else None
+            ),
+        )
+        ready = VolumeProvisioningData(
+            backend=BackendType.MASSEDCOMPUTE,
+            volume_id=volume_id,
+            size_gb=None,
+            attachable=False,
+            detachable=False,
+        )
+        compute = Mock(spec=ComputeMockSpec)
+        provision = compute.register_volume if external else compute.create_volume
+        provision.side_effect = [
+            VolumeProvisioningPending("Storage creating", volume_id),
+            VolumeProvisioningPending("Storage status unavailable"),
+            ready,
+        ]
+        backend = Mock()
+        backend.compute.return_value = compute
+        with (
+            patch.object(
+                volumes_pipeline.backends_cache,
+                "lease_project_backend_by_type",
+                mock_lease(backend),
+            ),
+            time_machine.travel(get_current_datetime(), tick=False) as clock,
+        ):
+            for message in ("Storage creating", "Storage status unavailable"):
+                (item,) = await fetcher.fetch(1)
+                await worker.process(item)
+                await session.refresh(volume)
+                assert volume.status == (
+                    VolumeStatus.SUBMITTED if external else VolumeStatus.PROVISIONING
+                )
+                assert volume.status_message == message
+                assert volume.lock_token is None
+                assert volume.volume_provisioning_data is not None
+                assert (
+                    VolumeProvisioningData.model_validate_json(
+                        volume.volume_provisioning_data
+                    ).volume_id
+                    == volume_id
+                )
+                await session.commit()
+                clock.shift(timedelta(seconds=16))
+
+            (item,) = await fetcher.fetch(1)
+            await worker.process(item)
+
+        assert provision.call_args.kwargs["volume"].volume_id == volume_id
+        await session.refresh(volume)
+        assert volume.status == VolumeStatus.ACTIVE
+        assert volume.status_message is None
+        assert volume.volume_provisioning_data == ready.model_dump_json()
+        assert [event.message for event in await list_events(session)] == (
+            ["Volume status changed SUBMITTED -> ACTIVE"]
+            if external
+            else [
+                "Volume status changed SUBMITTED -> PROVISIONING",
+                "Volume status changed PROVISIONING -> ACTIVE",
+            ]
+        )
+
+    @pytest.mark.parametrize(
+        ("lost_first_reply", "allocated_id", "expected_status"),
+        [
+            (False, None, VolumeStatus.FAILED),
+            (True, None, VolumeStatus.PROVISIONING),
+            (False, "allocated-id", VolumeStatus.FAILED),
+        ],
+    )
+    async def test_deletes_after_massedcompute_create_error(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: VolumeWorker,
+        fetcher: VolumeFetcher,
+        lost_first_reply: bool,
+        allocated_id: str | None,
+        expected_status: VolumeStatus,
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        volume = await create_volume(
+            session, project, user, configuration=MassedComputeVolumeConfiguration(name="data")
+        )
+        backend = Mock()
+        compute = backend.compute.return_value = Mock(spec=ComputeMockSpec)
+        errors: list[BackendError] = [VolumeProvisioningError("Create failed", allocated_id)]
+        if lost_first_reply:
+            errors.insert(0, VolumeProvisioningPending("Lost reply"))
+        compute.create_volume.side_effect = errors
+        with (
+            patch.object(
+                volumes_pipeline.backends_cache,
+                "lease_project_backend_by_type",
+                mock_lease(backend),
+            ),
+            time_machine.travel(get_current_datetime(), tick=False) as clock,
+        ):
+            for _ in errors:
+                (item,) = await fetcher.fetch(1)
+                await worker.process(item)
+                clock.shift(timedelta(seconds=16))
+            assert [
+                call.kwargs["volume"].status for call in compute.create_volume.call_args_list
+            ] == (
+                [VolumeStatus.SUBMITTED, VolumeStatus.PROVISIONING]
+                if lost_first_reply
+                else [VolumeStatus.SUBMITTED]
+            )
+            await session.refresh(volume)
+            assert volume.status == expected_status
+            assert volume.status_message == "Create failed"
+            await delete_volumes(session, project, [volume.name], user)
+
+            if lost_first_reply:
+                # This rejection applies only to the retry. Reconcile the original
+                # request by name and commit its recovered ID before deleting it.
+                compute.delete_volume.side_effect = [
+                    VolumeDeletionPending("Found volume", "recovered-id"),
+                    None,
+                ]
+                (item,) = await fetcher.fetch(1)
+                await worker.process(item)
+                await session.refresh(volume)
+                assert not volume.deleted
+                assert compute.delete_volume.call_args.kwargs["volume"].volume_id is None
+                await session.commit()
+                clock.shift(timedelta(seconds=16))
+
+            (item,) = await fetcher.fetch(1)
+            await worker.process(item)
+
+        await session.refresh(volume)
+        assert volume.deleted
+        if allocated_id or lost_first_reply:
+            assert compute.delete_volume.call_args.kwargs["volume"].volume_id == (
+                allocated_id or "recovered-id"
+            )
+        else:
+            compute.delete_volume.assert_not_called()
+
     async def test_skips_processing_if_lock_token_changed_before_refetch(
         self, test_db, session: AsyncSession, worker: VolumeWorker
     ):
@@ -421,6 +590,113 @@ class TestVolumeWorkerSubmitted:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestVolumeWorkerDeleted:
+    @pytest.mark.parametrize(
+        ("status", "external_id"),
+        [(VolumeStatus.SUBMITTED, None), (VolumeStatus.ACTIVE, "external-id")],
+    )
+    async def test_deletes_unsubmitted_or_external_massedcompute_volume_locally(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: VolumeWorker,
+        fetcher: VolumeFetcher,
+        status,
+        external_id,
+    ):
+        volume = await create_volume(
+            session,
+            await create_project(session),
+            await create_user(session),
+            configuration=MassedComputeVolumeConfiguration(name="data", volume_id=external_id),
+            status=status,
+            volume_provisioning_data=(
+                VolumeProvisioningData(
+                    backend=BackendType.MASSEDCOMPUTE, volume_id=external_id, size_gb=None
+                )
+                if external_id
+                else None
+            ),
+        )
+        volume.to_be_deleted = True
+        await session.commit()
+
+        with patch.object(
+            volumes_pipeline.backends_cache, "lease_project_backend_by_type"
+        ) as lease:
+            (item,) = await fetcher.fetch(1)
+            await worker.process(item)
+            lease.assert_not_called()
+
+        await session.refresh(volume)
+        assert volume.deleted
+        assert volume.deleted_at is not None
+        assert [event.message for event in await list_events(session)] == ["Volume deleted"]
+
+    @pytest.mark.parametrize("volume_id", [None, "known-id"])
+    async def test_confirms_massedcompute_deletion_before_forgetting_volume(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: VolumeWorker,
+        fetcher: VolumeFetcher,
+        volume_id,
+    ):
+        volume = await create_volume(
+            session,
+            await create_project(session),
+            await create_user(session),
+            configuration=MassedComputeVolumeConfiguration(name="data"),
+            status=VolumeStatus.PROVISIONING if volume_id is None else VolumeStatus.ACTIVE,
+            volume_provisioning_data=(
+                VolumeProvisioningData(
+                    backend=BackendType.MASSEDCOMPUTE, volume_id=volume_id, size_gb=None
+                )
+                if volume_id
+                else None
+            ),
+        )
+        volume.to_be_deleted = True
+        await session.commit()
+        backend = Mock()
+        compute = Mock(spec=ComputeMockSpec)
+        backend.compute.return_value = compute
+        compute.delete_volume.side_effect = [
+            VolumeDeletionPending("Still deleting", None if volume_id else "recovered-id"),
+            RuntimeError("Storage unavailable"),
+            None,
+        ]
+
+        with time_machine.travel(get_current_datetime(), tick=False) as clock:
+            for available_backend in (None, backend, backend):
+                with patch.object(
+                    volumes_pipeline.backends_cache,
+                    "lease_project_backend_by_type",
+                    mock_lease(available_backend),
+                ):
+                    (item,) = await fetcher.fetch(1)
+                    await worker.process(item)
+                await session.refresh(volume)
+                assert volume.to_be_deleted and not volume.deleted
+                assert volume.deleted_at is None
+                assert volume.status_message
+                assert await list_events(session) == []
+                await session.commit()
+                clock.shift(timedelta(seconds=16))
+            with patch.object(
+                volumes_pipeline.backends_cache,
+                "lease_project_backend_by_type",
+                mock_lease(backend),
+            ):
+                (item,) = await fetcher.fetch(1)
+                await worker.process(item)
+
+        requested = compute.delete_volume.call_args.kwargs["volume"]
+        assert requested.id == volume.id
+        assert requested.volume_id == (volume_id or "recovered-id")
+        await session.refresh(volume)
+        assert volume.deleted and volume.deleted_at is not None
+        assert [event.message for event in await list_events(session)] == ["Volume deleted"]
+
     async def test_marks_volume_deleted(
         self, test_db, session: AsyncSession, worker: VolumeWorker
     ):

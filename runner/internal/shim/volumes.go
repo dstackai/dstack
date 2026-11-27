@@ -23,6 +23,16 @@ func prepareVolumes(ctx context.Context, taskConfig TaskConfig) error {
 	}
 	log.Debug(ctx, "Preparing volumes...")
 	for _, volume := range taskConfig.Volumes {
+		if volume.MountPath != "" {
+			target, err := taskVolumeMountPoint(taskConfig.ID, volume)
+			if err != nil {
+				return err
+			}
+			if err := bindMountedVolume(volume.MountPath, target); err != nil {
+				return fmt.Errorf("bind mounted volume %s: %w", volume.Name, err)
+			}
+			continue
+		}
 		err := formatAndMountVolume(ctx, volume)
 		if err != nil {
 			return fmt.Errorf("format and mount volume: %w", err)
@@ -38,7 +48,22 @@ func unmountVolumes(ctx context.Context, taskConfig TaskConfig) error {
 	log.Debug(ctx, "Unmounting volumes...")
 	var failed []string
 	for _, volume := range taskConfig.Volumes {
-		mountPoint := getVolumeMountPoint(volume.Name)
+		mountPoint, err := taskVolumeMountPoint(taskConfig.ID, volume)
+		if err != nil {
+			return err
+		}
+		if volume.MountPath != "" {
+			// MNT_FORCE can abort the underlying FUSE connection, including the provider's mount.
+			err := unix.Unmount(mountPoint, unix.UMOUNT_NOFOLLOW)
+			if err != nil && !errors.Is(err, unix.EINVAL) && !errors.Is(err, unix.ENOENT) {
+				log.Error(ctx, "failed to release volume bind mount", "mountpoint", mountPoint, "err", err)
+				failed = append(failed, mountPoint)
+			} else {
+				_ = os.Remove(mountPoint)
+				_ = os.Remove(filepath.Dir(mountPoint))
+			}
+			continue
+		}
 		cmd := exec.CommandContext(ctx, "mountpoint", mountPoint)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			log.Info(ctx, "skipping", "mountpoint", mountPoint, "output", output)
@@ -56,6 +81,59 @@ func unmountVolumes(ctx context.Context, taskConfig TaskConfig) error {
 		return fmt.Errorf("failed to unmount volume(s): %v", failed)
 	}
 	return nil
+}
+
+// bindMountedVolume pins the source directory before checking its mount ID. A provider
+// unmount between verification and bind cannot substitute a directory on the root disk.
+func bindMountedVolume(source, target string) error {
+	// Reject symlinks in the entire path, including the provider's mount parent.
+	how := &unix.OpenHow{Flags: unix.O_PATH | unix.O_DIRECTORY | unix.O_CLOEXEC, Resolve: unix.RESOLVE_NO_SYMLINKS}
+	fd, err := unix.Openat2(unix.AT_FDCWD, source, how)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = unix.Close(fd) }()
+	var dir, parent unix.Statx_t
+	if err := unix.Statx(fd, "", unix.AT_EMPTY_PATH, unix.STATX_MNT_ID, &dir); err != nil {
+		return err
+	}
+	if err := unix.Statx(fd, "..", 0, unix.STATX_MNT_ID, &parent); err != nil {
+		return err
+	}
+	if dir.Mask&unix.STATX_MNT_ID == 0 || parent.Mask&unix.STATX_MNT_ID == 0 || dir.Mnt_id == parent.Mnt_id {
+		return fmt.Errorf("%s is not a verified mount point", source)
+	}
+	// Build a private bind mount before publishing it to Docker. Failure drops the
+	// detached mount when its file descriptor closes.
+	tree, err := unix.OpenTree(fd, "", unix.AT_EMPTY_PATH|unix.OPEN_TREE_CLONE|unix.OPEN_TREE_CLOEXEC)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = unix.Close(tree) }()
+	if err := unix.MountSetattr(tree, "", unix.AT_EMPTY_PATH, &unix.MountAttr{Propagation: unix.MS_PRIVATE}); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(target, 0o700); err != nil {
+		return err
+	}
+	targetFD, err := unix.Openat2(unix.AT_FDCWD, target, how)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = unix.Close(targetFD) }()
+	return unix.MoveMount(tree, "", targetFD, "", unix.MOVE_MOUNT_F_EMPTY_PATH|unix.MOVE_MOUNT_T_EMPTY_PATH)
+}
+
+func taskVolumeMountPoint(taskID string, volume VolumeInfo) (string, error) {
+	if volume.MountPath == "" {
+		return getVolumeMountPoint(volume.Name), nil
+	}
+	for _, name := range []string{taskID, volume.Name} {
+		if name == "." || !filepath.IsLocal(name) || filepath.Base(name) != name {
+			return "", fmt.Errorf("invalid volume bind path component %q", name)
+		}
+	}
+	return filepath.Join(taskVolumeMountPointDir, taskID, volume.Name), nil
 }
 
 func formatAndMountVolume(ctx context.Context, volume VolumeInfo) error {
@@ -94,7 +172,10 @@ func formatAndMountVolume(ctx context.Context, volume VolumeInfo) error {
 // volumeMountPointDir is a dstack-specific dir for volumes, used to avoid clashes with
 // host dirs. /mnt/disks is used since on some VM images other places may not be
 // writable (e.g. GCP COS).
-const volumeMountPointDir = "/mnt/disks/dstack-volumes"
+const (
+	volumeMountPointDir     = "/mnt/disks/dstack-volumes"
+	taskVolumeMountPointDir = "/mnt/disks/dstack-task-volumes"
+)
 
 func getVolumeMountPoint(volumeName string) string {
 	return filepath.Join(volumeMountPointDir, volumeName)

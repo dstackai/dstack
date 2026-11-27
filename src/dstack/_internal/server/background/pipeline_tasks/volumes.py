@@ -8,8 +8,14 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.orm import joinedload, load_only
 
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
-from dstack._internal.core.errors import BackendError
-from dstack._internal.core.models.volumes import VolumeStatus
+from dstack._internal.core.errors import (
+    BackendError,
+    VolumeDeletionPending,
+    VolumeProvisioningError,
+    VolumeProvisioningPending,
+)
+from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.volumes import VolumeProvisioningData, VolumeStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
     NOW_PLACEHOLDER,
     Fetcher,
@@ -142,7 +148,9 @@ class VolumeFetcher(Fetcher[VolumePipelineItem]):
                     select(VolumeModel)
                     .where(
                         or_(
-                            VolumeModel.status == VolumeStatus.SUBMITTED,
+                            VolumeModel.status.in_(
+                                [VolumeStatus.SUBMITTED, VolumeStatus.PROVISIONING]
+                            ),
                             VolumeModel.to_be_deleted == True,
                         ),
                         VolumeModel.deleted == False,
@@ -218,7 +226,7 @@ class VolumeWorker(Worker[VolumePipelineItem]):
 
         if item.to_be_deleted:
             result = await _process_to_be_deleted_volume(volume_model)
-        elif item.status == VolumeStatus.SUBMITTED:
+        elif item.status in (VolumeStatus.SUBMITTED, VolumeStatus.PROVISIONING):
             result = await _process_submitted_volume(volume_model)
         else:
             return
@@ -274,7 +282,7 @@ async def _apply_process_result(
                 # TODO: Clean up volume.
                 pass
             return
-        if item.to_be_deleted:
+        if update_map.get("deleted"):
             events.emit(
                 session,
                 "Volume deleted",
@@ -293,7 +301,7 @@ async def _apply_process_result(
 
 class _VolumeUpdateMap(ItemUpdateMap, total=False):
     status: VolumeStatus
-    status_message: str
+    status_message: Optional[str]
     volume_provisioning_data: str
     deleted: bool
     deleted_at: UpdateMapDateTime
@@ -306,6 +314,8 @@ class _ProcessResult:
 
 async def _process_submitted_volume(volume_model: VolumeModel) -> _ProcessResult:
     volume = volume_model_to_volume(volume_model)
+    managed_create = volume.get_backend() == BackendType.MASSEDCOMPUTE and not volume.external
+    first_create = managed_create and volume.status == VolumeStatus.SUBMITTED
     async with backends_cache.lease_project_backend_by_type(
         project=volume_model.project,
         backend_type=volume.configuration.backend,
@@ -317,14 +327,16 @@ async def _process_submitted_volume(volume_model: VolumeModel) -> _ProcessResult
                 volume.name,
                 volume.configuration.backend.value,
             )
-            return _ProcessResult(
-                update_map={
-                    "status": VolumeStatus.FAILED,
-                    "status_message": "Backend not available",
-                }
-            )
+            update_map = _VolumeUpdateMap(status_message="Backend not available")
+            if not managed_create:
+                update_map["status"] = VolumeStatus.FAILED
+            return _ProcessResult(update_map=update_map)
         compute = backend.compute()
         assert isinstance(compute, ComputeWithVolumeSupport)
+        # The winning caller keeps its SUBMITTED snapshot and may send one POST.
+        # A replacement reads PROVISIONING and can only look up the original create.
+        if first_create and not await _mark_volume_provisioning(volume_model):
+            return _ProcessResult()
         try:
             if volume.configuration.is_external:
                 logger.info("Registering external volume %s", volume_model.name)
@@ -338,19 +350,27 @@ async def _process_submitted_volume(volume_model: VolumeModel) -> _ProcessResult
                     compute.create_volume,
                     volume=volume,
                 )
+        except (VolumeProvisioningPending, VolumeProvisioningError) as e:
+            update_map = _get_volume_retry_update(str(e), e.volume_id, volume.get_backend())
+            # Rejection of a retry cannot rule out an earlier create with a lost response.
+            if isinstance(e, VolumeProvisioningError) and (
+                first_create or not managed_create or e.volume_id is not None
+            ):
+                update_map["status"] = VolumeStatus.FAILED
+            return _ProcessResult(update_map=update_map)
         except BackendError as e:
             logger.info("Failed to create volume %s: %s", volume_model.name, repr(e))
             status_message = f"Backend error: {repr(e)}"
             if len(e.args) > 0:
                 status_message = str(e.args[0])
-            return _ProcessResult(
-                update_map={
-                    "status": VolumeStatus.FAILED,
-                    "status_message": status_message,
-                }
-            )
+            update_map = _VolumeUpdateMap(status_message=status_message)
+            if not managed_create or volume.volume_id is not None:
+                update_map["status"] = VolumeStatus.FAILED
+            return _ProcessResult(update_map=update_map)
         except Exception as e:
             logger.exception("Got exception when creating volume %s", volume_model.name)
+            if managed_create:
+                return _ProcessResult(update_map={"status_message": f"Unexpected error: {e!r}"})
             return _ProcessResult(
                 update_map={
                     "status": VolumeStatus.FAILED,
@@ -359,33 +379,63 @@ async def _process_submitted_volume(volume_model: VolumeModel) -> _ProcessResult
             )
 
     logger.info("Added new volume %s", volume_model.name)
-    # Provisioned volumes marked as active since they become available almost immediately in AWS
-    # TODO: Consider checking volume state
-    return _ProcessResult(
-        update_map={
-            "status": VolumeStatus.ACTIVE,
-            "volume_provisioning_data": vpd.model_dump_json(),
-        }
+    update_map = _VolumeUpdateMap(
+        status=VolumeStatus.ACTIVE,
+        volume_provisioning_data=vpd.model_dump_json(),
     )
+    if volume.get_backend() == BackendType.MASSEDCOMPUTE and volume.status_message is not None:
+        update_map["status_message"] = None
+    return _ProcessResult(update_map=update_map)
+
+
+async def _mark_volume_provisioning(volume_model: VolumeModel) -> bool:
+    # A create may outlive its worker. Record that it needs reconciliation before calling out.
+    async with get_session_ctx() as session:
+        result = await session.execute(
+            update(VolumeModel)
+            .where(
+                VolumeModel.id == volume_model.id,
+                VolumeModel.lock_token == volume_model.lock_token,
+                VolumeModel.status == VolumeStatus.SUBMITTED,
+                VolumeModel.to_be_deleted == False,
+            )
+            .values(status=VolumeStatus.PROVISIONING)
+            .returning(VolumeModel.id)
+        )
+        if result.scalar_one_or_none() is None:
+            return False
+        emit_volume_status_change_event(
+            session, volume_model, VolumeStatus.SUBMITTED, VolumeStatus.PROVISIONING, None
+        )
+    volume_model.status = VolumeStatus.PROVISIONING
+    return True
 
 
 async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _ProcessResult:
     volume = volume_model_to_volume(volume_model)
     if volume.external:
         return _get_deleted_result()
-    if volume.provisioning_data is None:
-        # The volume wasn't provisioned so there is nothing to delete
+    managed_massedcompute = volume.get_backend() == BackendType.MASSEDCOMPUTE
+    if volume.provisioning_data is not None:
+        backend_type = volume.provisioning_data.backend
+    elif managed_massedcompute and volume.status == VolumeStatus.PROVISIONING:
+        # A previous create may have succeeded without returning its ID. A FAILED
+        # managed volume with no ID was definitively rejected on its first attempt.
+        backend_type = volume.get_backend()
+    else:
         return _get_deleted_result()
-    if volume.provisioning_data.backend is None:
+    if backend_type is None:
         logger.error(
             f"Failed to delete volume {volume_model.name}. volume.provisioning_data.backend is None."
         )
         return _get_deleted_result()
     async with backends_cache.lease_project_backend_by_type(
         project=volume_model.project,
-        backend_type=volume.provisioning_data.backend,
+        backend_type=backend_type,
     ) as backend:
         if backend is None:
+            if managed_massedcompute:
+                return _ProcessResult(update_map={"status_message": "Backend not available"})
             # TODO: Retry deletion
             logger.error(
                 f"Failed to delete volume {volume_model.name}. Backend {volume.configuration.backend} not available."
@@ -399,13 +449,32 @@ async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _ProcessRe
                 compute.delete_volume,
                 volume=volume,
             )
-        except Exception:
+        except VolumeDeletionPending as e:
+            logger.info("Volume %s deletion pending: %s", volume.name, e)
+            return _ProcessResult(
+                update_map=_get_volume_retry_update(str(e), e.volume_id, volume.get_backend())
+            )
+        except Exception as e:
+            if managed_massedcompute:
+                logger.exception("Could not confirm deletion of volume %s", volume.name)
+                return _ProcessResult(update_map={"status_message": f"Deletion unconfirmed: {e}"})
             # TODO: Retry deletion
             logger.exception(
                 "Got exception when deleting volume %s. Please terminate it manually to avoid unexpected charges.",
                 volume.name,
             )
     return _get_deleted_result()
+
+
+def _get_volume_retry_update(
+    message: str, volume_id: Optional[str], backend: BackendType
+) -> _VolumeUpdateMap:
+    update_map = _VolumeUpdateMap(status_message=message)
+    if volume_id is not None:
+        update_map["volume_provisioning_data"] = VolumeProvisioningData(
+            backend=backend, volume_id=volume_id, size_gb=None
+        ).model_dump_json()
+    return update_map
 
 
 def _get_deleted_result() -> _ProcessResult:

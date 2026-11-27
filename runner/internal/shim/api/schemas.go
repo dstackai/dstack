@@ -7,8 +7,9 @@ import (
 )
 
 type HealthcheckResponse struct {
-	Service string `json:"service"`
-	Version string `json:"version"`
+	Service                 string `json:"service"`
+	Version                 string `json:"version"`
+	SupportsVolumeMountPath bool   `json:"supports_volume_mount_path"`
 }
 
 type ShutdownRequest struct {

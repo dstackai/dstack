@@ -185,6 +185,10 @@ class ShimAPIVersionError(ShimError):
     """Raised when a caller uses an API the peer does not support. Signals a server-side bug."""
 
 
+class ShimVolumeError(ShimError):
+    """The requested volume cannot be passed safely to this shim."""
+
+
 class ShimResponseError(ShimError):
     pass
 
@@ -618,9 +622,14 @@ class ShimClient:
         host_ssh_keys: list[str],
         container_ssh_keys: list[str],
         instance_id: str,
+        volume_mount_paths: Optional[dict[uuid.UUID, str]] = None,
     ) -> None:
         if not self.is_api_v2_supported():
             raise ShimAPIVersionError()
+        if any(v.mount_on_instance for v in volumes) and not self._supports_volume_mount_path:
+            raise ShimVolumeError(
+                "The shim must be upgraded to use volumes mounted on the instance"
+            )
         body = TaskSubmitRequest(
             id=str(task_id),
             name=name,
@@ -634,7 +643,9 @@ class ShimClient:
             memory=_memory_to_bytes(memory),  # None = 0 = "all available"
             shm_size=_memory_to_bytes(shm_size),  # None = 0 = "use default value"
             network_mode=network_mode,
-            volumes=[_volume_to_shim_volume_info(v, instance_id) for v in volumes],
+            volumes=[
+                _volume_to_shim_volume_info(v, instance_id, volume_mount_paths) for v in volumes
+            ],
             volume_mounts=volume_mounts,
             instance_mounts=instance_mounts,
             gpu_devices=gpu_devices,
@@ -765,7 +776,9 @@ class ShimClient:
     def _negotiate(self, healthcheck_response: Optional[requests.Response] = None) -> None:
         if healthcheck_response is None:
             healthcheck_response = self._request("GET", "/api/healthcheck", raise_for_status=True)
-        version_string = self._response(HealthcheckResponse, healthcheck_response).version
+        health = self._response(HealthcheckResponse, healthcheck_response)
+        self._supports_volume_mount_path = health.supports_volume_mount_path
+        version_string = health.version
         version_tuple = _parse_version(version_string)
         if version_tuple is None or version_tuple >= self._API_V2_MIN_SHIM_VERSION:
             api_version = 2
@@ -841,17 +854,25 @@ def instance_info_response_to_gpu_driver(
     )
 
 
-def _volume_to_shim_volume_info(volume: Volume, instance_id: str) -> ShimVolumeInfo:
+def _volume_to_shim_volume_info(
+    volume: Volume, instance_id: str, volume_mount_paths: Optional[dict[uuid.UUID, str]] = None
+) -> ShimVolumeInfo:
     device_name = None
     attachment_data = volume.get_attachment_data_for_instance(instance_id)
     if attachment_data is not None:
         device_name = attachment_data.device_name
+    mount_path = None
+    if volume.mount_on_instance:
+        mount_path = (volume_mount_paths or {}).get(volume.id)
+        if not mount_path:
+            raise ShimVolumeError(f"No host mount was provided for volume {volume.name}")
     return ShimVolumeInfo(
         backend=volume.configuration.backend.value,
         name=volume.name,
         volume_id=get_or_error(volume.volume_id),
-        init_fs=not volume.external,
+        init_fs=not volume.external and mount_path is None,
         device_name=device_name,
+        mount_path=mount_path,
     )
 
 

@@ -416,7 +416,8 @@ class _TerminateSubmittedJobResult:
 @dataclass
 class _VolumeAttachmentPayload:
     volume_model: VolumeModel
-    attachment_data: str
+    attachment_data: Optional[str]
+    already_attached: bool = False
 
 
 @dataclass
@@ -1909,6 +1910,8 @@ async def _process_volume_attachments(
         compute = backend.compute()
         assert isinstance(compute, ComputeWithVolumeSupport)
 
+        # A retry can select another backend. Reacquire the same volume locks so the
+        # worker can release every lock held by its previous attempt.
         volume_models = await _lock_related_volume_models(
             item=item, volume_model_ids=prepared_job_volumes.volume_model_ids
         )
@@ -1927,6 +1930,13 @@ async def _process_volume_attachments(
             }
         )
         attachments: list[_VolumeAttachmentPayload] = []
+        for candidates in prepared_job_volumes.volumes:
+            if any(v.mount_on_instance for v in candidates) and not any(
+                job_provisioning_data.can_mount_volume(v) for v in candidates
+            ):
+                return _VolumeAttachmentResult(
+                    attachments, locked_volume_ids, "A requested volume is unavailable on the VM"
+                )
         related_volume_lock_owner = _get_related_volume_lock_owner(item.id)
         for mount_point_volume_models in volume_models:
             for volume_model in mount_point_volume_models:
@@ -1941,6 +1951,17 @@ async def _process_volume_attachments(
                         and volume_model.lock_owner != related_volume_lock_owner
                     ):
                         raise ServerClientError("Cannot attach a volume locked for processing")
+                    if volume.mount_on_instance:
+                        if not job_provisioning_data.can_mount_volume(volume):
+                            continue
+                        already_attached = any(
+                            a.instance_id == job_model.instance_id
+                            for a in volume_model.attachments
+                        )
+                        attachments.append(
+                            _VolumeAttachmentPayload(volume_model, None, already_attached)
+                        )
+                        break
                     if (
                         job_provisioning_data.get_base_backend() != volume.get_backend()
                         or job_provisioning_data.region.lower() != volume.get_region().lower()
@@ -2136,6 +2157,8 @@ async def _apply_volume_attachment_result(
             .values(last_job_processed_at=now)
         )
         for attachment in volume_attachment_result.attachments:
+            if attachment.already_attached:
+                continue
             session.add(
                 VolumeAttachmentModel(
                     volume_id=attachment.volume_model.id,

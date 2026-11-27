@@ -611,6 +611,9 @@ def filter_instances(
     # A None region matches any region; an empty string remains an exact region.
     volumes_locations: Optional[set[tuple[BackendType, Optional[str], Optional[str]]]] = None
 
+    mounted_volume_groups = [
+        candidates for candidates in volumes or [] if any(v.mount_on_instance for v in candidates)
+    ]
     if volumes:
         volumes_locations = set()
         for volume in volumes[0]:
@@ -671,6 +674,11 @@ def filter_instances(
             continue
         if volumes_locations is not None:
             jpd = get_instance_provisioning_data(instance)
+            if jpd is None and any(
+                all(v.mount_on_instance for v in candidates)
+                for candidates in mounted_volume_groups
+            ):
+                continue
             # instance_matches_constraints() also skips filtering if JPD is not set
             if jpd is not None:
                 instance_backend = jpd.get_base_backend()
@@ -683,6 +691,11 @@ def filter_instances(
                 if (
                     instance_location not in volumes_locations
                     and regionless_location not in volumes_locations
+                ):
+                    continue
+                if any(
+                    not any(jpd.can_mount_volume(v) for v in candidates)
+                    for candidates in mounted_volume_groups
                 ):
                     continue
         filtered_instances.append(instance)

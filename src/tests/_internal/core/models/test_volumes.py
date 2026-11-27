@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from dstack._internal.core.models.volumes import (
     DaytonaVolumeConfiguration,
     InstanceMountPoint,
+    MassedComputeVolumeConfiguration,
     VolumeConfiguration,
     VolumeConfigurationWithSize,
     VolumeMountPoint,
@@ -49,6 +50,41 @@ class TestDaytonaVolumeConfiguration:
             VolumeConfiguration.model_validate({"backend": "daytona", field: value})
 
 
+class TestMassedComputeVolumeConfiguration:
+    @pytest.mark.parametrize("volume_id", [None, "existing-volume"])
+    def test_roundtrip(self, volume_id):
+        spec = VolumeSpec.model_validate(
+            {
+                "configuration": {
+                    "backend": "massedcompute",
+                    "name": "cache",
+                    "volume_id": volume_id,
+                }
+            }
+        )
+
+        assert isinstance(spec.configuration, MassedComputeVolumeConfiguration)
+        assert spec.configuration.is_external == (volume_id is not None)
+        assert VolumeSpec.model_validate_json(spec.model_dump_json()) == spec
+
+    @pytest.mark.parametrize(("field", "value"), [("size", 100), ("region", "us")])
+    def test_rejects_fixed_size_and_region(self, field, value):
+        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+            VolumeConfiguration.model_validate({"backend": "massedcompute", field: value})
+
+    @pytest.mark.parametrize("duration", [None, "off", False, -1, 0])
+    def test_allows_disabled_auto_cleanup(self, duration):
+        config = MassedComputeVolumeConfiguration.model_validate(
+            {"auto_cleanup_duration": duration}
+        )
+        assert config.auto_cleanup_duration is None or config.auto_cleanup_duration <= 0
+
+    @pytest.mark.parametrize("duration", [1, "1d"])
+    def test_rejects_auto_cleanup(self, duration):
+        with pytest.raises(ValidationError, match="do not support automatic cleanup"):
+            MassedComputeVolumeConfiguration.model_validate({"auto_cleanup_duration": duration})
+
+
 class TestVolumeProvisioningData:
     def test_existing_capacity_remains_an_integer(self):
         data = VolumeProvisioningData.model_validate(
@@ -58,6 +94,7 @@ class TestVolumeProvisioningData:
         payload = json.loads(data.model_dump_json())
         assert type(payload["size_gb"]) is int
         assert payload["size_gb"] == 120
+        assert "mount_on_instance" not in payload
         assert VolumeProvisioningData.model_validate(payload).size_gb == 120
 
 

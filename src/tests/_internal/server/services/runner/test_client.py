@@ -39,6 +39,7 @@ from dstack._internal.server.services.runner.client import (
     ShimClient,
     ShimResponseBodyError,
     ShimResponseStatusError,
+    ShimVolumeError,
     _parse_version,
     healthcheck_response_to_instance_check,
     instance_info_response_to_gpu_driver,
@@ -47,6 +48,7 @@ from dstack._internal.server.testing.common import (
     get_run_spec,
     get_volume,
     get_volume_configuration,
+    get_volume_provisioning_data,
 )
 
 
@@ -598,28 +600,32 @@ class TestShimClientV2(BaseShimClientTest):
             ],
         )
 
-        client.submit_task(
-            task_id=uuid.UUID("c514f4ee-dfe7-472c-99a3-047178aafb5b"),
-            name="test-0-0",
-            registry_username="user",
-            registry_password="pass",
-            image_name="debian",
-            container_user="root",
-            privileged=True,
-            gpu=1,
-            cpu=4.0,
-            memory=Memory.parse("16GB"),
-            shm_size=Memory.parse("1GB"),
-            network_mode=NetworkMode.BRIDGE,
-            volumes=[volume],
-            volume_mounts=[VolumeMountPoint(name="vol", path="/vol")],
-            instance_mounts=[InstanceMountPoint(instance_path="/mnt/nfs/home", path="/home")],
-            gpu_devices=[],
-            host_ssh_user="dstack",
-            host_ssh_keys=["host_key"],
-            container_ssh_keys=["project_key", "user_key"],
-            instance_id="i-1",
-        )
+        def submit(paths=None):
+            client.submit_task(
+                task_id=uuid.UUID("c514f4ee-dfe7-472c-99a3-047178aafb5b"),
+                name="test-0-0",
+                registry_username="user",
+                registry_password="pass",
+                image_name="debian",
+                container_user="root",
+                privileged=True,
+                gpu=1,
+                cpu=4.0,
+                memory=Memory.parse("16GB"),
+                shm_size=Memory.parse("1GB"),
+                network_mode=NetworkMode.BRIDGE,
+                volumes=[volume],
+                volume_mounts=[VolumeMountPoint(name="vol", path="/vol")],
+                instance_mounts=[InstanceMountPoint(instance_path="/mnt/nfs/home", path="/home")],
+                gpu_devices=[],
+                host_ssh_user="dstack",
+                host_ssh_keys=["host_key"],
+                container_ssh_keys=["project_key", "user_key"],
+                instance_id="i-1",
+                volume_mount_paths=paths,
+            )
+
+        submit()
 
         assert adapter.call_count == 2
         self.assert_request(adapter, 0, "GET", "/api/healthcheck")
@@ -655,6 +661,14 @@ class TestShimClientV2(BaseShimClientTest):
             "container_ssh_keys": ["project_key", "user_key"],
         }
         self.assert_request(adapter, 1, "POST", "/api/tasks", expected_request)
+
+        volume.provisioning_data = get_volume_provisioning_data(backend=BackendType.GCP)
+        volume.provisioning_data.mount_on_instance = True
+        with pytest.raises(ShimVolumeError, match="upgraded"):
+            submit({volume.id: "/srv/checkpoints"})
+        assert (
+            adapter.call_count == 2
+        )  # An older shim must never fall back to its block device path.
 
     def test_terminate_task(self, client: ShimClient, adapter: requests_mock.Adapter):
         task_id = "c514f4ee-dfe7-472c-99a3-047178aafb5b"

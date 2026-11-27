@@ -17,8 +17,9 @@ func (s *ShimServer) HealthcheckHandler(w http.ResponseWriter, r *http.Request) 
 	defer s.mu.RUnlock()
 
 	return &HealthcheckResponse{
-		Service: "dstack-shim",
-		Version: s.version,
+		Service:                 "dstack-shim",
+		Version:                 s.version,
+		SupportsVolumeMountPath: true,
 	}, nil
 }
 

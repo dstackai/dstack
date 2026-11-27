@@ -308,7 +308,8 @@ func (d *DockerRunner) restoreStateFromContainers(
 			// Containers created by shim versions that did not write the state file have
 			// no config to restore. The volumes can still be recovered from the container
 			// mounts, unlike the host SSH keys, which are only known to the state file
-			config.Volumes = volumesFromMounts(containerShort.Mounts)
+			config.ID = taskID
+			config.Volumes = volumesFromMounts(taskID, containerShort.Mounts)
 			// Such a task still has a dir that must be removed along with the task
 			taskDir = d.findLegacyTaskDir(containerName)
 		}
@@ -357,12 +358,17 @@ func (d *DockerRunner) restoreStateFromContainers(
 }
 
 // volumesFromMounts recovers the volumes attached to a task from its container mounts.
-// Only the volume names are recovered, which is all that is needed to unmount them
-func volumesFromMounts(mounts []dockertypes.MountPoint) []VolumeInfo {
+// Only cleanup needs these entries. For a private bind the original host path is unknown.
+func volumesFromMounts(taskID string, mounts []dockertypes.MountPoint) []VolumeInfo {
 	var volumes []VolumeInfo
 	for _, mount := range mounts {
 		if name, found := strings.CutPrefix(mount.Source, volumeMountPointDir+"/"); found {
 			volumes = append(volumes, VolumeInfo{Name: name})
+			continue
+		}
+		volume := VolumeInfo{Name: filepath.Base(mount.Source), MountPath: mount.Source}
+		if target, err := taskVolumeMountPoint(taskID, volume); err == nil && target == mount.Source {
+			volumes = append(volumes, volume)
 		}
 	}
 	return volumes
@@ -979,7 +985,7 @@ func (d *DockerRunner) createContainer(
 	if err != nil {
 		return fmt.Errorf("get docker mounts: %w", err)
 	}
-	volumeMounts, err := getVolumeMounts(task.config.VolumeMounts)
+	volumeMounts, err := getVolumeMounts(task.config)
 	if err != nil {
 		return fmt.Errorf("get volume mounts: %w", err)
 	}
@@ -1328,10 +1334,23 @@ func configureHpcNetworkingIfAvailable(hostConfig *container.HostConfig) {
 	}
 }
 
-func getVolumeMounts(mountPoints []VolumeMountPoint) ([]mount.Mount, error) {
+func getVolumeMounts(cfg TaskConfig) ([]mount.Mount, error) {
+	sources := make(map[string]string)
+	for _, volume := range cfg.Volumes {
+		if volume.MountPath != "" {
+			source, err := taskVolumeMountPoint(cfg.ID, volume)
+			if err != nil {
+				return nil, err
+			}
+			sources[volume.Name] = source
+		}
+	}
 	mounts := []mount.Mount{}
-	for _, mountPoint := range mountPoints {
-		source := getVolumeMountPoint(mountPoint.Name)
+	for _, mountPoint := range cfg.VolumeMounts {
+		source, ok := sources[mountPoint.Name]
+		if !ok {
+			source = getVolumeMountPoint(mountPoint.Name)
+		}
 		mounts = append(mounts, mount.Mount{Type: mount.TypeBind, Source: source, Target: mountPoint.Path})
 	}
 	return mounts, nil

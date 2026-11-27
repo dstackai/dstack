@@ -106,6 +106,30 @@ class ComputeResourceNotFoundError(ComputeError):
     pass
 
 
+class VolumeProvisioningPending(ComputeError):
+    """Provisioning needs another provider check. Preserve the allocated ID when available."""
+
+    def __init__(self, message: str, volume_id: Optional[str] = None):
+        super().__init__(message)
+        self.volume_id = volume_id
+
+
+class VolumeProvisioningError(ComputeError):
+    """The create was rejected or the allocated volume failed. Preserve any allocated ID."""
+
+    def __init__(self, message: str, volume_id: Optional[str] = None):
+        super().__init__(message)
+        self.volume_id = volume_id
+
+
+class VolumeDeletionPending(ComputeError):
+    """The provider has not confirmed volume deletion. Retry without forgetting the volume."""
+
+    def __init__(self, message: str, volume_id: Optional[str] = None):
+        super().__init__(message)
+        self.volume_id = volume_id
+
+
 class PlacementGroupInUseError(ComputeError):
     pass
 

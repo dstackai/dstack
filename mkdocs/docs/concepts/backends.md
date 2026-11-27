@@ -1109,7 +1109,7 @@ projects:
 
 </div>
 
-The backend supports single-node, on-demand CPU and GPU VMs.
+The backend supports single-node, on-demand CPU and GPU VMs and experimental [network volumes](volumes.md#network-volumes).
 MassedCompute chooses the region for each VM.
 
 ### Vultr

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, Sequence
 
-from sqlalchemy import and_, not_, or_, select, update
+from sqlalchemy import and_, delete, not_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
 
@@ -45,6 +45,7 @@ from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
     ProjectModel,
+    VolumeAttachmentModel,
 )
 from dstack._internal.server.services import events
 from dstack._internal.server.services.fleets import skip_fleet_min_processing_interval
@@ -483,6 +484,14 @@ async def _apply_process_result(
                     if result.schedule_pg_deletion_except_id is None
                     else (result.schedule_pg_deletion_except_id,)
                 ),
+            )
+
+        if result.release_volume_attachments:
+            await session.execute(
+                delete(VolumeAttachmentModel).where(
+                    VolumeAttachmentModel.instance_id == instance_model.id,
+                    VolumeAttachmentModel.volume_id.in_(result.release_volume_attachments),
+                )
             )
 
         emit_instance_status_change_event(

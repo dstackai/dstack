@@ -672,6 +672,14 @@ async def _process_provisioning_status(
             # Expected while the instance is still booting
             logger.debug("%s: shim is unreachable: %s", fmt(context.job_model), e)
             success = False
+        except client.ShimVolumeError as e:
+            _terminate_job(
+                job_model=context.job_model,
+                job_update_map=result.job_update_map,
+                termination_reason=JobTerminationReason.VOLUME_ERROR,
+                termination_reason_message=str(e),
+            )
+            return
         except client.ShimResponseError as e:
             logger.warning(
                 "%s: shim did not accept the task submission: %s", fmt(context.job_model), e
@@ -1454,6 +1462,7 @@ def _process_provisioning_with_shim(
             host_ssh_keys=[ssh_key] if ssh_key else [],
             container_ssh_keys=public_keys,
             instance_id=jpd.instance_id,
+            volume_mount_paths=jpd.volume_mounts,
         )
     else:
         submitted = shim_client.submit(

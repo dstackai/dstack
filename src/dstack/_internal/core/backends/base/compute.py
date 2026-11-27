@@ -785,6 +785,16 @@ class ComputeWithVolumeSupport(ABC):
         """
         raise NotImplementedError()
 
+    def get_volume_mounts_to_sync(
+        self, provisioning_data: JobProvisioningData
+    ) -> Optional[list[str]]:
+        """Return host mounts requiring a guest flush before deleting this VM.
+
+        An empty list skips the flush. Return None if the VM is already gone.
+        Raise a backend error if its state cannot be confirmed.
+        """
+        return []
+
     def attach_volume(
         self, volume: Volume, provisioning_data: JobProvisioningData
     ) -> VolumeAttachmentData:
