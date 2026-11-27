@@ -1,8 +1,9 @@
+import asyncio
 import json
 import uuid
 from datetime import timedelta
 from typing import Optional
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import gpuhunt
 import pytest
@@ -31,6 +32,7 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     RunTerminationReason,
 )
+from dstack._internal.server.background.pipeline_tasks.jobs_running import JobRunningFetcher
 from dstack._internal.server.background.pipeline_tasks.runs import RunWorker
 from dstack._internal.server.models import (
     JobModel,
@@ -125,6 +127,41 @@ class TestRunActiveWorker:
         await session.refresh(run)
         assert run.status == RunStatus.RUNNING
         assert run.lock_token is None
+
+    async def test_does_not_postpone_running_job_processing(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            last_processed_at=get_current_datetime() - timedelta(minutes=1),
+        )
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        # Run processing must leave the job eligible for its own pipeline.
+        fetcher = JobRunningFetcher(
+            queue=asyncio.Queue(),
+            queue_desired_minsize=1,
+            min_processing_interval=timedelta(seconds=5),
+            lock_timeout=timedelta(seconds=30),
+            heartbeater=Mock(),
+        )
+        items = await fetcher.fetch(limit=1)
+        assert [item.id for item in items] == [job.id]
 
     async def test_terminates_run_when_all_jobs_done(
         self, test_db, session: AsyncSession, worker: RunWorker
@@ -1059,17 +1096,20 @@ class TestRunActiveWorker:
         )
         run.desired_replica_count = 2
         run.desired_replica_counts = json.dumps({"0": 2})
+        old_time = get_current_datetime() - timedelta(minutes=1)
         await create_job(
             session=session,
             run=run,
             status=JobStatus.RUNNING,
             replica_num=0,
+            last_processed_at=old_time,
         )
         await create_job(
             session=session,
             run=run,
             status=JobStatus.RUNNING,
             replica_num=1,
+            last_processed_at=old_time,
         )
         lock_run(run)
         await session.commit()
@@ -1091,6 +1131,8 @@ class TestRunActiveWorker:
         assert len(running) == 1
         assert len(terminating) == 1
         assert terminating[0].termination_reason == JobTerminationReason.SCALED_DOWN
+        assert running[0].last_processed_at == old_time
+        assert terminating[0].last_processed_at == run.last_processed_at
 
     async def test_service_zero_scale_noop(
         self, test_db, session: AsyncSession, worker: RunWorker

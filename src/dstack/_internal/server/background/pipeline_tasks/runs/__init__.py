@@ -703,9 +703,10 @@ def _build_active_job_update_rows(
         if job_update_map is not None:
             for key, value in job_update_map.items():
                 update_row[key] = value
+            # Unlocking a job must not postpone its own pipeline.
+            set_processed_update_map_fields(update_row)
         if job_id in unlock_job_ids:
             set_unlock_update_map_fields(update_row)
-        set_processed_update_map_fields(update_row)
         job_update_rows.append(update_row)
     return job_update_rows
 
