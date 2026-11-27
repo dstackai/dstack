@@ -96,6 +96,7 @@ class TestListBackendTypes:
             "kubernetes",
             "lambda",
             "lium",
+            "massedcompute",
             "nebius",
             "oci",
             "runpod",

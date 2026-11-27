@@ -10,6 +10,7 @@ declare type TBackendType =
     | 'kubernetes'
     | 'lambda'
     | 'lium'
+    | 'massedcompute'
     | 'local'
     | 'nebius'
     | 'remote'
