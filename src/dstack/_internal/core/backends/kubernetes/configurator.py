@@ -33,7 +33,7 @@ logger = get_logger(__name__)
 
 # Sanity floors that catch unit mistakes, e.g., `memory: 512` (bytes). Measured with the default
 # jump pod image: below 100m, SSH handshakes through the jump pod slow down sharply (~0.5s at 50m,
-# ~2s at 10m); 32Mi fits the container (~9Mi) and a few sessions (~1.6Mi each).
+# ~2s at 10m); 32Mi fits the container (~6Mi) and a few sessions (~1.9Mi each).
 _JUMP_POD_MIN_CPU = "100m"
 _JUMP_POD_MIN_MEMORY = "32Mi"
 
