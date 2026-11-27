@@ -136,6 +136,7 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_SERVICE_CLIENT_TIMEOUT`{ #DSTACK_SERVICE_CLIENT_TIMEOUT } – How long (in seconds) the in-server proxy and gateways wait for a service replica to send data. Defaults to 300.
 - `DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY`{ #DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY } – Forbids registering new services without a gateway if set to any value.
 - `DSTACK_FORBID_DSTACK_IN_RUNS`{ #DSTACK_FORBID_DSTACK_IN_RUNS } – Forbids submitting runs with `dstack: true` (dstack server access inside runs) if set to any value.
+- `DSTACK_SERVER_FLEETS_PER_PROJECT_LIMIT`{ #DSTACK_SERVER_FLEETS_PER_PROJECT_LIMIT } - The maximum number of fleets a project can have, including fleets that are being deleted. Creating a fleet over the limit fails. If unset, the number of fleets is not limited.
 - `DSTACK_SERVER_CODE_UPLOAD_LIMIT`{ #DSTACK_SERVER_CODE_UPLOAD_LIMIT } - The repo size limit when uploading diffs or local repos, in bytes. Set to `0` to disable size limits. Defaults to `2MiB`.
 - `DSTACK_SERVER_LOG_QUOTA_PER_JOB_HOUR`{ #DSTACK_SERVER_LOG_QUOTA_PER_JOB_HOUR } - The maximum size of logs a job can write per hour, in bytes. If exceeded, the job fails with the `log_quota_exceeded` termination reason. Set to `0` to disable the limit. Defaults to `50MiB`.
 - `DSTACK_SERVER_S3_BUCKET`{ #DSTACK_SERVER_S3_BUCKET } - The bucket that repo diffs will be uploaded to if set. If unset, diffs are uploaded to the database.

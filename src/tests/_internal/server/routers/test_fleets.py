@@ -31,6 +31,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
+from dstack._internal.server import settings
 from dstack._internal.server.models import FleetModel, InstanceModel
 from dstack._internal.server.services import fleets as fleets_services
 from dstack._internal.server.services.fleets import fleet_model_to_fleet
@@ -1708,6 +1709,49 @@ class TestApplyFleetPlan:
             json={"plan": {"spec": spec.model_dump()}, "force": False},
         )
         assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_errors_if_fleets_per_project_limit_reached(
+        self, test_db, session: AsyncSession, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(settings, "SERVER_FLEETS_PER_PROJECT_LIMIT", 2)
+        user = await create_user(session, global_role=GlobalRole.ADMIN)
+        project = await create_project(session)
+        await create_fleet(session=session, project=project, name="fleet-1")
+        await create_fleet(
+            session=session, project=project, name="fleet-2", status=FleetStatus.TERMINATING
+        )
+        spec = get_fleet_spec(conf=get_fleet_configuration(name="fleet-3"))
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/apply",
+            headers=get_auth_headers(user.token),
+            json={"plan": {"spec": spec.model_dump()}, "force": False},
+        )
+        assert response.status_code == 400
+        assert "Project fleet limit reached (2)" in response.text
+        res = await session.execute(select(FleetModel))
+        assert len(res.scalars().all()) == 2
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_fleets_per_project_limit_ignores_deleted_and_other_projects_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(settings, "SERVER_FLEETS_PER_PROJECT_LIMIT", 1)
+        user = await create_user(session, global_role=GlobalRole.ADMIN)
+        project = await create_project(session, owner=user, name="project")
+        other_project = await create_project(session, owner=user, name="other-project")
+        await create_fleet(session=session, project=project, name="fleet-1", deleted=True)
+        await create_fleet(session=session, project=other_project, name="fleet-2")
+        spec = get_fleet_spec(conf=get_fleet_configuration(name="fleet-3"))
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/apply",
+            headers=get_auth_headers(user.token),
+            json={"plan": {"spec": spec.model_dump()}, "force": False},
+        )
+        assert response.status_code == 200
+        assert response.json()["name"] == "fleet-3"
 
 
 @pytest.fixture
