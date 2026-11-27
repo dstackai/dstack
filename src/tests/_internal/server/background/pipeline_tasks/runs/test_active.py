@@ -11,6 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.configurations import (
+    AnyRunConfiguration,
+    DevEnvironmentConfiguration,
     ScalingSpec,
     ServiceConfiguration,
     TaskConfiguration,
@@ -128,8 +130,46 @@ class TestRunActiveWorker:
         assert run.status == RunStatus.RUNNING
         assert run.lock_token is None
 
+    @pytest.mark.parametrize(
+        "configuration",
+        [
+            pytest.param(DevEnvironmentConfiguration(ide="vscode"), id="dev-environment"),
+            pytest.param(TaskConfiguration(commands=["echo task"]), id="task"),
+            pytest.param(
+                ServiceConfiguration(
+                    port=8080,
+                    commands=["echo service"],
+                    replicas=Range[int](min=2, max=2),
+                ),
+                id="replicated-service",
+            ),
+            pytest.param(
+                ServiceConfiguration.model_validate(
+                    {
+                        "type": "service",
+                        "port": 8080,
+                        "model": "test-model",
+                        "groups": [
+                            {"name": "worker", "replicas": 2, "commands": ["echo worker"]},
+                            {
+                                "name": "router",
+                                "replicas": 1,
+                                "router": {"type": "smg"},
+                                "commands": ["echo router"],
+                            },
+                        ],
+                    }
+                ),
+                id="router-service",
+            ),
+        ],
+    )
     async def test_does_not_postpone_running_job_processing(
-        self, test_db, session: AsyncSession, worker: RunWorker
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: RunWorker,
+        configuration: AnyRunConfiguration,
     ) -> None:
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -140,13 +180,26 @@ class TestRunActiveWorker:
             repo=repo,
             user=user,
             status=RunStatus.RUNNING,
+            run_spec=get_run_spec(repo_id=repo.name, configuration=configuration),
         )
-        job = await create_job(
-            session=session,
-            run=run,
-            status=JobStatus.RUNNING,
-            last_processed_at=get_current_datetime() - timedelta(minutes=1),
-        )
+        replica_groups: list[Optional[str]] = [None]
+        if isinstance(configuration, ServiceConfiguration):
+            replica_groups = [
+                group.name
+                for group in configuration.replica_groups
+                for _ in range(group.replicas.min or 0)
+            ]
+        jobs = [
+            await create_job(
+                session=session,
+                run=run,
+                status=JobStatus.RUNNING,
+                replica_num=replica_num,
+                replica_group_name=group_name,
+                last_processed_at=get_current_datetime() - timedelta(minutes=1),
+            )
+            for replica_num, group_name in enumerate(replica_groups)
+        ]
         lock_run(run)
         await session.commit()
 
@@ -160,8 +213,8 @@ class TestRunActiveWorker:
             lock_timeout=timedelta(seconds=30),
             heartbeater=Mock(),
         )
-        items = await fetcher.fetch(limit=1)
-        assert [item.id for item in items] == [job.id]
+        items = await fetcher.fetch(limit=len(jobs))
+        assert {item.id for item in items} == {job.id for job in jobs}
 
     async def test_terminates_run_when_all_jobs_done(
         self, test_db, session: AsyncSession, worker: RunWorker
@@ -1395,6 +1448,7 @@ class TestRunActiveWorker:
 
         await session.refresh(job)
         assert job.deployment_num == 1
+        assert job.last_processed_at == run.last_processed_at
 
     async def test_service_in_place_deployment_bump_on_cpu_arch_widening(
         self, test_db, session: AsyncSession, worker: RunWorker, image_config_mock
