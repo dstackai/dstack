@@ -157,6 +157,74 @@ class TestKubernetesConfigurator:
             KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
 
     @pytest.mark.usefixtures("get_clusters_mock")
+    def test_validate_config_valid_proxy_jump_image(self):
+        config = KubernetesBackendConfigWithCreds(
+            kubeconfig=KubeconfigConfig(data="mocked", filename="-"),
+            contexts=[
+                KubernetesContextConfig(
+                    name="ctx",
+                    proxy_jump=KubernetesProxyJumpConfig(
+                        image="registry.example.com:5000/sshd:1.0@sha256:" + "0" * 64
+                    ),
+                ),
+            ],
+        )
+        KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
+
+    @pytest.mark.usefixtures("get_clusters_mock")
+    @pytest.mark.parametrize(
+        ["proxy_jump", "expected_error"],
+        [
+            pytest.param(
+                KubernetesProxyJumpConfig(image=""),
+                "invalid proxy_jump.image value '': Invalid reference format",
+                id="empty",
+            ),
+            pytest.param(
+                KubernetesProxyJumpConfig(image="registry.example.com/SSHD:1.0"),
+                "invalid proxy_jump.image value 'registry.example.com/SSHD:1.0':"
+                " Invalid reference format",
+                id="uppercase-repository",
+            ),
+            pytest.param(
+                KubernetesProxyJumpConfig(image="sshd@sha256:" + "0" * 63),
+                f"invalid proxy_jump.image value 'sshd@sha256:{'0' * 63}':"
+                " Invalid sha256 digest: must be 64 lowercase hex digits",
+                id="short-digest",
+            ),
+        ],
+    )
+    def test_validate_config_invalid_proxy_jump_image(
+        self, proxy_jump: KubernetesProxyJumpConfig, expected_error: str
+    ):
+        config = KubernetesBackendConfigWithCreds(
+            kubeconfig=KubeconfigConfig(data="mocked", filename="-"),
+            proxy_jump=proxy_jump,
+            namespace="ns",
+        )
+        with pytest.raises(ServerClientError, match=re.escape(expected_error)):
+            KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
+
+    @pytest.mark.usefixtures("get_clusters_mock")
+    def test_validate_config_invalid_context_proxy_jump_image(self):
+        config = KubernetesBackendConfigWithCreds(
+            kubeconfig=KubeconfigConfig(data="mocked", filename="-"),
+            contexts=[
+                KubernetesContextConfig(
+                    name="ctx",
+                    proxy_jump=KubernetesProxyJumpConfig(image=" sshd"),
+                ),
+            ],
+        )
+        with pytest.raises(
+            ServerClientError,
+            match=re.escape(
+                "invalid proxy_jump.image value ' sshd' in context 'ctx': Invalid reference format"
+            ),
+        ):
+            KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
+
+    @pytest.mark.usefixtures("get_clusters_mock")
     def test_validate_config_valid_proxy_jump_placement(self):
         config = KubernetesBackendConfigWithCreds(
             kubeconfig=KubeconfigConfig(data="mocked", filename="-"),

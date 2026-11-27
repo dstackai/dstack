@@ -1078,6 +1078,11 @@ def _create_jump_pod_service_if_not_exists(
                                     requests=requests,
                                     limits=limits,
                                 ),
+                                # sshd must run as root, whatever the image's USER is
+                                security_context=client.V1SecurityContext(
+                                    run_as_user=0,
+                                    run_as_group=0,
+                                ),
                             )
                         ],
                         restart_policy=RestartPolicy.ALWAYS,
@@ -1329,10 +1334,12 @@ def _get_jump_pod_tolerations_from_node_taints(
 def _get_jump_pod_commands(authorized_keys: list[str]) -> list[str]:
     authorized_keys_content = "\n".join(authorized_keys)
     commands = [
-        "mkdir -p ~/.ssh",
-        "chmod 700 ~/.ssh",
-        f"echo {shlex.quote(authorized_keys_content)} > ~/.ssh/authorized_keys",
-        "chmod 600 ~/.ssh/authorized_keys",
+        # Not ~, which follows HOME, and the image may set HOME for its own user. sshd looks up
+        # authorized_keys in root's home directory from the user database, as ~root does
+        "mkdir -p ~root/.ssh",
+        "chmod 700 ~root/.ssh",
+        f"echo {shlex.quote(authorized_keys_content)} > ~root/.ssh/authorized_keys",
+        "chmod 600 ~root/.ssh/authorized_keys",
         # regenerate host keys
         "rm -rf /etc/ssh/ssh_host_*",
         "ssh-keygen -A > /dev/null",
@@ -1340,6 +1347,8 @@ def _get_jump_pod_commands(authorized_keys: list[str]) -> list[str]:
         (
             f"/usr/sbin/sshd -D -e -p {JUMP_POD_SSH_PORT}"
             " -o LogLevel=ERROR"
+            # The image's sshd_config may forbid root login, and clients log in as root
+            " -o PermitRootLogin=prohibit-password"
             " -o PasswordAuthentication=no"
             " -o AllowTcpForwarding=local"
         ),

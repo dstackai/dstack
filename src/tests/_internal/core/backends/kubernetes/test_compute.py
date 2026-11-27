@@ -276,8 +276,12 @@ class TestCreateJumpPodServiceIfNotExists:
         assert replica_set.spec.replicas == 1
         assert replica_set.spec.selector.match_labels == JUMP_POD_SELECTOR
         assert replica_set.spec.template.metadata.labels == JUMP_POD_LABELS
-        assert replica_set.spec.template.spec.containers[0].image == image
-        resources = replica_set.spec.template.spec.containers[0].resources
+        container = replica_set.spec.template.spec.containers[0]
+        assert container.image == image
+        # Root regardless of the image's USER
+        assert container.security_context.run_as_user == 0
+        assert container.security_context.run_as_group == 0
+        resources = container.resources
         # Equal CPU and memory requests and limits for the Guaranteed QoS class, and
         # an ephemeral-storage request without a limit
         assert resources.limits == {"cpu": cpu, "memory": memory}
@@ -318,11 +322,11 @@ class TestCreateJumpPodServiceIfNotExists:
     def test_sets_jump_pod_image(self):
         api, apps_api = self.make_apis()
 
-        self.call(api, apps_api, image="registry.example.com/sshd:1@sha256:" + "0" * 64)
+        image = "registry.example.com/sshd:1@sha256:" + "0" * 64
 
-        self.assert_replica_set_created(
-            apps_api, image="registry.example.com/sshd:1@sha256:" + "0" * 64
-        )
+        self.call(api, apps_api, image=image)
+
+        self.assert_replica_set_created(apps_api, image=image)
 
     def test_sets_jump_pod_resources(self):
         api, apps_api = self.make_apis()

@@ -1,6 +1,11 @@
 import pytest
 
-from dstack._internal.utils.docker import DockerImage, _is_host, parse_image_name
+from dstack._internal.utils.docker import (
+    DockerImage,
+    _is_host,
+    parse_image_name,
+    validate_image_name,
+)
 
 
 class TestParseImageName:
@@ -43,6 +48,50 @@ class TestParseImageName:
     )
     def test_parse(self, image: str, expected: DockerImage) -> None:
         assert parse_image_name(image) == expected
+
+
+class TestValidateImageName:
+    @pytest.mark.parametrize(
+        "image",
+        [
+            "ubuntu",
+            "ubuntu:22.04",
+            "dstackai/miniforge:py3.9-0.2",
+            "ghcr.io/dstackai/miniforge",
+            "localhost:5000/sshd:latest",
+            "Registry.Example.com/team/sshd",
+            "192.168.0.1:5000/sshd",
+            "[::1]:5000/sshd",
+            "my__org/ssh-d.server_1:v1.0_RC",
+            "sshd@sha256:" + "0" * 64,
+            "registry.example.com/sshd:1.0@sha512:" + "0" * 128,
+        ],
+    )
+    def test_valid(self, image: str) -> None:
+        validate_image_name(image)
+
+    @pytest.mark.parametrize(
+        ["image", "error"],
+        [
+            ("", "Invalid reference format"),
+            (" ubuntu", "Invalid reference format"),
+            ("Ubuntu", "Invalid reference format"),
+            ("ghcr.io/dstackai/Miniforge", "Invalid reference format"),
+            ("ubuntu:", "Invalid reference format"),
+            ("ubuntu:.22.04", "Invalid reference format"),
+            ("ubuntu:" + "1" * 129, "Invalid reference format"),
+            ("-ubuntu", "Invalid reference format"),
+            ("ubuntu//sshd", "Invalid reference format"),
+            ("ubuntu@sha256", "Invalid reference format"),
+            ("ubuntu@sha256:" + "0" * 31, "Invalid reference format"),
+            ("ubuntu@md5:" + "0" * 32, "Unsupported digest algorithm: md5"),
+            ("ubuntu@sha256:" + "0" * 63, "Invalid sha256 digest"),
+            ("ubuntu@sha256:" + "A" * 64, "Invalid sha256 digest"),
+        ],
+    )
+    def test_invalid(self, image: str, error: str) -> None:
+        with pytest.raises(ValueError, match=error):
+            validate_image_name(image)
 
 
 class TestIsHost:

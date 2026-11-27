@@ -1276,7 +1276,7 @@ projects:
         memory: 2Gi
     ```
 
-    Each SSH session through the jump pod takes about 2 MiB of memory. Each `dstack` server replica keeps at least one session open per running job, and each `dstack attach` adds one more. If the jump pod exceeds its memory limit, Kubernetes restarts it.
+    With the default image, each SSH session through the jump pod takes about 2 MiB of memory. Each `dstack` server replica keeps at least one session open per running job, and each `dstack attach` adds one more. If the jump pod exceeds its memory limit, Kubernetes restarts it.
 
     When the jump pod restarts or is recreated, its SSH sessions drop. The `dstack` server reconnects automatically, but `dstack attach` may fail for runs submitted before that. If reliable SSH access to runs is important, deploy [`dstack-sshproxy`](../guides/server-deployment.md#ssh-proxy).
 
@@ -1305,7 +1305,13 @@ projects:
         image: registry.example.com/sshd:1.0@sha256:...
     ```
 
-    The image must run OpenSSH `sshd` at `/usr/sbin/sshd` as root and provide `/bin/sh` and `ssh-keygen`: `dstack` writes the authorized keys, regenerates the host keys with `ssh-keygen -A`, and starts `sshd`. Pin the image by digest.
+    `dstack` runs the jump pod's container as root, writes root's authorized keys, regenerates the host keys with `ssh-keygen -A`, and starts `sshd` with `PermitRootLogin`, `PasswordAuthentication`, and `AllowTcpForwarding` overridden. The server then connects as root and runs a shell script that adds users' keys. Other `sshd_config` settings, e.g., ciphers and MACs, apply as set in the image. The image must provide:
+
+    - a `root` user with a POSIX login shell, e.g., `sh` or `bash`
+    - OpenSSH `sshd` at `/usr/sbin/sshd`
+    - `/bin/sh`, `ssh-keygen`, `mkdir`, `chmod`, `rm`, `touch`, `tail`, and `grep`
+
+    `dstack` doesn't pass registry credentials for the jump pod's image, so a private image can be pulled only if the nodes have credentials for the registry or the namespace's `default` service account has `imagePullSecrets`.
 
     !!! warning "Changing `image`, `cpu`, `memory`, `node_selector`, and `tolerations`"
         New values don't apply to an existing jump pod. To apply them, update the jump pod's ReplicaSet in the context's namespace and delete the pod so that Kubernetes recreates it:
