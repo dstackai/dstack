@@ -5,6 +5,24 @@ Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHIT
 `BACKENDS.md`, `ORPHAN-CLEANUP.md`, `GPUHUNT.md`, `PROXY.md`, `RUNNER-AND-SHIM.md`, `FRONTEND.md`,
 `DOCS.md`, `DEVELOPMENT.md`, `RELEASE.md`.
 
+## Development principles
+
+These principles must be followed when implementing or changing anything in this repo.
+
+1. When it comes to implementation, simplicity is a priority. Aim for the simplest and smallest solutions where possible.
+2. The repo has very strong conventions over how code and documentation are written. This includes design approaches, interface approaches, models, level of verbosity, etc.
+3. When it comes to documentation or comments, we always aim for a minimal but very clear and explicit style. Explicitness doesn't mean verbosity or a "defensive approach". Specifics mean explaining the main point simply and clearly - focusing on the main point, what, why, etc.
+4. If the contract of a method or a class is unclear from the code, it must be documented, but the documentation's purpose is not verbosity or repeating the obvious but explaining the context of the contract: who invokes this and why, and what is special about this function or method, etc. Simple and clear inline comments are also helpful, especially if they are implementation-specific (not contract-specific).
+5. We aim to keep the codebase small or at least keep it from exploding in size.
+6. We constantly try to remove tests that are not needed, tests that overlap, or tests that are not for the most essential cases. Add only the tests that are essential and actually needed, never tests for their own sake.
+7. Clear and simple contracts are a top priority (again, learn from the codebase). Never mess up a contract, whether of a method or of a component. If a contract becomes weak or is changed during the implementation, this must be explicitly escalated.
+8. We aim at organizing the code so its components are cohesive, without unnecessary coupling.
+9. We aim at using strong types, and it's one of the pillars (along with simple and clear contracts). Untyped structures or weak contracts significantly hurt the codebase and must be avoided.
+10. The agent should not speak or introduce new "terms" (or "concepts") that are not conventional to dstack unless it's required to improve the codebase or design; in this case, this must be explicitly escalated.
+11. If there is an issue in the design or implementation, it must be escalated explicitly and never hidden.
+12. One of the biggest requirements is that any new code or documentation should stay conventional. Exceptions must be explicitly escalated. Conventionalism goes in all directions, including the level of verbosity, how the code is organized, how the documentation is organized, etc. Follow the code structure and naming of the dstack repos.
+13. While conventionalism is important, the agent should strive to improve the baseline, but only within the scope of the changes.
+
 ## Project Structure & Module Organization
 - Core Python package lives in `src/dstack`; internal modules (including server) sit under `_internal`, API surfaces under `api`, and plugin integrations under `plugins`.
 - Tests reside in `src/tests` and mirror package paths; add new suites alongside the code they cover.
