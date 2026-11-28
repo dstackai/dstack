@@ -82,6 +82,8 @@ _DEFAULT_MAX_OFFERS = 50
 # they grow linearly with the number of fleets.
 _PER_FLEET_MAX_OFFERS = 100
 
+_FleetOfferQueryKey = tuple[uuid.UUID, Hashable, Hashable, Hashable]
+
 
 async def get_job_plans(
     session: AsyncSession,
@@ -782,6 +784,7 @@ async def _get_backend_offers_in_fleet(
     max_offers: Optional[int] = None,
     full_offers: bool = False,
     unallocated_resources: bool = False,
+    seen_queries: Optional[set[_FleetOfferQueryKey]] = None,
 ) -> list[InstanceOfferWithAvailability]:
     if fleet_spec is None:
         fleet_spec = get_fleet_spec(fleet_model)
@@ -793,37 +796,52 @@ async def _get_backend_offers_in_fleet(
             fleet_spec=fleet_spec,
         )
     except ValueError:
-        backend_offers = []
-    else:
-        # Master job offers must be in the same cluster as existing instances.
-        master_instance_provisioning_data = get_fleet_master_instance_provisioning_data(
-            fleet_model=fleet_model,
-            fleet_spec=fleet_spec,
+        return []
+
+    # Master job offers must be in the same cluster as existing instances.
+    master_instance_provisioning_data = get_fleet_master_instance_provisioning_data(
+        fleet_model=fleet_model,
+        fleet_spec=fleet_spec,
+    )
+    query_key = None
+    if seen_queries is not None:
+        # All other query parameters are fixed for this job's fleet offer collection.
+        query_key = (
+            fleet_model.project_id,
+            _freeze_offer_identity_value(profile.model_dump()),
+            _freeze_offer_identity_value(requirements.model_dump()),
+            _freeze_offer_identity_value(master_instance_provisioning_data.model_dump())
+            if master_instance_provisioning_data is not None
+            else None,
         )
-        # Handle multinode for old jobs that don't have requirements.multinode set.
-        # TODO: Drop multinode param.
-        multinode = requirements.multinode or is_multinode_job(job)
-        # Offers come from the fleet's project backends, which differ from
-        # the run's project backends if the fleet is imported.
-        async with backends_cache.lease_project_backends(fleet_model.project) as backends:
-            backends_with_offers = await get_offers_by_requirements(
-                backends=backends,
-                profile=profile,
-                requirements=requirements,
-                multinode=multinode,
-                master_job_provisioning_data=master_instance_provisioning_data,
-                volumes=volumes,
-                privileged=job.job_spec.privileged,
-                instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
-                create_instance_support=new_instances_in_fleet_require_create_instance_support(
-                    fleet_model, job_project_id=project.id
-                ),
-                max_offers=max_offers,
-                full_offers=full_offers,
-                unallocated_resources=unallocated_resources,
-            )
-        backend_offers = [offer for _, offer in backends_with_offers]
-    return backend_offers
+        if query_key in seen_queries:
+            return []
+
+    # Handle multinode for old jobs that don't have requirements.multinode set.
+    # TODO: Drop multinode param.
+    multinode = requirements.multinode or is_multinode_job(job)
+    # Offers come from the fleet's project backends, which differ from
+    # the run's project backends if the fleet is imported.
+    async with backends_cache.lease_project_backends(fleet_model.project) as backends:
+        backends_with_offers = await get_offers_by_requirements(
+            backends=backends,
+            profile=profile,
+            requirements=requirements,
+            multinode=multinode,
+            master_job_provisioning_data=master_instance_provisioning_data,
+            volumes=volumes,
+            privileged=job.job_spec.privileged,
+            instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+            create_instance_support=new_instances_in_fleet_require_create_instance_support(
+                fleet_model, job_project_id=project.id
+            ),
+            max_offers=max_offers,
+            full_offers=full_offers,
+            unallocated_resources=unallocated_resources,
+        )
+    if seen_queries is not None and query_key is not None:
+        seen_queries.add(query_key)
+    return [offer for _, offer in backends_with_offers]
 
 
 async def _get_pool_offers(
@@ -933,11 +951,11 @@ async def get_backend_offers_in_run_candidate_fleets(
         run_model=None,
         run_spec=run_spec,
     )
-    seen_offer_identities = set()
+    seen_queries: set[_FleetOfferQueryKey] = set()
+    seen_offer_identities: set[Hashable] = set()
     offers: list[InstanceOfferWithAvailability] = []
     for candidate_fleet_model in candidate_fleet_models:
-        offers_from_fleet = []
-        for offer in await _get_backend_offers_in_fleet(
+        offers_from_fleet = await _get_backend_offers_in_fleet(
             project=project,
             fleet_model=candidate_fleet_model,
             run_spec=run_spec,
@@ -946,12 +964,12 @@ async def get_backend_offers_in_run_candidate_fleets(
             max_offers=max_offers_per_fleet,
             full_offers=full_offers,
             unallocated_resources=unallocated_resources,
-        ):
-            offer_identity = _get_backend_offer_identity(offer)
-            if offer_identity not in seen_offer_identities:
-                offers_from_fleet.append(offer)
-                seen_offer_identities.add(offer_identity)
-        offers = list(heapq.merge(offers, offers_from_fleet, key=lambda o: o.price))
+            seen_queries=seen_queries,
+        )
+        if offers_from_fleet:
+            offers = await common_utils.run_async(
+                _merge_backend_offers, offers, offers_from_fleet, seen_offer_identities
+            )
     return offers
 
 
@@ -999,11 +1017,8 @@ async def get_offers_in_run_candidate_fleets(
     if skip_backend_offers:
         backend_offers = []
     else:
-        # TODO: Intentionally pass `max_offers_per_fleet=None` here. `dstack offer --fleet ...`
-        # is expected to return the exact `total_offers`, so capping backend offers per selected
-        # fleet would make that total approximate. We already deduplicate identical backend offers
-        # while merging selected fleets via `_get_backend_offer_identity()`. Revisit adding a cap
-        # only if this path causes real performance or memory problems.
+        # `dstack offer --fleet ...` needs the exact number of unique offers. Keep each query
+        # uncapped so `_get_job_plan()` can calculate the total before limiting the returned list.
         backend_offers = await get_backend_offers_in_run_candidate_fleets(
             session=session,
             project=project,
@@ -1015,6 +1030,22 @@ async def get_offers_in_run_candidate_fleets(
             unallocated_resources=unallocated_resources,
         )
     return instance_offers, backend_offers
+
+
+def _merge_backend_offers(
+    offers: list[InstanceOfferWithAvailability],
+    offers_from_fleet: list[InstanceOfferWithAvailability],
+    seen_offer_identities: set[Hashable],
+) -> list[InstanceOfferWithAvailability]:
+    unique_offers = []
+    for offer in offers_from_fleet:
+        offer_identity = _get_backend_offer_identity(offer)
+        if offer_identity not in seen_offer_identities:
+            unique_offers.append(offer)
+            seen_offer_identities.add(offer_identity)
+    if not unique_offers:
+        return offers
+    return list(heapq.merge(offers, unique_offers, key=lambda offer: offer.price))
 
 
 def _get_backend_offer_identity(offer: InstanceOfferWithAvailability) -> Hashable:

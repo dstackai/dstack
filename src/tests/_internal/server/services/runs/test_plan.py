@@ -1,4 +1,6 @@
 import copy
+import threading
+from collections.abc import Hashable
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -14,7 +16,10 @@ from dstack._internal.core.models.configurations import (
     TaskConfiguration,
 )
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
-from dstack._internal.core.models.instances import InstanceAvailability
+from dstack._internal.core.models.instances import (
+    InstanceAvailability,
+    InstanceOfferWithAvailability,
+)
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
     FleetInstanceSelector,
@@ -190,6 +195,84 @@ class TestGetJobPlansBackendOffers:
         assert len(job_plans) == 1
         assert job_plans[0].total_offers == 1
         assert job_plans[0].offers == [instance_offer]
+
+
+class TestGetJobPlansFleetOffers:
+    @pytest.mark.windows
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_reuses_identical_queries_and_reports_exact_totals(
+        self, test_db, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        await create_fleet(session=session, project=project, name="first")
+        await create_fleet(session=session, project=project, name="second")
+        await create_fleet(
+            session=session,
+            project=project,
+            name="regional",
+            spec=get_fleet_spec(profile=Profile(regions=["us-west"])),
+        )
+        exporter = await create_project(session=session, owner=user, name="exporter")
+        imported_fleet = await create_fleet(session=session, project=exporter, name="remote")
+        await create_export(
+            session=session,
+            exporter_project=exporter,
+            importer_projects=[project],
+            exported_fleets=[imported_fleet],
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                image="scratch",
+                user="root",
+                commands=[":"],
+                fleets=["first", "second", "regional", "exporter/remote"],
+            ),
+        )
+
+        backend = Mock(TYPE=BackendType.AWS)
+        offers = [
+            get_instance_offer_with_availability(price=float(price)) for price in range(1, 13)
+        ]
+        regional_offer = get_instance_offer_with_availability(region="us-west", price=99.0)
+        imported_offer = get_instance_offer_with_availability(price=50.0)
+
+        async def get_offers(profile: Profile, create_instance_support: bool, **kwargs):
+            if create_instance_support:
+                matching_offers = [offers[0].model_copy(deep=True), imported_offer]
+            else:
+                matching_offers = [regional_offer] if profile.regions else offers
+            return [(backend, offer) for offer in matching_offers]
+
+        get_offers_mock = AsyncMock(side_effect=get_offers)
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan.get_offers_by_requirements",
+            get_offers_mock,
+        )
+        monkeypatch.setattr(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend]),
+        )
+
+        for expected_queries in (3, 6):
+            [job_plan] = await get_job_plans(
+                session=session,
+                project=project,
+                run_spec=run_spec,
+                max_offers=10,
+                full_offers=False,
+                unallocated_resources=False,
+                for_offers_only=True,
+            )
+
+            assert job_plan.offers == offers[:10]
+            assert job_plan.total_offers == 14
+            assert job_plan.max_price == 99.0
+            assert get_offers_mock.await_count == expected_queries
+        assert all(call.kwargs["max_offers"] is None for call in get_offers_mock.await_args_list)
 
 
 class TestGetJobPlansNodeGroups:
@@ -836,6 +919,47 @@ class TestGetTargetedInstanceOffers:
 
 
 class TestGetBackendOffersInRunCandidateFleets:
+    @pytest.mark.windows
+    @pytest.mark.asyncio
+    async def test_deduplicates_offers_off_the_event_loop(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        first = get_instance_offer_with_availability(price=2.0)
+        duplicate = first.model_copy(deep=True)
+        different = first.model_copy(update={"availability": InstanceAvailability.UNKNOWN})
+        cheapest = get_instance_offer_with_availability(price=1.0)
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan._select_candidate_fleet_models",
+            AsyncMock(return_value=[Mock(), Mock()]),
+        )
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan._get_backend_offers_in_fleet",
+            AsyncMock(side_effect=[[first], [cheapest, duplicate, different]]),
+        )
+        event_loop_thread_id = threading.get_ident()
+        identity_thread_ids: set[int] = set()
+
+        def record_offer_identity(offer: InstanceOfferWithAvailability) -> Hashable:
+            identity_thread_ids.add(threading.get_ident())
+            return _get_backend_offer_identity(offer)
+
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan._get_backend_offer_identity",
+            record_offer_identity,
+        )
+
+        offers = await get_backend_offers_in_run_candidate_fleets(
+            session=Mock(),
+            project=Mock(),
+            run_spec=get_run_spec(repo_id="test-repo"),
+            job=Mock(),
+            volumes=None,
+        )
+
+        assert offers == [cheapest, first, different]
+        assert identity_thread_ids
+        assert event_loop_thread_id not in identity_thread_ids
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_skips_backend_offers_when_instances_specified(
