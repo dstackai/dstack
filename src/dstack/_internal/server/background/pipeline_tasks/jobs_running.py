@@ -137,7 +137,9 @@ logger = get_logger(__name__)
 
 JOB_STATUSES_WITH_MIN_PROCESSING_INTERVAL = [JobStatus.PROVISIONING, JobStatus.PULLING]
 
-JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(minutes=2)
+JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(
+    seconds=server_settings.SERVER_JOB_DISCONNECTED_RETRY_TIMEOUT_SECONDS
+)
 """`The minimum time before terminating active job in case of connectivity issues."""
 
 MAX_DURATION_ENFORCEMENT_GRACE = timedelta(minutes=2)
